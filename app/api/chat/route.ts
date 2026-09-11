@@ -6,6 +6,8 @@ import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** Vercel 函数最长执行时间（Hobby 60s 上限，Pro 可到 300s） */
+export const maxDuration = 60;
 
 /** 允许通过该代理访问的模型（防止被当成任意 OpenAI 代理滥用） */
 interface ChatRequestBody {

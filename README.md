@@ -9,6 +9,31 @@
 
 ---
 
+## 🚀 部署（不会代码也能做）
+
+👉 **请看：[Vercel小白部署教程.md](./Vercel小白部署教程.md)** —— 全程点点点，10 分钟上线。
+
+简要版 5 步：
+
+1. **建数据库**：[console.upstash.com](https://console.upstash.com/) → Create Database（选 Regional + 近的地区，免费）→ 复制 **REST API** 区里的 `UPSTASH_REDIS_REST_URL` 和 `UPSTASH_REDIS_REST_TOKEN`
+2. **导入项目**：[vercel.com](https://vercel.com/) → Add New → Project → Import `AlotofSkymoon/agnes-chat`（框架自动识别 Next.js，其余全部默认）
+3. **填 4 个环境变量**：
+
+   | Key | Value |
+   | --- | --- |
+   | `UPSTASH_REDIS_REST_URL` | 第 1 步复制的 URL |
+   | `UPSTASH_REDIS_REST_TOKEN` | 第 1 步复制的 TOKEN |
+   | `SESSION_SECRET` | 任意长随机串 |
+   | `PRESET_AGNES_API_KEY` | 站点内置 Key（见 `.env.example`） |
+
+4. **点 Deploy**，等 1～3 分钟出彩带就成功了
+5. **注册第一个账号** → 自动成为管理员 → 右上角盾牌进 `/admin`
+
+> ⚠️ 改了环境变量后必须 **Redeploy** 才生效。
+> ⚠️ 复制的一定是带 **REST** 字样的两个值，不是 `UPSTASH_REDIS_URL`。
+
+---
+
 ## 一、本地运行
 
 ```bash
@@ -28,57 +53,7 @@ npm run dev
 
 ---
 
-## 二、Upstash Redis 创建步骤
-
-1. 打开 https://console.upstash.com/ ，注册 / 登录（可用 GitHub 登录）。
-2. 点击右上角 **Create Database**。
-3. 配置：
-   - **Name**：任意，如 `agnes-ai-chat`
-   - **Type**：`Regional`
-   - **Region**：选离你用户最近的，推荐 `ap-southeast-1`（新加坡）或 `us-east-1`
-   - **Eviction**：保持默认
-   - 免费额度足够个人公益项目使用（10 万次命令/天）
-4. 创建完成后进入数据库详情页，找到 **REST API** 区域。
-5. 复制两个值，稍后填到 Vercel：
-   - `UPSTASH_REDIS_REST_URL`（形如 `https://xxxx.upstash.io`）
-   - `UPSTASH_REDIS_REST_TOKEN`
-
-⚠️ 注意复制的是 **REST** 的 URL / TOKEN，不是 `UPSTASH_REDIS_URL`（那个是 TCP 连接用的）。
-
----
-
-## 三、Vercel 环境变量配置步骤
-
-1. 把代码推到 GitHub（或在 Vercel 直接导入本目录）。
-2. 打开 https://vercel.com/new ，导入仓库。
-3. **Framework Preset** 会自动识别为 `Next.js`，无需改动，**不要**填 Build Command。
-4. 展开 **Environment Variables**，逐个添加：
-
-| Key | 值 | 说明 |
-| --- | --- | --- |
-| `UPSTASH_REDIS_REST_URL` | `https://xxxx.upstash.io` | Upstash 控制台 REST API 区域 |
-| `UPSTASH_REDIS_REST_TOKEN` | `AXxxASQ...` | Upstash REST TOKEN |
-| `SESSION_SECRET` | 任意长随机串 | `openssl rand -base64 32` 生成 |
-| `PRESET_AGNES_API_KEY` | `sk-...` | 站点内置 Key，只存在服务端 |
-
-5. 三个环境（Production / Preview / Development）都勾上，点 **Add**。
-6. 点 **Deploy**。
-
-> 改了环境变量后需要 **Redeploy** 才生效。
-
----
-
-## 四、Vercel 部署说明
-
-- 构建命令：`next build`（自动），输出目录 `.next`（自动）。
-- 聊天接口 `/api/chat` 是 **Edge 无关的 Node.js Runtime**，SSE 流式在 Vercel 上正常透传（已加 `X-Accel-Buffering: no`）。
-- **Serverless 函数默认最长执行时间**：Hobby 计划 10s / Pro 60s。本项目是流式输出，每个 chunk 都会刷新，不会被单次超时卡死；超长回答受上游限制。
-- 所有 Redis 操作都在服务端 API Route 内完成，浏览器永远拿不到 TOKEN。
-- 建议部署后在 `/register` 第一个注册的账号即管理员，之后可在 `/admin` 管理用户、查看内置 Key。
-
----
-
-## 五、路由一览
+## 二、路由一览
 
 | 路由 | 说明 |
 | --- | --- |
@@ -99,7 +74,7 @@ npm run dev
 
 ---
 
-## 六、Redis 数据结构
+## 三、Redis 数据结构
 
 | Key | 类型 | 说明 |
 | --- | --- | --- |
@@ -114,7 +89,7 @@ npm run dev
 
 ---
 
-## 七、安全说明
+## 四、安全说明
 
 - 密码：bcrypt hash（cost 10），绝不明文存储。
 - Session：32 字节随机数，Cookie `httpOnly + secure + sameSite=lax`，TTL 7 天。
@@ -125,7 +100,17 @@ npm run dev
 
 ---
 
-## 八、不实现的功能
+## 五、Vercel 技术备注
+
+- 构建命令 `next build`、输出目录 `.next` 都由 Vercel 自动识别，无需配置。
+- 聊天接口 `/api/chat` 为 Node.js Runtime + SSE 流式，已设置 `maxDuration = 60` 与 `X-Accel-Buffering: no`。
+- 字体使用系统字体栈（Inter 优先），构建过程不访问外部网络，部署更稳。
+- 所有 Redis 操作都在服务端 API Route 内完成，浏览器永远拿不到 TOKEN。
+- 代码推到 GitHub 后 Vercel 会自动重新部署。
+
+---
+
+## 六、不实现的功能
 
 Agent、工具调用、联网搜索、代码执行、文件上传、语音、多模态 —— 只做纯文本聊天。
 需要 Agent 功能请去 **AgentScope** 添加 Agnes API Key。
