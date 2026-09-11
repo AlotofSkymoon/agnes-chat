@@ -24,6 +24,16 @@ const config: Config = {
         ],
       },
       colors: {
+        brand: {
+          DEFAULT: "#4D6BFE",
+          hover: "#3757E4",
+          light: "#EDF1FF",
+          dark: "#2E45C4",
+        },
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar))",
+          foreground: "hsl(var(--sidebar-foreground))",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

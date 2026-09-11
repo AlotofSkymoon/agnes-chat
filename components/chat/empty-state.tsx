@@ -1,48 +1,60 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import { AgnesIcon } from "@/components/agnes-logo";
+import { useTheme } from "@/components/theme-provider";
+import { Moon, Sun } from "lucide-react";
 
 const SUGGESTIONS = [
-  "帮我写一段自我介绍",
-  "用通俗的话解释什么是向量数据库",
-  "帮我润色这段邮件",
-  "写一个 Python 快速排序",
+  { title: "帮我写一段自我介绍", sub: "简洁、有记忆点" },
+  { title: "用通俗的话解释向量数据库", sub: "并举一个例子" },
+  { title: "帮我润色这段邮件", sub: "更专业得体" },
+  { title: "写一个 Python 快速排序", sub: "带注释" },
 ];
 
-export function EmptyState({ onPick, onStart }: { onPick: (text: string) => void; onStart: () => void }) {
+export function EmptyState({ onPick }: { onPick: (text: string) => void }) {
+  const { theme, toggleTheme } = useTheme();
+
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center px-6 text-center">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl brand-gradient shadow-2xl shadow-primary/30">
-        <Sparkles className="h-8 w-8 text-primary-foreground" />
+    <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-5">
+      {/* 主题切换（空状态时放在右上角） */}
+      <div className="flex w-full justify-end">
+        <button
+          onClick={toggleTheme}
+          className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          title={theme === "dark" ? "切换到浅色" : "切换到深色"}
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
       </div>
-      <h1 className="bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl">
-        Agnes AI 免费试用
-      </h1>
-      <p className="mt-3 text-sm text-muted-foreground sm:text-base">仅聊天，无 Agent 功能</p>
 
-      <Button size="lg" className="mt-8" onClick={onStart}>
-        <Sparkles className="h-4 w-4" />
-        开始聊天
-      </Button>
+      {/* 主标题区 */}
+      <div className="mt-4 flex flex-col items-center text-center">
+        <span className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#4D6BFE] to-[#7B8CFF] p-3 text-white shadow-lg shadow-[#4D6BFE]/25">
+          <AgnesIcon />
+        </span>
+        <h1 className="text-[26px] font-semibold tracking-tight sm:text-[30px]">
+          我是 Agnes，很高兴见到你！
+        </h1>
+        <p className="mt-2.5 text-[15px] text-muted-foreground">有什么可以帮到你？</p>
+        <p className="mt-3 inline-flex items-center rounded-full border border-border bg-muted/50 px-3 py-1 text-xs text-muted-foreground">
+          仅聊天，无 Agent 功能
+        </p>
+      </div>
 
-      <div className="mt-10 grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
+      {/* 推荐问题 */}
+      <div className="mt-10 grid w-full grid-cols-1 gap-2.5 sm:grid-cols-2">
         {SUGGESTIONS.map((s) => (
           <button
-            key={s}
+            key={s.title}
             type="button"
-            onClick={() => onPick(s)}
-            className="rounded-xl border border-border/70 bg-card/50 px-4 py-3 text-left text-sm text-muted-foreground transition-all hover:border-primary/40 hover:bg-accent hover:text-foreground"
+            onClick={() => onPick(s.title)}
+            className="group rounded-xl border border-border bg-card px-4 py-3 text-left transition-all hover:border-primary/50 hover:bg-accent/60"
           >
-            {s}
+            <span className="block text-sm font-medium text-foreground">{s.title}</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">{s.sub}</span>
           </button>
         ))}
       </div>
-
-      <p className="mt-8 text-xs text-muted-foreground">
-        纯文本聊天 · 聊天记录默认只保存在你的浏览器本地
-      </p>
     </div>
   );
 }

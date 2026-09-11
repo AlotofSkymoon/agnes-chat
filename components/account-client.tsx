@@ -84,8 +84,15 @@ export function AccountClient({ user }: { user: AccountUser }) {
   }
 
   function clearLocalHistory() {
-    localStorage.removeItem(LS_KEYS.messages);
-    toast.success("已清空本地聊天记录");
+    try {
+      // 清空所有本地会话（历史列表 + 每个会话的消息）
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("agnes:msgs:") || k === "agnes:conversations")
+        .forEach((k) => localStorage.removeItem(k));
+      toast.success("已清空本地聊天记录");
+    } catch {
+      toast.error("清空失败");
+    }
   }
 
   return (

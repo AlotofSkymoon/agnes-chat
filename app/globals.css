@@ -4,48 +4,65 @@
 
 @layer base {
   :root {
+    /* DeepSeek 风格：浅色优先，品牌蓝 #4D6BFE */
     --background: 0 0% 100%;
-    --foreground: 240 10% 4%;
+    --foreground: 220 12% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 4%;
+    --card-foreground: 220 12% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 4%;
-    --primary: 262 83% 58%;
+    --popover-foreground: 220 12% 12%;
+    --primary: 230 99% 65%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
-    --accent: 262 83% 96%;
-    --accent-foreground: 262 60% 30%;
+    --secondary: 228 60% 97%;
+    --secondary-foreground: 228 20% 30%;
+    --muted: 228 40% 97%;
+    --muted-foreground: 220 8% 52%;
+    --accent: 228 100% 97%;
+    --accent-foreground: 230 60% 42%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 262 83% 58%;
+    --border: 228 20% 91%;
+    --input: 228 20% 91%;
+    --ring: 230 99% 65%;
+
     --radius: 0.85rem;
+
+    /* 侧边栏 */
+    --sidebar: 228 33% 98%;
+    --sidebar-foreground: 220 12% 20%;
+
+    /* 助手消息区 */
+    --assistant-bubble: 0 0% 100%;
+    /* 用户气泡 */
+    --user-bubble: 228 100% 97%;
   }
 
   .dark {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 8% 7%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 8% 7%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 263 90% 66%;
+    --background: 0 0% 11%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 14%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 15%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 230 99% 68%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 13%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 5% 13%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 263 40% 18%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 63% 45%;
+    --secondary: 0 0% 18%;
+    --secondary-foreground: 0 0% 92%;
+    --muted: 0 0% 17%;
+    --muted-foreground: 220 8% 62%;
+    --accent: 230 40% 22%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 0 63% 48%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5% 16%;
-    --input: 240 5% 18%;
-    --ring: 263 90% 66%;
+    --border: 0 0% 20%;
+    --input: 0 0% 22%;
+    --ring: 230 99% 68%;
+
+    --sidebar: 0 0% 9%;
+    --sidebar-foreground: 0 0% 88%;
+
+    --assistant-bubble: 0 0% 11%;
+    --user-bubble: 230 30% 22%;
   }
 
   * {
@@ -54,7 +71,6 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "cv11", "ss01";
   }
 
   html {
@@ -63,85 +79,74 @@
 }
 
 @layer components {
-  /* 顶部渐变装饰光 */
-  .aurora {
-    background-image: radial-gradient(
-        ellipse 80% 60% at 50% -10%,
-        hsl(263 90% 60% / 0.28),
-        transparent 60%
-      ),
-      radial-gradient(ellipse 60% 50% at 90% 10%, hsl(217 91% 60% / 0.18), transparent 60%);
-  }
-
-  .glass {
-    @apply border border-white/10 bg-white/60 backdrop-blur-xl dark:bg-white/[0.04];
-  }
-
   .brand-gradient {
-    background-image: linear-gradient(100deg, hsl(263 90% 66%), hsl(217 91% 60%), hsl(263 90% 66%));
+    background-image: linear-gradient(100deg, hsl(230 99% 62%), hsl(240 90% 70%));
     background-size: 200% 100%;
   }
 }
 
 /* 滚动条 */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.25);
+  background: hsl(var(--muted-foreground) / 0.28);
   border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.45);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* -------- Markdown / 代码高亮（highlight.js github-dark 简化主题） -------- */
+/* -------- Markdown / 代码高亮 -------- */
 .markdown-body {
-  @apply text-[15px] leading-7;
+  @apply text-[15px] leading-[1.75];
 }
 .markdown-body > * + * {
   @apply mt-3;
 }
 .markdown-body h1 {
-  @apply mt-5 text-xl font-semibold;
+  @apply mt-6 text-xl font-semibold;
 }
 .markdown-body h2 {
-  @apply mt-5 text-lg font-semibold;
+  @apply mt-6 text-lg font-semibold;
 }
 .markdown-body h3 {
-  @apply mt-4 text-base font-semibold;
+  @apply mt-5 text-base font-semibold;
 }
 .markdown-body p {
   @apply whitespace-pre-wrap break-words;
 }
 .markdown-body ul {
-  @apply list-disc space-y-1 pl-5;
+  @apply list-disc space-y-1 pl-6;
 }
 .markdown-body ol {
-  @apply list-decimal space-y-1 pl-5;
+  @apply list-decimal space-y-1 pl-6;
 }
 .markdown-body a {
   @apply text-primary underline underline-offset-2;
 }
 .markdown-body blockquote {
-  @apply border-l-2 border-primary/50 pl-3 italic text-muted-foreground;
+  @apply border-l-[3px] border-primary/40 pl-3 italic text-muted-foreground;
 }
 .markdown-body table {
   @apply w-full border-collapse overflow-hidden rounded-lg text-sm;
 }
 .markdown-body th,
 .markdown-body td {
-  @apply border border-border px-2 py-1 text-left;
+  @apply border border-border px-2.5 py-1.5 text-left;
 }
 .markdown-body th {
-  @apply bg-muted/60 font-semibold;
+  @apply bg-muted/70 font-semibold;
 }
 .markdown-body code:not(pre code) {
-  @apply rounded bg-muted px-1.5 py-0.5 text-[13px] font-medium text-foreground;
+  @apply rounded-md bg-muted px-1.5 py-0.5 text-[13px] font-medium;
 }
 .markdown-body pre {
-  @apply overflow-x-auto rounded-xl border border-white/10 bg-[#0b0b12] p-3 text-[13px] leading-6;
+  @apply overflow-x-auto rounded-xl border border-border bg-[#0f1117] p-3.5 text-[13px] leading-6 dark:bg-[#0a0a0a];
 }
 .markdown-body pre code {
   @apply bg-transparent p-0 text-[13px];
@@ -149,34 +154,34 @@
 
 .hljs-comment,
 .hljs-quote {
-  color: #8b93a7;
+  color: #7d8590;
 }
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-literal {
-  color: #c792ea;
+  color: #ff7b72;
 }
 .hljs-string,
 .hljs-doctag {
-  color: #a5e844;
+  color: #a5d6ff;
 }
 .hljs-number,
 .hljs-symbol {
-  color: #f78c6c;
+  color: #79c0ff;
 }
 .hljs-title,
 .hljs-name,
 .hljs-function .hljs-title {
-  color: #82aaff;
+  color: #d2a8ff;
 }
 .hljs-attr,
 .hljs-attribute {
-  color: #ffcb6b;
+  color: #ffca85;
 }
 .hljs-built_in,
 .hljs-type {
-  color: #7fdbca;
+  color: #7ee787;
 }
 .hljs-tag {
-  color: #ff5874;
+  color: #ff7b72;
 }
