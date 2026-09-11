@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser, requireAdmin } from "@/lib/auth";
-import { getRedis, hasRedisConfig, hgetAll, KEYS } from "@/lib/redis";
+import { getRedis, hasRedisConfig, hgetAll, KEYS, listKeys } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export async function GET() {
     if (!hasRedisConfig()) return NextResponse.json({ error: "服务端未配置 Redis" }, { status: 500 });
 
     const redis = getRedis();
-    const keys = (await redis.keys("user:*")) ?? [];
+    const keys = await listKeys("user:*");
     const userKeys = keys.filter((k) => !k.startsWith("user:email:") && !k.startsWith("user:sessions:"));
 
     const users = await Promise.all(

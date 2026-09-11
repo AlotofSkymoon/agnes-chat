@@ -62,3 +62,24 @@ export async function hgetAll<T>(key: string): Promise<T | null> {
   const raw = await redis.hgetall<Record<string, unknown>>(key);
   return (raw as unknown as T | null) ?? null;
 }
+
+/** get 的类型安全封装 */
+export async function getValue<T = string>(key: string): Promise<T | null> {
+  const redis = getRedis();
+  const raw = await redis.get<unknown>(key);
+  return (raw as T | null) ?? null;
+}
+
+/** smembers 的类型安全封装（Upstash 的 smembers<TData extends unknown[]> 约束会导致 string 报错） */
+export async function setMembers(key: string): Promise<string[]> {
+  const redis = getRedis();
+  const raw = await redis.smembers<unknown[]>(key);
+  return ((raw ?? []) as unknown as string[]) ?? [];
+}
+
+/** keys 的类型安全封装 */
+export async function listKeys(pattern: string): Promise<string[]> {
+  const redis = getRedis();
+  const raw = await redis.keys(pattern);
+  return ((raw ?? []) as unknown as string[]) ?? [];
+}

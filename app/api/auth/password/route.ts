@@ -9,7 +9,7 @@ import {
   verifyPassword,
   type UserRecord,
 } from "@/lib/auth";
-import { getRedis, hasRedisConfig, hgetAll, KEYS } from "@/lib/redis";
+import { getRedis, getValue, hasRedisConfig, hgetAll, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const sessionId = readSessionIdFromCookie();
     if (!sessionId) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
-    const userId = await redis.get<string>(KEYS.session(sessionId));
+    const userId = await getValue<string>(KEYS.session(sessionId));
     if (!userId) return NextResponse.json({ error: "登录已失效，请重新登录" }, { status: 401 });
 
     const user = await hgetAll<UserRecord>(KEYS.user(userId));

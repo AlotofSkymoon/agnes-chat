@@ -8,7 +8,7 @@ import {
   setSessionCookie,
   toSafeUser,
 } from "@/lib/auth";
-import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
+import { getRedis, getValue, hasRedisConfig, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const redis = getRedis();
 
     // 1) 邮箱唯一性检查
-    const existingId = await redis.get<string>(KEYS.userEmail(email));
+    const existingId = await getValue<string>(KEYS.userEmail(email));
     if (existingId) {
       return NextResponse.json({ error: "该邮箱已注册" }, { status: 409 });
     }

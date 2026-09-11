@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth";
-import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
+import { getRedis, getValue, hasRedisConfig, KEYS, setMembers } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,10 +13,10 @@ export async function GET() {
   if (!hasRedisConfig()) return NextResponse.json({ error: "服务端未配置 Redis" }, { status: 500 });
 
   const redis = getRedis();
-  const ids = (await redis.smembers<string>(KEYS.chatIndex(user.id))) ?? [];
+  const ids = await setMembers(KEYS.chatIndex(user.id));
   const items = await Promise.all(
     ids.map(async (id) => {
-      const raw = await redis.get<string>(KEYS.chat(user.id, id));
+      const raw = await getValue<string>(KEYS.chat(user.id, id));
       if (!raw) return null;
       try {
         const parsed = JSON.parse(raw) as { updatedAt?: number; model?: string };
@@ -37,7 +37,7 @@ export async function DELETE() {
   if (!hasRedisConfig()) return NextResponse.json({ error: "服务端未配置 Redis" }, { status: 500 });
 
   const redis = getRedis();
-  const ids = (await redis.smembers<string>(KEYS.chatIndex(user.id))) ?? [];
+  const ids = await setMembers(KEYS.chatIndex(user.id));
   const pipeline = redis.pipeline();
   for (const id of ids) pipeline.del(KEYS.chat(user.id, id));
   pipeline.del(KEYS.chatIndex(user.id));

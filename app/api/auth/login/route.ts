@@ -10,7 +10,7 @@ import {
   verifyPassword,
   type UserRecord,
 } from "@/lib/auth";
-import { getRedis, hasRedisConfig, hgetAll, KEYS } from "@/lib/redis";
+import { getRedis, getValue, hasRedisConfig, hgetAll, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
     const redis = getRedis();
 
-    const userId = await redis.get<string>(KEYS.userEmail(email));
+    const userId = await getValue<string>(KEYS.userEmail(email));
     if (!userId) {
       return NextResponse.json({ error: GENERIC_ERROR }, { status: 401 });
     }

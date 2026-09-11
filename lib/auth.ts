@@ -4,7 +4,15 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
-import { getRedis, hasRedisConfig, hgetAll, KEYS, SESSION_TTL_SECONDS } from "./redis";
+import {
+  getRedis,
+  getValue,
+  hasRedisConfig,
+  hgetAll,
+  KEYS,
+  SESSION_TTL_SECONDS,
+  setMembers,
+} from "./redis";
 
 /* -------------------------------------------------------------------------- */
 /*                                   类型                                      */
@@ -75,7 +83,7 @@ export async function createSession(userId: string): Promise<{ sessionId: string
 export async function destroySession(sessionId: string): Promise<void> {
   if (!sessionId) return;
   const redis = getRedis();
-  const userId = await redis.get<string>(KEYS.session(sessionId));
+  const userId = await getValue<string>(KEYS.session(sessionId));
   const pipeline = redis.pipeline().del(KEYS.session(sessionId));
   if (userId) pipeline.srem(KEYS.userSessions(userId), sessionId);
   await pipeline.exec();
@@ -83,7 +91,7 @@ export async function destroySession(sessionId: string): Promise<void> {
 
 export async function destroyAllSessionsOf(userId: string): Promise<void> {
   const redis = getRedis();
-  const sessionIds = (await redis.smembers<string>(KEYS.userSessions(userId))) ?? [];
+  const sessionIds = await setMembers(KEYS.userSessions(userId));
   if (sessionIds.length === 0) return;
   const pipeline = redis.pipeline();
   for (const sid of sessionIds) pipeline.del(KEYS.session(sid));
@@ -120,7 +128,7 @@ export async function getUserBySessionId(sessionId: string | null): Promise<User
   if (!sessionId || !hasRedisConfig()) return null;
   try {
     const redis = getRedis();
-    const userId = await redis.get<string>(KEYS.session(sessionId));
+    const userId = await getValue<string>(KEYS.session(sessionId));
     if (!userId) return null;
     const user = await hgetAll<UserRecord>(KEYS.user(userId));
     if (!user || !user.id) return null;
