@@ -10,7 +10,7 @@ import {
   verifyPassword,
   type UserRecord,
 } from "@/lib/auth";
-import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
+import { getRedis, hasRedisConfig, hgetAll, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: GENERIC_ERROR }, { status: 401 });
     }
 
-    const user = await redis.hgetall<UserRecord>(KEYS.user(userId));
+    const user = await hgetAll<UserRecord>(KEYS.user(userId));
     if (!user?.passwordHash) {
       return NextResponse.json({ error: GENERIC_ERROR }, { status: 401 });
     }

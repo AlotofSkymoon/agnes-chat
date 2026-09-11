@@ -9,7 +9,7 @@ import {
   verifyPassword,
   type UserRecord,
 } from "@/lib/auth";
-import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
+import { getRedis, hasRedisConfig, hgetAll, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const userId = await redis.get<string>(KEYS.session(sessionId));
     if (!userId) return NextResponse.json({ error: "登录已失效，请重新登录" }, { status: 401 });
 
-    const user = await redis.hgetall<UserRecord>(KEYS.user(userId));
+    const user = await hgetAll<UserRecord>(KEYS.user(userId));
     if (!user?.passwordHash) return NextResponse.json({ error: "用户不存在" }, { status: 404 });
 
     const { currentPassword, newPassword } = (await request.json()) as {

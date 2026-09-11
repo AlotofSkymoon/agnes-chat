@@ -51,3 +51,14 @@ export const KEYS = {
 } as const;
 
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 天
+
+/**
+ * hgetall 的宽松封装。
+ * Upstash 的 hgetall<TData extends Record<string, unknown>> 要求 TData 带索引签名，
+ * 而我们的 interface（如 UserRecord）没有，直接传泛型会编译报错。这里统一处理。
+ */
+export async function hgetAll<T>(key: string): Promise<T | null> {
+  const redis = getRedis();
+  const raw = await redis.hgetall<Record<string, unknown>>(key);
+  return (raw as unknown as T | null) ?? null;
+}

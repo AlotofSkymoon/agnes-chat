@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser, requireAdmin } from "@/lib/auth";
-import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
+import { getRedis, hasRedisConfig, hgetAll, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function GET() {
 
     const users = await Promise.all(
       userKeys.map(async (key) => {
-        const u = await redis.hgetall<Record<string, string>>(key);
+        const u = await hgetAll<Record<string, string>>(key);
         if (!u?.id) return null;
         return {
           id: u.id,
@@ -78,7 +78,7 @@ export async function DELETE(request: Request) {
     if (userId === admin.id) return NextResponse.json({ error: "不能删除自己" }, { status: 400 });
 
     const redis = getRedis();
-    const user = await redis.hgetall<{ email?: string }>(KEYS.user(userId));
+    const user = await hgetAll<{ email?: string }>(KEYS.user(userId));
     if (!user?.email) return NextResponse.json({ error: "用户不存在" }, { status: 404 });
 
     const pipeline = redis.pipeline();

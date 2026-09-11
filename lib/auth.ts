@@ -4,7 +4,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
-import { getRedis, hasRedisConfig, KEYS, SESSION_TTL_SECONDS } from "./redis";
+import { getRedis, hasRedisConfig, hgetAll, KEYS, SESSION_TTL_SECONDS } from "./redis";
 
 /* -------------------------------------------------------------------------- */
 /*                                   类型                                      */
@@ -122,7 +122,7 @@ export async function getUserBySessionId(sessionId: string | null): Promise<User
     const redis = getRedis();
     const userId = await redis.get<string>(KEYS.session(sessionId));
     if (!userId) return null;
-    const user = await redis.hgetall<UserRecord>(KEYS.user(userId));
+    const user = await hgetAll<UserRecord>(KEYS.user(userId));
     if (!user || !user.id) return null;
     return user;
   } catch {
