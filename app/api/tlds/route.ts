@@ -33,7 +33,6 @@ export async function GET() {
   try {
     const res = await fetch(IANA_URL, {
       headers: { "User-Agent": "agnes-chat/1.0" },
-      next: { revalidate: 86400 },
     });
     if (res.ok) {
       const text = await res.text();

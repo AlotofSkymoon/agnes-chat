@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, RotateCw, TriangleAlert } from "lucide-react";
+import { Check, Copy, FileText, RotateCw, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { AgnesIcon } from "@/components/agnes-logo";
 import { Markdown } from "@/components/chat/markdown";
 import { Button } from "@/components/ui/button";
-import type { ChatMessage } from "@/lib/types";
+import { formatBytes, type ChatMessage } from "@/lib/types";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -32,11 +32,33 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
 
   /* ---------------- 用户消息：右侧蓝色气泡 ---------------- */
   if (isUser) {
+    const atts = message.attachments ?? [];
     return (
-      <div className="flex animate-fade-in justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-lg bg-[hsl(var(--user-bubble))] px-4 py-2.5 text-[15px] leading-[1.75] text-foreground sm:max-w-[75%]">
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
-        </div>
+      <div className="flex animate-fade-in flex-col items-end gap-1.5">
+        {/* 附件 */}
+        {atts.length > 0 ? (
+          <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5 sm:max-w-[75%]">
+            {atts.map((a) => (
+              <span
+                key={a.id}
+                className="inline-flex max-w-[200px] items-center gap-1.5 rounded-lg border border-border/70 bg-muted/60 py-1 pl-1.5 pr-2 text-xs"
+              >
+                {a.kind === "image" && a.content ? (
+                  <img src={a.content} alt={a.name} className="h-6 w-6 shrink-0 rounded object-cover" />
+                ) : (
+                  <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
+                )}
+                <span className="truncate text-fg-secondary">{a.name}</span>
+                <span className="shrink-0 text-[10px] text-fg-quaternary">{formatBytes(a.size)}</span>
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {message.content ? (
+          <div className="max-w-[85%] rounded-2xl rounded-br-lg bg-[hsl(var(--user-bubble))] px-4 py-2.5 text-[15px] leading-[1.75] text-[hsl(var(--user-bubble-foreground))] sm:max-w-[75%]">
+            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          </div>
+        ) : null}
       </div>
     );
   }

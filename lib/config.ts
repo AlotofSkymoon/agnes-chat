@@ -34,6 +34,8 @@ export interface ModelOption {
   label: string;
   desc: string;
   provider: ProviderId;
+  /** 是否支持图片输入（vision-language） */
+  vision: boolean;
 }
 
 /** 可选模型（纯聊天，不含 Agent / 工具调用） */
@@ -41,21 +43,30 @@ export const CHAT_MODELS: ModelOption[] = [
   {
     id: "agnes-2.5-flash",
     label: "agnes-2.5-flash",
-    desc: "更快，日常聊天首选",
+    desc: "更快，日常聊天首选，支持识图",
     provider: "agnes",
+    vision: true,
   },
-  { id: "agnes-2.0-flash", label: "agnes-2.0-flash", desc: "稳定版", provider: "agnes" },
+  {
+    id: "agnes-2.0-flash",
+    label: "agnes-2.0-flash",
+    desc: "稳定版，支持识图",
+    provider: "agnes",
+    vision: true,
+  },
   {
     id: "deepseek-chat",
     label: "deepseek-chat",
     desc: "DeepSeek V3 · 通用对话",
     provider: "deepseek",
+    vision: false,
   },
   {
     id: "deepseek-reasoner",
     label: "deepseek-reasoner",
     desc: "DeepSeek R1 · 深度推理",
     provider: "deepseek",
+    vision: false,
   },
 ];
 
@@ -78,6 +89,11 @@ export function isAllowedModel(modelId: string): boolean {
 
 export function getProvider(modelId: string): ProviderId {
   return getModel(modelId)?.provider ?? "agnes";
+}
+
+/** 该模型是否支持图片输入 */
+export function supportsVision(modelId: string): boolean {
+  return getModel(modelId)?.vision ?? false;
 }
 
 /* ---------------------------- localStorage Keys ---------------------------- */

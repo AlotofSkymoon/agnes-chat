@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Compass, Eraser, Menu, Settings2 } from "lucide-react";
+import { Compass, Eraser, Menu, Settings2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatInput } from "@/components/chat/chat-input";
@@ -10,9 +10,16 @@ import { EmptyState } from "@/components/chat/empty-state";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { SettingsDialog, type ChatSettings } from "@/components/chat/settings-dialog";
 import { Sidebar } from "@/components/chat/sidebar";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { DEFAULT_MODEL, LS_KEYS } from "@/lib/config";
-import { createId, type ChatMessage } from "@/lib/types";
+import { DEFAULT_MODEL, LS_KEYS, supportsVision } from "@/lib/config";
+import {
+  createId,
+  MAX_FILES,
+  readFileToAttachment,
+  type Attachment,
+  type ChatMessage,
+} from "@/lib/types";
 import { useConversations } from "@/lib/use-conversations";
 
 interface SafeUser {
@@ -50,6 +57,10 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [cloudSync, setCloudSync] = React.useState(false);
+  /* ---- 附件 + 拖拽 ---- */
+  const [attachments, setAttachments] = React.useState<Attachment[]>([]);
+  const [dragging, setDragging] = React.useState(false);
+  const dragDepth = React.useRef(0);
 
   const abortRef = React.useRef<AbortController | null>(null);
   const bottomRef = React.useRef<HTMLDivElement>(null);
@@ -139,7 +150,55 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
           body: JSON.stringify({
             messages: history
               .filter((m) => !m.error)
-              .map((m) => ({ role: m.role, content: m.content })),
+              .map((m, idx, arr) => {
+                const atts = m.attachments ?? [];
+                // 只有最后一条用户消息带附件才需要多模态；历史消息用文字摘要，省 token
+                const isLastUser =
+                  m.role === "user" && idx === arr.length - 1 && atts.length > 0;
+
+                if (!isLastUser) {
+                  const past =
+                    atts.length > 0
+                      ? `${m.content}\n（此前附带的附件：${atts
+                          .map((a) => a.name)
+                          .join("、")}）`
+                      : m.content;
+                  return { role: m.role, content: past };
+                }
+
+                const visionOk = supportsVision(settings.model);
+                const textAtts = atts.filter((a) => a.kind === "text" && a.content);
+                const imgAtts = visionOk
+                  ? atts.filter((a) => a.kind === "image" && a.content)
+                  : [];
+                const otherAtts = atts.filter(
+                  (a) => !textAtts.includes(a) && !imgAtts.includes(a),
+                );
+
+                const textBlocks = [
+                  m.content,
+                  ...textAtts.map((a) => `\n---\n【附件：${a.name}】\n${a.content}`),
+                  ...otherAtts.map((a) => `\n【附件：${a.name}】${a.note ?? "（内容不可用）"}`),
+                  ...(atts.length > 0 && !visionOk && atts.some((a) => a.kind === "image")
+                    ? ["\n（当前模型不支持识图，图片未发送）"]
+                    : []),
+                ]
+                  .filter(Boolean)
+                  .join("\n");
+
+                if (imgAtts.length === 0) return { role: m.role, content: textBlocks };
+
+                return {
+                  role: m.role,
+                  content: [
+                    { type: "text" as const, text: textBlocks },
+                    ...imgAtts.map((a) => ({
+                      type: "image_url" as const,
+                      image_url: { url: a.content!, detail: "auto" as const },
+                    })),
+                  ],
+                };
+              }),
             model: settings.model,
             keys: settings.keys,
             baseUrl: settings.baseUrl,
@@ -207,7 +266,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
   const send = React.useCallback(
     (raw: string) => {
       const text = raw.trim();
-      if (!text || status === "streaming") return;
+      if (status === "streaming") return;
+      if (!text && attachments.length === 0) return;
 
       // 确保有当前会话
       let convId = currentId;
@@ -220,19 +280,30 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         ensureConversation(convId, text);
       }
 
+      const pending = attachments;
       const userMessage: ChatMessage = {
         id: createId(),
         role: "user",
         content: text,
         createdAt: Date.now(),
+        attachments: pending.length ? pending : undefined,
       };
       const next = [...base, userMessage];
       messagesRef.current = next;
       setMessages(next);
       setInput("");
+      setAttachments([]);
       void runCompletion(next, convId);
     },
-    [currentId, ensureConversation, newConversation, runCompletion, setMessages, status],
+    [
+      attachments,
+      currentId,
+      ensureConversation,
+      newConversation,
+      runCompletion,
+      setMessages,
+      status,
+    ],
   );
 
   const retry = React.useCallback(() => {
@@ -257,6 +328,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     abortRef.current?.abort();
     messagesRef.current = [];
     setMessages([]);
+    setAttachments([]);
     toast.success("已清空当前对话");
   }
 
@@ -276,6 +348,62 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     }
     toast.success("已清空全部本地数据");
   }
+
+  /* ------------------------------ 附件 ------------------------------ */
+  const addFiles = React.useCallback(async (incoming: FileList | File[]) => {
+    const list = Array.from(incoming);
+    if (list.length === 0) return;
+
+    const room = MAX_FILES - attachments.length;
+    if (room <= 0) {
+      toast.error(`最多同时上传 ${MAX_FILES} 个文件`);
+      return;
+    }
+    if (list.length > room) {
+      toast.warning(`最多 ${MAX_FILES} 个文件，已只取前 ${room} 个`);
+    }
+
+    const picked = list.slice(0, room);
+    const parsed = await Promise.all(picked.map(readFileToAttachment));
+    setAttachments((prev) => [...prev, ...parsed]);
+    const failed = parsed.filter((a) => a.note);
+    if (failed.length) toast.warning(failed[0].note);
+  }, [attachments.length]);
+
+  const removeAttachment = React.useCallback((id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
+  /* 真实 HTML5 拖拽：只在整页范围内生效，用深度计数避免子元素抖动 */
+  const onDragEnter = React.useCallback((e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setDragging(true);
+  }, []);
+
+  const onDragOver = React.useCallback((e: React.DragEvent) => {
+    if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const onDragLeave = React.useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragging(false);
+  }, []);
+
+  const onDrop = React.useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      dragDepth.current = 0;
+      setDragging(false);
+      const files = e.dataTransfer?.files;
+      if (files?.length) void addFiles(files);
+    },
+    [addFiles],
+  );
 
   /** 在输入框里直接切模型 */
   function changeModel(modelId: string) {
@@ -305,7 +433,13 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-background">
+    <div
+      className="relative flex h-[100dvh] overflow-hidden bg-background"
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       {/* 侧边栏 */}
       <Sidebar
         conversations={conversations}
@@ -322,53 +456,42 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
 
       {/* 主区域 */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* 顶栏（对话态才显示） */}
-        {!isEmpty ? (
-          <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="md:hidden"
-                onClick={() => setSidebarOpen(true)}
-              >
-                <Menu className="h-4 w-4" />
-              </Button>
-              <span className="truncate text-sm text-muted-foreground">
-                {conversations.find((c) => c.id === currentId)?.title ?? "新对话"}
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" asChild title="导航站">
-                <Link href="/nav">
-                  <Compass className="h-4 w-4" />
-                </Link>
-              </Button>
+        {/* 顶栏：常驻显示，液态玻璃 */}
+        <header className="glass-bar sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between px-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="打开侧边栏"
+            >
+              <Menu className="h-4 w-4" />
+            </Button>
+            <span className="truncate text-sm text-fg-secondary">
+              {isEmpty
+                ? "新对话"
+                : (conversations.find((c) => c.id === currentId)?.title ?? "新对话")}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button variant="ghost" size="icon" asChild title="导航站">
+              <Link href="/nav">
+                <Compass className="h-4 w-4" />
+              </Link>
+            </Button>
+            {!isEmpty ? (
               <Button variant="ghost" size="icon" onClick={handleClearCurrent} title="清空当前对话">
                 <Eraser className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title="设置">
-                <Settings2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </header>
-        ) : (
-          <header className="flex h-14 shrink-0 items-center justify-between px-3 md:hidden">
-            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
-              <Menu className="h-4 w-4" />
+            ) : null}
+            <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title="设置">
+              <Settings2 className="h-4 w-4" />
             </Button>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" asChild title="导航站">
-                <Link href="/nav">
-                  <Compass className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)}>
-                <Settings2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </header>
-        )}
+            {/* 主题切换：常驻顶栏，液态玻璃 */}
+            <ThemeToggle />
+          </div>
+        </header>
 
         {/* 消息区 */}
         <main className="min-h-0 flex-1 overflow-y-auto">
@@ -405,7 +528,10 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   streaming={status === "streaming"}
                   model={mounted ? settings.model : undefined}
                   onModelChange={changeModel}
-                  placeholder="给 Agnes 发送消息"
+                  placeholder="给 Agnes 发送消息，可拖拽文件到此处"
+                  attachments={attachments}
+                  onPickFiles={addFiles}
+                  onRemoveAttachment={removeAttachment}
                 />
                 <p className="mt-3 text-center text-xs text-fg-quaternary">
                   内容由 AI 生成，仅供参考 · 仅聊天，无 Agent / 联网 / 文件上传
@@ -421,7 +547,10 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   streaming={status === "streaming"}
                   model={mounted ? settings.model : undefined}
                   onModelChange={changeModel}
-                  placeholder="给 Agnes 发送消息"
+                  placeholder="给 Agnes 发送消息，可拖拽文件到此处"
+                  attachments={attachments}
+                  onPickFiles={addFiles}
+                  onRemoveAttachment={removeAttachment}
                 />
                 <p className="mt-2 text-center text-xs text-fg-quaternary">
                   内容由 AI 生成，仅供参考
@@ -431,6 +560,21 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
           </div>
         </div>
       </div>
+
+      {/* 拖拽文件时的全屏提示 */}
+      {dragging ? (
+        <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-primary/5 backdrop-blur-sm">
+          <div className="glass flex flex-col items-center gap-3 rounded-2xl px-10 py-8">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15">
+              <Upload className="h-5 w-5 text-primary" />
+            </div>
+            <p className="text-sm font-medium">松手即可添加附件</p>
+            <p className="text-xs text-fg-tertiary">
+              支持图片与文本 / 代码文件，单个最大 5MB，最多 5 个
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <SettingsDialog
         open={settingsOpen}

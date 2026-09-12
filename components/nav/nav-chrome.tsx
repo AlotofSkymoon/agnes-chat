@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Compass, LogIn, MessageSquare, Moon, Shield, Sun, User as UserIcon } from "lucide-react";
+import { Compass, LogIn, MessageSquare, Shield, User as UserIcon } from "lucide-react";
 
 import { AgnesIcon } from "@/components/agnes-logo";
-import { useTheme } from "@/components/theme-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 
 interface ChromeUser {
@@ -17,7 +17,6 @@ interface ChromeUser {
 
 /** 导航站 / 通用子页面的顶部栏（含主题切换、聊天入口、账户入口） */
 export function NavChrome({ user }: { user?: ChromeUser | null }) {
-  const { theme, toggleTheme } = useTheme();
   const [me, setMe] = React.useState<ChromeUser | null>(user ?? null);
 
   React.useEffect(() => {
@@ -35,7 +34,7 @@ export function NavChrome({ user }: { user?: ChromeUser | null }) {
   }, [user]);
 
   return (
-    <header className="relative z-10 flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2.5 backdrop-blur-xl sm:px-6">
+    <header className="glass-bar relative z-10 flex items-center justify-between gap-2 px-3 py-2.5 sm:px-6">
       <Link href="/" className="flex items-center gap-2">
         <AgnesIcon className="h-7 w-7 text-[#4D6BFE]" />
         <span className="text-sm font-semibold sm:text-base">Agnes AI</span>
@@ -53,9 +52,7 @@ export function NavChrome({ user }: { user?: ChromeUser | null }) {
             <Compass className="h-4 w-4" />
           </Link>
         </Button>
-        <Button variant="ghost" size="icon" onClick={toggleTheme} title="切换主题">
-          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
+        <ThemeToggle />
 
         {me ? (
           <>

@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth";
-import { DEFAULT_MODEL, PROVIDERS, getProvider, isAllowedModel } from "@/lib/config";
+import {
+  DEFAULT_MODEL,
+  PROVIDERS,
+  getProvider,
+  isAllowedModel,
+  supportsVision,
+} from "@/lib/config";
 import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
@@ -9,9 +15,16 @@ export const dynamic = "force-dynamic";
 /** Vercel 函数最长执行时间（Hobby 60s 上限，Pro 可到 300s） */
 export const maxDuration = 60;
 
-/** 允许通过该代理访问的模型（防止被当成任意 OpenAI 代理滥用） */
+/** OpenAI 兼容的消息内容：纯文本 或 多模态片段数组 */
+type ContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string; detail?: "low" | "high" | "auto" } };
+
 interface ChatRequestBody {
-  messages?: { role: "user" | "assistant" | "system"; content: string }[];
+  messages?: {
+    role: "user" | "assistant" | "system";
+    content: string | ContentPart[];
+  }[];
   model?: string;
   /** 用户自己的 Key（来自 localStorage，可选） */
   apiKey?: string;
@@ -52,6 +65,12 @@ export async function POST(request: Request) {
     return errorResponse(400, "BAD_MODEL", "不支持的模型");
   }
 
+  // 单条消息体积保护（图片 base64 容易撑爆）
+  const tooBig = messages.some((m) => JSON.stringify(m.content).length > 1_500_000);
+  if (tooBig) {
+    return errorResponse(413, "TOO_LARGE", "单条消息内容过大，请减少附件后再试");
+  }
+
   const provider = getProvider(model);
   const providerCfg = PROVIDERS[provider];
 
@@ -74,6 +93,21 @@ export async function POST(request: Request) {
     );
   }
 
+  // 不支持识图的模型：把图片片段降级为占位文字，避免上游报错
+  const visionOk = supportsVision(model);
+  let outbound = messages;
+  if (!visionOk) {
+    outbound = messages.map((m) => {
+      if (typeof m.content === "string") return m;
+      const textParts = m.content.filter((c) => c.type === "text");
+      const imgs = m.content.filter((c) => c.type === "image_url");
+      const text =
+        textParts.map((c) => (c as { type: "text"; text: string }).text).join("\n") +
+        (imgs.length ? `\n[已附带 ${imgs.length} 张图片，但当前模型不支持识图]` : "");
+      return { ...m, content: text };
+    });
+  }
+
   const targetBase = (baseUrl?.trim() || providerCfg.baseUrl).replace(/\/+$/, "");
   const upstreamUrl = `${targetBase}/chat/completions`;
 
@@ -88,7 +122,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: outbound.map((m) => ({ role: m.role, content: m.content })),
         stream: true,
       }),
       signal: request.signal,
@@ -141,7 +175,21 @@ export async function POST(request: Request) {
               const payload = JSON.stringify({
                 conversationId,
                 model,
-                messages: [...(messages ?? []), { role: "assistant", content: assistantText }],
+                messages: [
+                  // 存云端时把多模态内容压成纯文本，避免图片 base64 占满 Redis
+                  ...(messages ?? []).map((m) => ({
+                    role: m.role,
+                    content:
+                      typeof m.content === "string"
+                        ? m.content
+                        : m.content
+                            .map((c) =>
+                              c.type === "text" ? c.text : "[图片]",
+                            )
+                            .join("\n"),
+                  })),
+                  { role: "assistant", content: assistantText },
+                ],
                 updatedAt: Date.now(),
               });
               await redis

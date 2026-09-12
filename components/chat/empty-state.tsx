@@ -1,8 +1,6 @@
 "use client";
 
 import { AgnesIcon } from "@/components/agnes-logo";
-import { useTheme } from "@/components/theme-provider";
-import { Moon, Sun } from "lucide-react";
 
 const SUGGESTIONS = [
   { title: "帮我写一段自我介绍", sub: "简洁、有记忆点" },
@@ -12,21 +10,9 @@ const SUGGESTIONS = [
 ];
 
 export function EmptyState({ onPick }: { onPick: (text: string) => void }) {
-  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-5">
-      {/* 主题切换（空状态时放在右上角） */}
-      <div className="flex w-full justify-end">
-        <button
-          onClick={toggleTheme}
-          className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          title={theme === "dark" ? "切换到浅色" : "切换到深色"}
-        >
-          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </button>
-      </div>
-
       {/* 主标题区 */}
       <div className="mt-4 flex flex-col items-center text-center">
         <span className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#4D6BFE] to-[#7B8CFF] p-3 text-white shadow-lg shadow-[#4D6BFE]/25">

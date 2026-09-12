@@ -5,18 +5,15 @@ import Link from "next/link";
 import {
   LogIn,
   MessageSquare,
-  Moon,
   Plus,
   Settings2,
   Shield,
-  Sun,
   Trash2,
   User as UserIcon,
   X,
 } from "lucide-react";
 
 import { AgnesIcon } from "@/components/agnes-logo";
-import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import type { Conversation } from "@/lib/use-conversations";
 import { cn } from "@/lib/utils";
@@ -46,7 +43,6 @@ export function Sidebar({
   onClose,
   user,
 }: SidebarProps) {
-  const { theme, toggleTheme } = useTheme();
 
   return (
     <>
@@ -149,13 +145,6 @@ export function Sidebar({
           >
             <Settings2 className="h-4 w-4" />
             设置
-          </button>
-          <button
-            onClick={toggleTheme}
-            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))] transition-colors hover:bg-muted"
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {theme === "dark" ? "浅色模式" : "深色模式"}
           </button>
           {user ? (
             <>

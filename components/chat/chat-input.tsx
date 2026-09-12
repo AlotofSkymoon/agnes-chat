@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, FileText, ImageIcon, Paperclip, Square, X } from "lucide-react";
 
 import { ModelPicker } from "@/components/chat/model-picker";
+import { formatBytes, type Attachment } from "@/lib/types";
 
 interface ChatInputProps {
   value: string;
@@ -16,6 +17,10 @@ interface ChatInputProps {
   model?: string;
   onModelChange?: (modelId: string) => void;
   placeholder?: string;
+  /* ---- 附件 ---- */
+  attachments?: Attachment[];
+  onPickFiles?: (files: FileList | File[]) => void;
+  onRemoveAttachment?: (id: string) => void;
 }
 
 export function ChatInput({
@@ -28,8 +33,12 @@ export function ChatInput({
   model,
   onModelChange,
   placeholder = "给 Agnes 发送消息",
+  attachments = [],
+  onPickFiles,
+  onRemoveAttachment,
 }: ChatInputProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const fileRef = React.useRef<HTMLInputElement>(null);
 
   // 自适应高度
   React.useEffect(() => {
@@ -46,6 +55,15 @@ export function ChatInput({
     }
   }
 
+  // 粘贴文件（截图直接 Ctrl+V）
+  function handlePaste(e: React.ClipboardEvent) {
+    const files = Array.from(e.clipboardData?.files ?? []);
+    if (files.length && onPickFiles) {
+      e.preventDefault();
+      onPickFiles(files);
+    }
+  }
+
   const isHero = variant === "hero";
 
   return (
@@ -56,6 +74,47 @@ export function ChatInput({
           : "w-full rounded-2xl border border-border bg-card px-3 pb-2.5 pt-3 shadow-sm transition-colors focus-within:border-primary/60"
       }
     >
+      {/* 附件预览 */}
+      {attachments.length > 0 ? (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {attachments.map((a) => (
+            <span
+              key={a.id}
+              className="group inline-flex max-w-[220px] items-center gap-1.5 rounded-lg border border-border/70 bg-muted/60 py-1 pl-1.5 pr-1 text-xs"
+            >
+              {a.kind === "image" && a.content ? (
+                <img
+                  src={a.content}
+                  alt={a.name}
+                  className="h-6 w-6 shrink-0 rounded object-cover"
+                />
+              ) : a.kind === "text" ? (
+                <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <ImageIcon className="h-3.5 w-3.5 shrink-0 text-fg-tertiary" />
+              )}
+              <span className="truncate text-fg-secondary">{a.name}</span>
+              <span className="shrink-0 text-[10px] text-fg-quaternary">
+                {formatBytes(a.size)}
+              </span>
+              {a.note ? (
+                <span className="shrink-0 text-[10px] text-amber-500" title={a.note}>
+                  !
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => onRemoveAttachment?.(a.id)}
+                className="ml-0.5 shrink-0 rounded p-0.5 text-fg-tertiary transition-colors hover:bg-background hover:text-destructive"
+                aria-label={`移除 ${a.name}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+
       <textarea
         ref={textareaRef}
         rows={1}
@@ -63,18 +122,42 @@ export function ChatInput({
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
         className={
           isHero
-            ? "w-full resize-none bg-transparent text-[15px] leading-6 outline-none placeholder:text-muted-foreground"
-            : "max-h-[200px] w-full resize-none bg-transparent px-1 text-[15px] leading-6 outline-none placeholder:text-muted-foreground"
+            ? "w-full resize-none bg-transparent text-[15px] leading-6 outline-none placeholder:text-fg-quaternary"
+            : "max-h-[200px] w-full resize-none bg-transparent px-1 text-[15px] leading-6 outline-none placeholder:text-fg-quaternary"
         }
       />
 
       <div className="mt-2 flex items-center justify-between gap-2">
-        {/* 左侧：模型选择小框 */}
-        <div className="min-w-0">
+        {/* 左侧：模型选择小框 + 附件按钮 */}
+        <div className="flex min-w-0 items-center gap-1.5">
           {model && onModelChange ? (
             <ModelPicker value={model} onChange={onModelChange} />
+          ) : null}
+          {onPickFiles ? (
+            <>
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                title="添加附件（也可拖拽文件到页面）"
+                aria-label="添加附件"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-fg-tertiary transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Paperclip className="h-3.5 w-3.5" />
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                hidden
+                onChange={(e) => {
+                  if (e.target.files?.length) onPickFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </>
           ) : null}
         </div>
 
@@ -91,8 +174,8 @@ export function ChatInput({
           ) : (
             <button
               onClick={onSubmit}
-              disabled={!value.trim()}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#4D6BFE] text-white transition-all hover:bg-[#3757E4] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+              disabled={!value.trim() && attachments.length === 0}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#4D6BFE] text-white transition-all hover:bg-[#3757E4] disabled:cursor-not-allowed disabled:bg-muted disabled:text-fg-quaternary"
               title="发送"
             >
               <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
