@@ -104,34 +104,20 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 | `R2_BUCKET` | 桶名，如 `agnes-chat`（可选） |
 | `R2_PUBLIC_BASE_URL` | 公开域名，如 `https://pub-xxx.r2.dev`（可选） |
 
-#### 4. 启用自动部署（只需做一次）
+#### 4. 推送代码
 
-工作流文件在仓库的 `workflows/deploy-cloudflare.yml`。
-由于 GitHub 安全限制，它需要先放到 `.github/workflows/` 才会生效：
+工作流已经在 `.github/workflows/deploy-cloudflare.yml`，推到 `main` 即自动触发：
 
-- **方法 A（网页端，推荐）**：仓库 → Add file → Create new file →
-  路径填 `.github/workflows/deploy-cloudflare.yml` → 粘贴本文件内容 → Commit
-- **方法 B（本地）**：
-
-  ```bash
-  mkdir -p .github/workflows
-  cp workflows/deploy-cloudflare.yml .github/workflows/
-  git add . && git commit -m "ci: enable cloudflare deploy" && git push
-  ```
-
-#### 5. 推送代码
-
-放好工作流后，推到 `main` 分支即自动触发：
-
-1. 把 KV / D1 ID 填进 `wrangler.jsonc` 占位符
-2. 执行 `schema.sql` 建表（幂等）
-3. 确保 R2 桶存在
-4. OpenNext 构建 + `wrangler deploy`
+1. 校验必需 Secrets（缺哪个会直接告诉你，不用等构建完）
+2. 把 KV / D1 ID 填进 `wrangler.jsonc` 占位符
+3. 执行 `schema.sql` 建表（幂等，已存在不会重复建）
+4. 确保 R2 桶存在（未开通则跳过，不影响其余功能）
+5. OpenNext 构建 + `wrangler deploy`
 6. 用 `wrangler secret put` 写入密钥（**不会进仓库**）
 
 > ⚠️ 密钥一律走 `wrangler secret put`，**不要**写进 `wrangler.jsonc`——那个文件会提交到仓库。
 
-#### 6. 首个用户
+#### 5. 首个用户
 
 注册第一个账号 → 自动成为管理员 → 侧边栏盾牌图标进 `/admin`。
 

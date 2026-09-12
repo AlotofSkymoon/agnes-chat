@@ -164,10 +164,30 @@ sk-d5DyJCcfW9TmkeIHnfFPgHJ2ZjxfKHCx5ip3tR14abyrgZEi
 
 **之后每次推代码都会自动重新部署。**
 
+> 工作流文件在 `.github/workflows/deploy-cloudflare.yml`，已由上游配置好，不用你自己建。
+
 ### 怎么找到你的网站地址？
 
 - 部署日志里会有一行 `https://agnes-chat.xxxx.workers.dev`
 - 或者 Cloudflare 后台：**Workers 和 Pages** → 点你的项目 → 看「预览 URL」
+
+### 上线后先做一次自检
+
+浏览器打开 `https://你的域名/api/health`，会返回一份**不含任何密钥**的诊断：
+
+```jsonc
+{
+  "ok": true,
+  "platform": "cloudflare",
+  "storage": { "backend": "cloudflare", "reachable": true },
+  "problems": []
+}
+```
+
+- `ok: true` → 一切正常，去注册第一个账号（自动成为管理员）
+- `problems` 有内容 → 按提示逐条修
+
+> 常见问题里列了几个典型报错的对照表，先去那儿看一眼。
 
 ---
 

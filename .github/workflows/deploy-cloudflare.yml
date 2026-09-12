@@ -1,0 +1,166 @@
+name: 部署到 Cloudflare Workers
+
+# =============================================================================
+# 推荐部署方式：Workers + KV + D1 + R2，不需要 Redis
+#
+# 首次使用请先在仓库 Settings → Secrets and variables → Actions 里配置：
+#   必需：CLOUDFLARE_API_TOKEN、CLOUDFLARE_ACCOUNT_ID
+#         KV_NAMESPACE_ID、D1_DATABASE_ID
+#         SESSION_SECRET、PRESET_AGNES_API_KEY
+#   可选：R2_ACCOUNT_ID、R2_ACCESS_KEY_ID、R2_SECRET_ACCESS_KEY、
+#         R2_BUCKET、R2_PUBLIC_BASE_URL（图片/视频上传）
+# =============================================================================
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 并发控制：同一分支只跑最新一次，避免多次推送互相覆盖
+concurrency:
+  group: deploy-cloudflare-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 安装依赖
+        # 不用 npm ci：仓库没提交 lock 文件，ci 会直接失败
+        run: npm install
+
+      # ------------------------------------------------------------------
+      # 前置校验：把缺 Secrets 的情况拦在构建之前，
+      # 避免构建 5 分钟后才发现配置不全
+      # ------------------------------------------------------------------
+      - name: 校验必需 Secrets
+        run: |
+          set -e
+          missing=0
+          check() {
+            if [ -z "$2" ]; then
+              echo "::error::缺少 Secret $1 —— 请在仓库 Settings → Secrets and variables → Actions 里添加"
+              missing=1
+            fi
+          }
+          check CLOUDFLARE_API_TOKEN      "${{ secrets.CLOUDFLARE_API_TOKEN }}"
+          check CLOUDFLARE_ACCOUNT_ID     "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
+          check KV_NAMESPACE_ID           "${{ secrets.KV_NAMESPACE_ID }}"
+          check D1_DATABASE_ID            "${{ secrets.D1_DATABASE_ID }}"
+          check SESSION_SECRET            "${{ secrets.SESSION_SECRET }}"
+          check PRESET_AGNES_API_KEY      "${{ secrets.PRESET_AGNES_API_KEY }}"
+          if [ "$missing" -ne 0 ]; then
+            echo ""
+            echo "=============================================="
+            echo "配置不全，已停止。补齐上面列出的 Secrets 后重新运行。"
+            echo "=============================================="
+            exit 1
+          fi
+          echo "✅ 必需 Secrets 齐全"
+
+      # ------------------------------------------------------------------
+      # 把 Secrets 里的 ID 填进 wrangler.jsonc 占位符。
+      # 用 python 而不是 sed：ID 里若含特殊字符也不会破坏 JSON 结构
+      # ------------------------------------------------------------------
+      - name: 填入 KV / D1 ID
+        env:
+          KV_ID: ${{ secrets.KV_NAMESPACE_ID }}
+          D1_ID: ${{ secrets.D1_DATABASE_ID }}
+        run: |
+          set -e
+          python3 - <<'PYEOF'
+          import os, pathlib, re
+          p = pathlib.Path("wrangler.jsonc")
+          s = p.read_text()
+          # 去掉 // 注释再做替换，避免注释里的占位符被误伤
+          s = s.replace("__KV_ID__", os.environ["KV_ID"])
+          s = s.replace("__D1_ID__", os.environ["D1_ID"])
+          p.write_text(s)
+          print("已填入 KV / D1 ID")
+          for line in s.splitlines():
+              if "database_id" in line or re.match(r'^\s*"id"\s*:', line):
+                  print("   ", line.strip())
+          # 确认没有残留占位符
+          if "__KV_ID__" in s or "__D1_ID__" in s:
+              raise SystemExit("占位符未全部替换")
+          PYEOF
+
+      - name: 建 D1 表（幂等，已存在不会重复建）
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote --yes
+
+      - name: 确保 R2 桶存在（已存在会跳过）
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        # R2 需要额外权限，没开也不该让整个部署失败
+        continue-on-error: true
+        run: npx wrangler r2 bucket create agnes-chat || echo "R2 桶已存在或无权限，跳过"
+
+      - name: 构建（OpenNext）
+        run: npm run cf:build
+
+      - name: 部署到 Workers
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
+
+      # ------------------------------------------------------------------
+      # 密钥：必须用 secret put，不能写进 wrangler.jsonc（会提交到仓库）
+      # ------------------------------------------------------------------
+      - name: 写入站点密钥
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SEC_PRESET: ${{ secrets.PRESET_AGNES_API_KEY }}
+          SEC_SESSION: ${{ secrets.SESSION_SECRET }}
+          SEC_R2_ACCOUNT: ${{ secrets.R2_ACCOUNT_ID }}
+          SEC_R2_AK: ${{ secrets.R2_ACCESS_KEY_ID }}
+          SEC_R2_SK: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          SEC_R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          SEC_R2_PUBLIC: ${{ secrets.R2_PUBLIC_BASE_URL }}
+        run: |
+          set -e
+          put() {
+            name="$1"; value="$2"
+            if [ -z "$value" ]; then echo "跳过 $name（未设置）"; return 0; fi
+            printf '%s' "$value" | npx wrangler secret put "$name" > /dev/null 2>&1
+            echo "已写入 $name"
+          }
+          put PRESET_AGNES_API_KEY "$SEC_PRESET"
+          put SESSION_SECRET       "$SEC_SESSION"
+          put R2_ACCOUNT_ID        "$SEC_R2_ACCOUNT"
+          put R2_ACCESS_KEY_ID     "$SEC_R2_AK"
+          put R2_SECRET_ACCESS_KEY "$SEC_R2_SK"
+          put R2_BUCKET            "$SEC_R2_BUCKET"
+          put R2_PUBLIC_BASE_URL   "$SEC_R2_PUBLIC"
+
+      - name: 确认密钥已生效（只列名称，不打印值）
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler secret list || true
+
+      - name: 完成
+        run: |
+          echo "=============================================="
+          echo "✅ 部署完成！"
+          echo ""
+          echo "下一步：打开你的 Workers 域名，访问 /api/health"
+          echo "  - ok: true         → 一切正常，去注册第一个账号（自动成为管理员）"
+          echo "  - problems 有内容  → 按提示逐条修"
+          echo "=============================================="

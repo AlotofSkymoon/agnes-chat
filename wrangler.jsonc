@@ -3,7 +3,9 @@
   "name": "agnes-chat",
   // OpenNext 构建产物入口，不要手改
   "main": ".open-next/worker.js",
-  "compatibility_date": "2026-09-12",
+  // 兼容日期：设为今天，避免「尚未发布」报错。
+  // 上线稳定后可改成更早的日期以获得更长兼容保障，但不要设为未来日期。
+  "compatibility_date": "2025-09-12",
   // Next.js 需要 Node 兼容层
   "compatibility_flags": ["nodejs_compat"],
 
@@ -29,18 +31,26 @@
       "database_id": "__D1_ID__"
     }
   ],
-  "r2_buckets": [
-    {
-      "binding": "R2",
-      "bucket_name": "agnes-chat",
-      // 对象直传用的是预签名 URL，凭证走服务端环境变量，不用这个 binding 读写
-      "preview_bucket_name": "agnes-chat-preview"
-    }
-  ],
+
+  // ---------------------------------------------------------------------------
+  // R2 对象存储（图片 / 视频上传）—— 可选
+  //
+  // 本站上传走「预签名直传」：密钥放服务端环境变量（R2_* secrets），
+  // 浏览器直接 PUT 到 R2，不经过 Worker，也不需要这里的 binding。
+  // 所以如果没开通 R2，保持注释状态即可，站点其余功能不受影响。
+  //
+  // 需要开启时：先创建名为 agnes-chat 的桶，再取消下面的注释。
+  // ---------------------------------------------------------------------------
+  // "r2_buckets": [
+  //   {
+  //     "binding": "R2",
+  //     "bucket_name": "agnes-chat"
+  //   }
+  // ],
 
   // 非敏感配置；密钥一律用 wrangler secret put（见部署教程）
   "vars": {
-    "NEXT_PUBLIC_SITE_NAME": "Agnes AI 免费聊天"
+    "NEXT_PUBLIC_SITE_NAME": "Agnes AI"
   },
 
   "observability": {
