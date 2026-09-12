@@ -39,7 +39,13 @@ export function EmptyState({ onPick }: { onPick: (text: string) => void }) {
             key={s.title}
             type="button"
             onClick={() => onPick(s.title)}
-            className="group rounded-xl border border-border bg-card px-4 py-3 text-left transition-all hover:border-primary/50 hover:bg-accent/60"
+            onMouseMove={(e) => {
+              const el = e.currentTarget as HTMLElement;
+              const r = el.getBoundingClientRect();
+              el.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
+              el.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
+            }}
+            className="acet-spotlight group rounded-xl border border-border bg-card px-4 py-3 text-left transition-all hover:border-primary/50 hover:bg-accent/60"
           >
             <span className="block text-sm font-medium text-foreground">{s.title}</span>
             <span className="mt-0.5 block text-xs text-fg-tertiary">{s.sub}</span>

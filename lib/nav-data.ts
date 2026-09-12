@@ -275,6 +275,26 @@ export const DEFAULT_NAV: NavCategory[] = [
         desc: "新加坡公司，agent 非常强，搭配 AgentScope Platform 神中神，有中国站",
         recommended: true,
       },
+      {
+        id: "niulai-main",
+        name: "牛来 API（主力）",
+        url: "https://hiapi.cc.cd/",
+        desc: "牛来大模型 API 中转，主力入口",
+        recommended: true,
+      },
+      {
+        id: "niulai-backup",
+        name: "牛来 API（备用）",
+        url: "https://1hi.dpdns.org/",
+        desc: "牛来 API 备用域名，主力打不开时走这里",
+      },
+      {
+        id: "openrouter",
+        name: "OpenRouter",
+        url: "https://openrouter.ai/",
+        desc: "聚合平台，一个 Key 调用全球主流模型",
+        recommended: true,
+      },
     ],
   },
   {

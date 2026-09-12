@@ -169,7 +169,13 @@ export function NavBoard() {
                       href={item.url}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="group relative flex flex-col rounded-xl border border-border/70 bg-card/60 p-4 transition-all hover:border-primary/50 hover:bg-accent hover:shadow-md"
+                      onMouseMove={(e) => {
+                        const el = e.currentTarget as HTMLElement;
+                        const r = el.getBoundingClientRect();
+                        el.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
+                        el.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
+                      }}
+                      className="acet-spotlight group relative flex flex-col rounded-xl border border-border/70 bg-card/60 p-4 transition-all hover:border-primary/50 hover:bg-accent hover:shadow-md"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <span className="font-medium leading-snug">{item.name}</span>

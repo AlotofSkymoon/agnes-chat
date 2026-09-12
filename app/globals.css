@@ -1,4 +1,12 @@
 @tailwind base;
+
+/* 让 --angle 可被动画驱动 */
+  @property --angle {
+    syntax: "<angle>";
+    initial-value: 0deg;
+    inherits: false;
+  }
+
 @tailwind components;
 @tailwind utilities;
 
@@ -517,6 +525,251 @@
     font-weight: 700;
     letter-spacing: -0.025em;
     line-height: 1.1;
+  }
+
+  /* ==========================================================================
+     Aceternity UI 风格效果（纯 CSS 实现，不引入 framer-motion）
+     ========================================================================== */
+
+  /**
+   * Aurora 极光背景。
+   * ⚠️ 这个类之前被 5 个页面引用却从未定义，背景一直是空的 —— 现在补上。
+   * 做法：多个大尺寸彩色光斑做 blur，缓慢漂移动画。
+   */
+  .aurora {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .aurora::before,
+  .aurora::after {
+    content: "";
+    position: absolute;
+    inset: -40% -10% auto -10%;
+    height: 150%;
+    z-index: -1;
+    pointer-events: none;
+    filter: blur(72px);
+    opacity: 0.55;
+  }
+
+  .aurora::before {
+    background:
+      radial-gradient(38% 44% at 18% 32%, hsl(var(--primary) / 0.42) 0%, transparent 62%),
+      radial-gradient(32% 38% at 68% 22%, hsl(280 85% 66% / 0.34) 0%, transparent 60%);
+    animation: aurora-drift-a 22s ease-in-out infinite alternate;
+  }
+
+  .aurora::after {
+    background:
+      radial-gradient(34% 40% at 82% 58%, hsl(190 90% 60% / 0.30) 0%, transparent 62%),
+      radial-gradient(28% 34% at 32% 72%, hsl(330 85% 68% / 0.26) 0%, transparent 58%);
+    animation: aurora-drift-b 28s ease-in-out infinite alternate;
+  }
+
+  @keyframes aurora-drift-a {
+    0%   { transform: translate3d(-4%, -2%, 0) scale(1); }
+    50%  { transform: translate3d(4%, 3%, 0) scale(1.08); }
+    100% { transform: translate3d(-2%, 4%, 0) scale(1.02); }
+  }
+
+  @keyframes aurora-drift-b {
+    0%   { transform: translate3d(3%, 2%, 0) scale(1.05); }
+    50%  { transform: translate3d(-5%, -3%, 0) scale(1); }
+    100% { transform: translate3d(2%, -4%, 0) scale(1.1); }
+  }
+
+  /**
+   * Spotlight 聚光灯卡片。
+   * 鼠标位置由 JS 写进 --mx / --my（百分比），这里渲染跟随的径向高光。
+   * 两个伪元素分工：::before 是光斑，::after 是勾边的亮弧。
+   */
+  .acet-spotlight {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .acet-spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    background: radial-gradient(
+      360px circle at var(--mx, 50%) var(--my, 50%),
+      hsl(var(--primary) / 0.16),
+      transparent 68%
+    );
+  }
+
+  .acet-spotlight:hover::before {
+    opacity: 1;
+  }
+
+  /** 勾边亮弧：只在 hover 时沿鼠标位置亮起一小段 */
+  .acet-spotlight::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    background: radial-gradient(
+      420px circle at var(--mx, 50%) var(--my, 50%),
+      hsl(var(--primary) / 0.55),
+      transparent 70%
+    );
+    /* 用 mask 只保留 1px 边框区域，形成"跟随的亮边" */
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    padding: 1px;
+    border-radius: inherit;
+  }
+
+  .acet-spotlight:hover::after {
+    opacity: 1;
+  }
+
+  /** 内容要压在光效之上 */
+  .acet-spotlight > * {
+    position: relative;
+    z-index: 2;
+  }
+
+  /**
+   * 3D 倾斜卡片。
+   * JS 写 --rx / --ry（deg），这里负责透视与平滑回弹。
+   */
+  .acet-tilt {
+    transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))
+      translateZ(0);
+    transform-style: preserve-3d;
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .acet-tilt:hover {
+    /* hover 期间缩短过渡，跟随更跟手；离开时用上面的时长缓慢回正 */
+    transition: transform 0.12s linear;
+  }
+
+  /** 旋转渐变边框：conic-gradient + 遮罩，只显示 1px 边 */
+  .acet-glow-border {
+    position: relative;
+    border-radius: inherit;
+  }
+
+  .acet-glow-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--angle, 0deg),
+      transparent 0deg,
+      hsl(var(--primary) / 0.9) 60deg,
+      hsl(280 85% 70% / 0.7) 120deg,
+      transparent 200deg,
+      transparent 360deg
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: acet-spin 4s linear infinite;
+  }
+
+  .acet-glow-border:hover::before {
+    opacity: 1;
+  }
+
+  @keyframes acet-spin {
+    to {
+      --angle: 360deg;
+    }
+  }
+
+  /** Shimmer：斜向微光扫过 */
+  .acet-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .acet-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(0 0% 100% / 0.28),
+      transparent
+    );
+    animation: acet-shimmer 2.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  @keyframes acet-shimmer {
+    0%, 60%   { transform: translateX(-100%); }
+    100%      { transform: translateX(100%); }
+  }
+
+  /** 网格背景 + 中心淡出遮罩 */
+  .acet-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.55) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.55) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(ellipse 78% 62% at 50% 40%, #000 40%, transparent 100%);
+    mask-image: radial-gradient(ellipse 78% 62% at 50% 40%, #000 40%, transparent 100%);
+  }
+
+  /** 光束：从顶部落下的细长渐变光柱 */
+  .acet-beams {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .acet-beams i {
+    position: absolute;
+    top: -30%;
+    width: 2px;
+    height: 40%;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      hsl(var(--primary) / 0.55),
+      transparent
+    );
+    animation: acet-beam-fall linear infinite;
+  }
+
+  @keyframes acet-beam-fall {
+    0%   { transform: translateY(-40%) scaleY(0.6); opacity: 0; }
+    12%  { opacity: 1; }
+    88%  { opacity: 1; }
+    100% { transform: translateY(320%) scaleY(1.4); opacity: 0; }
   }
 
   /* 尊重系统的"减少动态效果"设置 */
