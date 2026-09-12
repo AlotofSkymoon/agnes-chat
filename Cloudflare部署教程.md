@@ -31,23 +31,49 @@
 ## 第 1 步：创建 Cloudflare API 令牌
 
 这个令牌让 GitHub Actions 能帮你部署。
+**这一步最容易出问题**——权限少勾一个，部署时就会报 `Authentication error [code: 10000]`。
+
+### 方式 A：用官方模板（推荐）
 
 1. 打开 <https://dash.cloudflare.com/profile/api-tokens>
 2. 点 **「创建令牌」** / **Create Token**
-3. 找到 **「编辑 Cloudflare Workers」** / **Edit Cloudflare Workers** 这一行，
+3. 找到 **「编辑 Cloudflare Workers」** / **Edit Cloudflare Workers**，
    点右边的 **「使用模板」** / **Use template**
-
-   > 如果找不到这个模板，就用 **「创建自定义令牌」**，权限按下面勾：
-   > - 账户 → **Workers 脚本** → 编辑
-   > - 账户 → **Workers KV 存储** → 编辑
-   > - 账户 → **D1** → 编辑
-   > - 账户 → **Workers R2 存储** → 编辑
-   > - 区域 → **Workers 路由** → 编辑（可选）
-
 4. **账户资源**：选「包括 → 你的账户」
-5. **区域资源**：选「包括 → 所有区域」（或指定你的域名）
-6. 点 **「继续到摘要」** → **「创建令牌」**
-7. **复制显示的令牌**（只显示一次！）存到记事本
+5. **区域资源**：选「包括 → 所有区域」
+6. **继续到摘要** → **创建令牌**
+7. **复制令牌**（只显示一次！）
+
+### 方式 B：手动勾选（模板找不到时用）
+
+用 **「创建自定义令牌」**，按下表逐条勾：
+
+| 层级 | 权限项 | 级别 |
+|---|---|---|
+| 账户 | Workers 脚本 | 编辑 |
+| 账户 | Workers KV 存储 | 编辑 |
+| 账户 | D1 | 编辑 |
+| 账户 | Workers R2 存储 | 编辑 |
+| 用户 | **User Details** | 读取 |
+| 用户 | **Memberships** | 读取 |
+
+> ⚠️ 最后两个「用户」层级的权限**极易漏勾**。
+> 漏了的表现是：账户 ID 能读到，但报
+> `Unable to retrieve email... Are you missing the User->User Details->Read permission?`
+> 或 `Unable to get membership roles... Memberships->Read permission?`
+
+### 自检令牌权限
+
+本地跑一次就能验证（不用等 Actions）：
+
+```bash
+export CLOUDFLARE_API_TOKEN=你的令牌
+export CLOUDFLARE_ACCOUNT_ID=你的账户ID
+npx wrangler whoami
+```
+
+- 正常 → 会列出账户名和权限
+- 报 `Authentication error [code: 10000]` → 权限不足，回去补勾
 
 ---
 
@@ -192,6 +218,30 @@ sk-d5DyJCcfW9TmkeIHnfFPgHJ2ZjxfKHCx5ip3tR14abyrgZEi
 ---
 
 ## 常见问题
+
+### ❌ 部署时报 Authentication error [code: 10000]
+
+**原因**：API 令牌权限不足（不是账户 ID 错了）。
+
+典型长这样：
+
+```
+✘ [ERROR] A request to the Cloudflare API (/accounts/***/workers/services/***) failed.
+  Authentication error [code: 10000]
+👋 Unable to retrieve email... Are you missing the `User->User Details->Read` permission?
+🎢 Unable to get membership roles... Are you missing the `User->Memberships->Read` permission?
+```
+
+**解决**：回第 1 步重新生成令牌，确认勾了这两个**用户层级**的权限：
+
+- 用户 → **User Details** → 读取
+- 用户 → **Memberships** → 读取
+
+生成后更新 Secret `CLOUDFLARE_API_TOKEN`，再跑一次 Actions。
+
+本地可先用 `npx wrangler whoami` 验证，不用每次都等 Actions 跑完。
+
+---
 
 ### ❌ Actions 报「缺少 Secret D1_DATABASE_ID」
 

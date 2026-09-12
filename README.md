@@ -82,7 +82,17 @@ npx wrangler r2 bucket create agnes-chat
 #### 2. 获取 API Token
 
 Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「编辑 Cloudflare Workers」模板。
-需要有 **Workers / KV / D1 / R2 的编辑权限**。
+
+需要的权限（手动创建时逐条勾）：
+
+| 层级 | 权限项 | 级别 |
+|---|---|---|
+| 账户 | Workers 脚本 / Workers KV 存储 / D1 / Workers R2 存储 | 编辑 |
+| 用户 | **User Details** | 读取 |
+| 用户 | **Memberships** | 读取 |
+
+> ⚠️ 后两个「用户」层级权限极易漏勾，漏了会报
+> `Authentication error [code: 10000]`。可用 `npx wrangler whoami` 本地验证。
 
 同时记下 **账户 ID**（Dashboard 右侧栏）。
 
