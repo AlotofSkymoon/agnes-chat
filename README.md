@@ -62,7 +62,7 @@
 
 ### 方式一：Cloudflare Workers + GitHub Actions（需 API 令牌）
 
-> 不想配令牌？直接看[方式二（界面部署）](#方式二cloudflare-界面部署workers-builds-小白推荐)，更省事。
+> 不想配令牌？直接看[界面部署](https://github.com/AlotofSkymoon/agnes-chat/blob/main/Cloudflare部署教程.md#方式二cloudflare-界面部署workers-builds)，更省事。
 
 #### 1. 准备 Cloudflare 三件套
 
