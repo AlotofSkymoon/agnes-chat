@@ -297,26 +297,50 @@ npx wrangler r2 bucket create agnes-chat
 
 或用 Cloudflare 后台：**存储和数据库 → R2 → 创建存储桶** → 名字填 `agnes-chat`。
 
+> 💡 **桶名可以留空**。只要 Worker 环境变量里有 `CLOUDFLARE_API_TOKEN`，
+> 系统会自动在账户里找 `agnes-chat` → `agnes-chat-r2`（按此顺序），
+> 找到就自动填好 Endpoint 和公开域名，不用手抄 32 位账户 ID。
+> 设置面板里点「自动寻找」按钮，桶名那栏空着直接点即可。
+
 > 💡 R2 免费额度 10 GB 存储，**零出站流量费**（这是它比 S3/B2 香的地方）。
 > 图片、视频、大文件都走它，且是浏览器直传，不经过 Worker，
 > 所以文件大小不受 Workers 请求体限制（R2 单次 PUT 上限 5 GB）。
 
-### ③ 建一次 D1 表（只需一次）
+### ③ 设置 JWT_SECRET（用于初始化 D1）
 
-在你自己的电脑上（或用 Cloudflare 后台的 D1 控制台）跑：
+Worker → **设置 → 变量和机密 → 添加**：
+
+| 类型 | 名称 | 值 |
+|---|---|---|
+| 机密（加密） | `JWT_SECRET` | `openssl rand -base64 32` 生成的随机串 |
+
+> ⚠️ 这一步不能省。D1 初始化接口靠它签发令牌，
+> 不配的话谁都能访问建表地址（虽然建表本身幂等，但仍然不该裸奔）。
+
+### ④ 访问一次建表地址（只需一次）
+
+先生成令牌（在你电脑上，把 `<你的JWT_SECRET>` 换成上一步填的值）：
 
 ```bash
-npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote
+npm run cf:d1:token -- <你的JWT_SECRET> 24
 ```
 
-第一次会让你登录 Cloudflare，跟着提示点就行。
-建表语句是幂等的，重复执行不会产生副作用。
-现在会建 4 张表：`users`（账号）、`meta`（计数器）、
-`conversations` + `messages`（聊天记录）。
+会输出一串令牌。然后浏览器访问：
 
-> 如果不想装 Node，也可以用 Cloudflare 后台：
-> **存储和数据库 → D1 → 选 agnes-chat-db → Console**，
-> 把 `schema.sql` 的内容粘贴进去执行。
+```
+https://你的域名/api/d1/cshsjk/<令牌>
+```
+
+看到 `{"ok":true,"message":"D1 表结构已就绪…"}` 就成功了。
+
+建表语句全部是 `CREATE TABLE IF NOT EXISTS`，**幂等**，重复访问无害。
+会建 5 张表：`users`（账号）、`meta`（计数器）、
+`conversations` + `messages`（聊天记录）、`site_settings`（站点配置）。
+
+> **令牌无效 / 401**：确认填的 `JWT_SECRET` 和生成令牌时用的是同一个，且改完变量后**重新部署过一次**（改环境变量要重新部署才生效）。
+>
+> **想省事也可以用命令行**：`npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote`，
+> 或在 D1 控制台粘贴 `schema.sql` 执行 —— 三条路任选其一。
 
 ---
 

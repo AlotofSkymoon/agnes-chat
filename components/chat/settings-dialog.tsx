@@ -133,13 +133,9 @@ export function SettingsDialog({
    */
   const isAdmin = user?.role === "admin";
 
-  /** 只填桶名 → 自动定位 R2 桶并填好 endpoint / 公开域名 */
+  /** 留空也能找：自动在账户里匹配 agnes-chat / agnes-chat-r2 */
   async function discoverBucket() {
     const name = (form.s3?.bucket ?? "").trim();
-    if (!name) {
-      setDiscoverMsg("请先填写桶名");
-      return;
-    }
     setDiscovering(true);
     setDiscoverMsg("");
     try {
@@ -150,21 +146,27 @@ export function SettingsDialog({
       });
       const data = (await res.json()) as {
         found?: boolean;
+        bucket?: string;
         endpoint?: string;
         publicBaseUrl?: string;
+        available?: string[];
         error?: string;
       };
-      if (data.found && data.endpoint) {
+      if (data.found && data.endpoint && data.bucket) {
         patchS3({
           enabled: true,
           endpoint: data.endpoint,
           region: "auto",
-          bucket: name,
+          bucket: data.bucket,
           publicBaseUrl: data.publicBaseUrl ?? "",
         });
-        setDiscoverMsg(`已找到桶「${name}」，端点已自动填入`);
+        setDiscoverMsg(`已找到桶「${data.bucket}」，端点已自动填入`);
       } else {
-        setDiscoverMsg(data.error ?? "未找到该桶");
+        setDiscoverMsg(
+          data.available?.length
+            ? `${data.error ?? "未找到"}（可选：${data.available.join("、")}）`
+            : data.error ?? "未找到该桶",
+        );
       }
     } catch {
       setDiscoverMsg("查找失败，请稍后重试");
@@ -781,7 +783,7 @@ export function SettingsDialog({
                   <Label className="text-xs">Bucket</Label>
                   <div className="flex gap-2">
                     <Input
-                      placeholder="只填桶名，如 agnes-chat"
+                      placeholder="留空自动找 agnes-chat / agnes-chat-r2"
                       value={s3.bucket}
                       onChange={(e) => patchS3({ bucket: e.target.value })}
                       autoComplete="off"
@@ -793,7 +795,7 @@ export function SettingsDialog({
                       className="h-9 shrink-0 text-xs"
                       disabled={discovering}
                       onClick={() => void discoverBucket()}
-                      title="用桶名自动查找并填入 Endpoint"
+                      title="留空则自动匹配 agnes-chat / agnes-chat-r2"
                     >
                       {discovering ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />

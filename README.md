@@ -207,6 +207,8 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 | `UPSTREAM_MODEL` | `agnes-3.0-flash` | 默认模型 |
 | `NEXT_PUBLIC_ALLOW_CUSTOM_KEY` | `true` | 设 `false` 锁死：访客只能用站长的 Key |
 | `NEXT_PUBLIC_REQUIRE_LOGIN` | `false` | 设 `true` 则必须登录才能对话 |
+| `JWT_SECRET` | 无 | D1 初始化接口的签名密钥，界面部署时用它生成建表令牌 |
+| `CLOUDFLARE_API_TOKEN` | 无 | 选填，配了就能自动寻找 R2 桶（`agnes-chat` / `agnes-chat-r2`） |
 | `NEXT_PUBLIC_ALLOW_CUSTOM_BASE_URL` | `true` | 设 `false` 锁死 Base URL |
 
 > 💡 只要服务兼容 OpenAI 的 `/chat/completions` 就能直接套用。

@@ -24,6 +24,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "请求格式错误" }, { status: 400 });
   }
 
+  // 桶名留空 = 自动在账户里找 agnes-chat / agnes-chat-r2
   const result = await discoverR2Bucket(body.bucket ?? "");
   return NextResponse.json(result, { status: result.found ? 200 : 404 });
 }

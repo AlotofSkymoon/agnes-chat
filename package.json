@@ -12,6 +12,7 @@
     "cf:dev": "opennextjs-cloudflare && wrangler dev",
     "cf:deploy": "opennextjs-cloudflare && wrangler deploy",
     "cf:d1:init": "wrangler d1 execute agnes-chat-db --file=./schema.sql --remote",
+  "cf:d1:token": "node scripts/gen-d1-token.mjs",
     "cf:secret": "wrangler secret bulk .dev.vars"
   },
   "dependencies": {

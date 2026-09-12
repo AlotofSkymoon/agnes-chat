@@ -50,24 +50,42 @@ function r2AccountId(): string {
 }
 
 /**
+ * 本站默认的 R2 桶名候选。
+ *
+ * 部署时只要账户里存在其中任意一个，就能自动选中，用户不用填桶名。
+ * 顺序即优先级：先找 agnes-chat，没有再找 agnes-chat-r2。
+ */
+export const R2_CANDIDATE_BUCKETS = ["agnes-chat", "agnes-chat-r2"] as const;
+
+/**
  * 按桶名自动定位 R2 桶。
  *
  * 用户只填桶名就够了 —— 用 Cloudflare API 列出账户下所有桶，
  * 找到同名桶并自动拼出 endpoint，免去手抄 32 位账户 ID 的麻烦。
  *
+ * 桶名为空时，会按 R2_CANDIDATE_BUCKETS 依次尝试，
+ * 命中第一个存在的就用它 —— 这样"只配了 API Token"也能直接用上。
+ *
  * 需要 CLOUDFLARE_API_TOKEN（或 R2_API_TOKEN）+ 账户 ID。
  */
 export async function discoverR2Bucket(
   bucketName: string,
-): Promise<{ found: boolean; endpoint: string; publicBaseUrl: string; error?: string }> {
-  const bucket = bucketName.trim();
-  if (!bucket) return { found: false, endpoint: "", publicBaseUrl: "", error: "请填写桶名" };
-
+): Promise<{
+  found: boolean;
+  bucket: string;
+  endpoint: string;
+  publicBaseUrl: string;
+  available?: string[];
+  error?: string;
+}> {
+  const wanted = bucketName.trim();
   const token = (process.env.CLOUDFLARE_API_TOKEN ?? process.env.R2_API_TOKEN ?? "").trim();
   const account = r2AccountId();
+
   if (!token || !account) {
     return {
       found: false,
+      bucket: "",
       endpoint: "",
       publicBaseUrl: "",
       error: "缺少 CLOUDFLARE_API_TOKEN 或账户 ID，无法自动查找",
@@ -82,36 +100,72 @@ export async function discoverR2Bucket(
     if (!res.ok) {
       return {
         found: false,
+        bucket: "",
         endpoint: "",
         publicBaseUrl: "",
-        error: `Cloudflare API 返回 ${res.status}`,
+        error: `Cloudflare API 返回 ${res.status}（令牌权限不足？需要「Workers R2 存储 → 编辑」）`,
       };
     }
     const data = (await res.json()) as {
       success?: boolean;
       result?: { name?: string }[];
     };
-    const names = (data.result ?? []).map((b) => b.name ?? "");
-    const hit = names.find((n) => n.toLowerCase() === bucket.toLowerCase());
+    const names = (data.result ?? []).map((b) => b.name ?? "").filter(Boolean);
+
+    if (names.length === 0) {
+      return {
+        found: false,
+        bucket: "",
+        endpoint: "",
+        publicBaseUrl: "",
+        available: [],
+        error: "账户下还没有任何 R2 桶，请先创建一个（例如 agnes-chat）",
+      };
+    }
+
+    // 1) 指定了名字：精确匹配，其次前缀匹配（容忍 agnes-chat-2 这类变体）
+    let hit = "";
+    if (wanted) {
+      hit =
+        names.find((n) => n.toLowerCase() === wanted.toLowerCase()) ??
+        names.find((n) => n.toLowerCase().startsWith(wanted.toLowerCase())) ??
+        "";
+    }
+
+    // 2) 没指定 / 没匹配上：按默认候选名依次找
+    if (!hit) {
+      hit =
+        R2_CANDIDATE_BUCKETS.find((c) =>
+          names.some((n) => n.toLowerCase() === c.toLowerCase()),
+        ) ?? "";
+    }
+
     if (!hit) {
       return {
         found: false,
+        bucket: "",
         endpoint: "",
         publicBaseUrl: "",
-        error: `账户下没有名为「${bucket}」的桶，现有：${names.join("、") || "（空）"}`,
+        available: names,
+        error: wanted
+          ? `没找到「${wanted}」，也没找到默认的 ${R2_CANDIDATE_BUCKETS.join(" / ")}。账户现有：${names.join("、")}`
+          : `没找到默认的 ${R2_CANDIDATE_BUCKETS.join(" / ")}。账户现有：${names.join("、")}`,
       };
     }
 
     const endpoint = `https://${account}.r2.cloudflarestorage.com`;
     return {
       found: true,
+      bucket: hit,
       endpoint,
       // r2.dev 公开域名（需在桶设置里开启）；用户也可填自定义域覆盖
       publicBaseUrl: `https://pub-${account}.r2.dev`,
+      available: names,
     };
   } catch (err) {
     return {
       found: false,
+      bucket: "",
       endpoint: "",
       publicBaseUrl: "",
       error: err instanceof Error ? err.message : "查找失败",
