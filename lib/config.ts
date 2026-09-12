@@ -1,24 +1,90 @@
-/** 允许的模型列表（纯聊天，不含 Agent / 工具调用） */
-export const AGNES_MODELS = [
-  { id: "agnes-2.5-flash", label: "agnes-2.5-flash", desc: "更快，日常聊天首选" },
-  { id: "agnes-2.0-flash", label: "agnes-2.0-flash", desc: "稳定版" },
-] as const;
+/** 支持的模型服务商 */
+export type ProviderId = "agnes" | "deepseek";
 
-export type AgnesModelId = (typeof AGNES_MODELS)[number]["id"];
+export interface ProviderConfig {
+  id: ProviderId;
+  label: string;
+  /** 默认 API Base URL（OpenAI 兼容） */
+  baseUrl: string;
+  /** 站点是否内置了该服务商的 Key（Agnes 有，DeepSeek 没有，需用户自备） */
+  hasPreset: boolean;
+  /** 申请 Key 的地址 */
+  keyUrl: string;
+}
 
-export const DEFAULT_MODEL: AgnesModelId = "agnes-2.5-flash";
+export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
+  agnes: {
+    id: "agnes",
+    label: "Agnes AI",
+    baseUrl: "https://apihub.agnes-ai.com/v1",
+    hasPreset: true,
+    keyUrl: "https://platform.agnes-ai.com/",
+  },
+  deepseek: {
+    id: "deepseek",
+    label: "DeepSeek",
+    baseUrl: "https://api.deepseek.com/v1",
+    hasPreset: false,
+    keyUrl: "https://platform.deepseek.com/api_keys",
+  },
+};
 
-export const DEFAULT_BASE_URL = "https://apihub.agnes-ai.com/v1";
+export interface ModelOption {
+  id: string;
+  label: string;
+  desc: string;
+  provider: ProviderId;
+}
+
+/** 可选模型（纯聊天，不含 Agent / 工具调用） */
+export const CHAT_MODELS: ModelOption[] = [
+  {
+    id: "agnes-2.5-flash",
+    label: "agnes-2.5-flash",
+    desc: "更快，日常聊天首选",
+    provider: "agnes",
+  },
+  { id: "agnes-2.0-flash", label: "agnes-2.0-flash", desc: "稳定版", provider: "agnes" },
+  {
+    id: "deepseek-chat",
+    label: "deepseek-chat",
+    desc: "DeepSeek V3 · 通用对话",
+    provider: "deepseek",
+  },
+  {
+    id: "deepseek-reasoner",
+    label: "deepseek-reasoner",
+    desc: "DeepSeek R1 · 深度推理",
+    provider: "deepseek",
+  },
+];
+
+/** 兼容旧引用的 Agnes 模型列表 */
+export const AGNES_MODELS = CHAT_MODELS.filter((m) => m.provider === "agnes");
+
+export const DEFAULT_MODEL = "agnes-2.5-flash";
+
+export const DEFAULT_BASE_URL = PROVIDERS.agnes.baseUrl;
 
 export const AGENT_TIP = "仅聊天模式。需要 Agent 功能请去 AgentScope 添加 Agnes API Key。";
 
-export function isAllowedModel(model: string): boolean {
-  return AGNES_MODELS.some((m) => m.id === model);
+export function getModel(modelId: string): ModelOption | undefined {
+  return CHAT_MODELS.find((m) => m.id === modelId);
+}
+
+export function isAllowedModel(modelId: string): boolean {
+  return CHAT_MODELS.some((m) => m.id === modelId);
+}
+
+export function getProvider(modelId: string): ProviderId {
+  return getModel(modelId)?.provider ?? "agnes";
 }
 
 /* ---------------------------- localStorage Keys ---------------------------- */
 
 export const LS_KEYS = {
+  // 各服务商的 Key 分开存
+  keys: "agnes:keys", // JSON: { agnes?: string; deepseek?: string }
   apiKey: "agnes:apiKey",
   baseUrl: "agnes:baseUrl",
   model: "agnes:model",

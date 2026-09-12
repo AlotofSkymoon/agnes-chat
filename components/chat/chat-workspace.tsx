@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Eraser, Menu, Settings2 } from "lucide-react";
+import Link from "next/link";
+import { Compass, Eraser, Menu, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatInput } from "@/components/chat/chat-input";
@@ -10,7 +11,7 @@ import { MessageBubble } from "@/components/chat/message-bubble";
 import { SettingsDialog, type ChatSettings } from "@/components/chat/settings-dialog";
 import { Sidebar } from "@/components/chat/sidebar";
 import { Button } from "@/components/ui/button";
-import { DEFAULT_BASE_URL, DEFAULT_MODEL, LS_KEYS } from "@/lib/config";
+import { DEFAULT_MODEL, LS_KEYS } from "@/lib/config";
 import { createId, type ChatMessage } from "@/lib/types";
 import { useConversations } from "@/lib/use-conversations";
 
@@ -22,8 +23,8 @@ interface SafeUser {
 }
 
 const DEFAULT_SETTINGS: ChatSettings = {
-  apiKey: "",
-  baseUrl: DEFAULT_BASE_URL,
+  keys: { agnes: "", deepseek: "" },
+  baseUrl: "",
   model: DEFAULT_MODEL,
 };
 
@@ -61,9 +62,27 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
   /* ------------------------------ 初始化设置 ------------------------------ */
   React.useEffect(() => {
     try {
+      // 新版：各服务商分开存；兼容旧版单一 apiKey
+      let keys: Record<string, string> = { agnes: "", deepseek: "" };
+      const rawKeys = localStorage.getItem(LS_KEYS.keys);
+      if (rawKeys) {
+        try {
+          const parsed = JSON.parse(rawKeys) as Record<string, string>;
+          keys = { agnes: parsed.agnes ?? "", deepseek: parsed.deepseek ?? "" };
+        } catch {
+          /* 忽略 */
+        }
+      }
+      // 迁移：旧版本存的单一 apiKey 当作 Agnes Key
+      const legacy = localStorage.getItem(LS_KEYS.apiKey) ?? "";
+      if (!keys.agnes && legacy) {
+        keys.agnes = legacy;
+        localStorage.setItem(LS_KEYS.keys, JSON.stringify(keys));
+      }
+
       const saved: ChatSettings = {
-        apiKey: localStorage.getItem(LS_KEYS.apiKey) ?? "",
-        baseUrl: localStorage.getItem(LS_KEYS.baseUrl) ?? DEFAULT_BASE_URL,
+        keys: keys as ChatSettings["keys"],
+        baseUrl: localStorage.getItem(LS_KEYS.baseUrl) ?? "",
         model: localStorage.getItem(LS_KEYS.model) ?? DEFAULT_MODEL,
       };
       setSettings(saved);
@@ -122,7 +141,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
               .filter((m) => !m.error)
               .map((m) => ({ role: m.role, content: m.content })),
             model: settings.model,
-            apiKey: settings.apiKey,
+            keys: settings.keys,
             baseUrl: settings.baseUrl,
             conversationId,
             saveToCloud: Boolean(user) && cloudSync,
@@ -182,7 +201,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         abortRef.current = null;
       }
     },
-    [cloudSync, settings.apiKey, settings.baseUrl, settings.model, setMessages, user],
+    [cloudSync, settings.baseUrl, settings.keys, settings.model, setMessages, user],
   );
 
   const send = React.useCallback(
@@ -261,7 +280,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
   function saveSettings(next: ChatSettings) {
     setSettings(next);
     try {
-      localStorage.setItem(LS_KEYS.apiKey, next.apiKey);
+      localStorage.setItem(LS_KEYS.keys, JSON.stringify(next.keys));
       localStorage.setItem(LS_KEYS.baseUrl, next.baseUrl);
       localStorage.setItem(LS_KEYS.model, next.model);
     } catch {
@@ -307,6 +326,11 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
               </span>
             </div>
             <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" asChild title="导航站">
+                <Link href="/nav">
+                  <Compass className="h-4 w-4" />
+                </Link>
+              </Button>
               <Button variant="ghost" size="icon" onClick={handleClearCurrent} title="清空当前对话">
                 <Eraser className="h-4 w-4" />
               </Button>
@@ -320,9 +344,16 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
             <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
               <Menu className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)}>
-              <Settings2 className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" asChild title="导航站">
+                <Link href="/nav">
+                  <Compass className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)}>
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </div>
           </header>
         )}
 

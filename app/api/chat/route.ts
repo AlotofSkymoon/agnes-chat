@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth";
-import { DEFAULT_BASE_URL, DEFAULT_MODEL, isAllowedModel } from "@/lib/config";
+import { DEFAULT_MODEL, PROVIDERS, getProvider, isAllowedModel } from "@/lib/config";
 import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
@@ -15,6 +15,8 @@ interface ChatRequestBody {
   model?: string;
   /** 用户自己的 Key（来自 localStorage，可选） */
   apiKey?: string;
+  /** 各服务商的 Key：{ agnes?: string; deepseek?: string } */
+  keys?: { agnes?: string; deepseek?: string };
   baseUrl?: string;
   /** 云端保存开关打开时才传 */
   conversationId?: string;
@@ -33,7 +35,15 @@ export async function POST(request: Request) {
     return errorResponse(400, "BAD_REQUEST", "请求格式错误");
   }
 
-  const { messages, model = DEFAULT_MODEL, apiKey, baseUrl, conversationId, saveToCloud } = body;
+  const {
+    messages,
+    model = DEFAULT_MODEL,
+    apiKey,
+    keys,
+    baseUrl,
+    conversationId,
+    saveToCloud,
+  } = body;
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return errorResponse(400, "BAD_REQUEST", "消息不能为空");
@@ -42,15 +52,29 @@ export async function POST(request: Request) {
     return errorResponse(400, "BAD_MODEL", "不支持的模型");
   }
 
-  // 优先级：用户自己的 Key > 服务端预设 Key（预设 Key 永不下发给浏览器）
-  const presetKey = process.env.PRESET_AGNES_API_KEY?.trim();
-  const finalKey = apiKey?.trim() || presetKey;
+  const provider = getProvider(model);
+  const providerCfg = PROVIDERS[provider];
 
-  if (!finalKey) {
-    return errorResponse(401, "NO_API_KEY", "未配置 Agnes API Key，请在设置中填写你的 Key");
+  // 按服务商取 Key：Agnes 可回落到服务端预设 Key，DeepSeek 必须用户自备
+  let finalKey = "";
+  if (provider === "agnes") {
+    const presetKey = process.env.PRESET_AGNES_API_KEY?.trim() ?? "";
+    finalKey = (keys?.agnes ?? apiKey ?? "").trim() || presetKey;
+  } else {
+    finalKey = (keys?.deepseek ?? "").trim();
   }
 
-  const targetBase = (baseUrl?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, "");
+  if (!finalKey) {
+    return errorResponse(
+      401,
+      "NO_API_KEY",
+      provider === "agnes"
+        ? "未配置 Agnes API Key，请在设置中填写你的 Key"
+        : `使用 ${providerCfg.label} 模型需要填写你自己的 ${providerCfg.label} API Key（设置中填写）`,
+    );
+  }
+
+  const targetBase = (baseUrl?.trim() || providerCfg.baseUrl).replace(/\/+$/, "");
   const upstreamUrl = `${targetBase}/chat/completions`;
 
   let upstream: Response;
@@ -75,7 +99,11 @@ export async function POST(request: Request) {
 
   if (!upstream.ok || !upstream.body) {
     if (upstream.status === 401) {
-      return errorResponse(401, "INVALID_KEY", "Agnes API Key 无效，请检查后重试");
+      return errorResponse(
+        401,
+        "INVALID_KEY",
+        `${providerCfg.label} API Key 无效，请检查后重试`,
+      );
     }
     if (upstream.status === 429) {
       return errorResponse(429, "RATE_LIMIT", "请求过快，请稍后再试");
@@ -87,6 +115,15 @@ export async function POST(request: Request) {
 
   const user = await getCurrentUser();
   const shouldSave = Boolean(saveToCloud && conversationId && user && hasRedisConfig());
+
+  // 统计：累计 AI 回复次数（失败不计）
+  if (hasRedisConfig()) {
+    try {
+      await getRedis().incr(KEYS.statMessages);
+    } catch {
+      /* 统计失败不影响聊天 */
+    }
+  }
 
   // 透传上游 SSE，同时累积助手文本，用于「保存到云端」
   const reader = upstream.body.getReader();

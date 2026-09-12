@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Eye, EyeOff, KeyRound, Server, Trash2 } from "lucide-react";
+import { Eye, EyeOff, ExternalLink, KeyRound, Server, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,10 +15,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { AGENT_TIP, AGNES_MODELS, DEFAULT_BASE_URL } from "@/lib/config";
+import {
+  AGENT_TIP,
+  CHAT_MODELS,
+  PROVIDERS,
+  type ProviderId,
+} from "@/lib/config";
 
 export interface ChatSettings {
-  apiKey: string;
+  /** 各服务商的 Key */
+  keys: Record<ProviderId, string>;
+  /** 自定义 Base URL，留空则用模型所属服务商的默认地址 */
   baseUrl: string;
   model: string;
 }
@@ -34,6 +41,8 @@ interface SettingsDialogProps {
   onClearAll: () => void;
 }
 
+const PROVIDER_ORDER: ProviderId[] = ["agnes", "deepseek"];
+
 export function SettingsDialog({
   open,
   onOpenChange,
@@ -45,7 +54,10 @@ export function SettingsDialog({
   onClearAll,
 }: SettingsDialogProps) {
   const [form, setForm] = React.useState<ChatSettings>(settings);
-  const [showKey, setShowKey] = React.useState(false);
+  const [showKey, setShowKey] = React.useState<Record<ProviderId, boolean>>({
+    agnes: false,
+    deepseek: false,
+  });
 
   React.useEffect(() => {
     if (open) setForm(settings);
@@ -54,8 +66,11 @@ export function SettingsDialog({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     onSave({
-      apiKey: form.apiKey.trim(),
-      baseUrl: form.baseUrl.trim() || DEFAULT_BASE_URL,
+      keys: {
+        agnes: form.keys.agnes.trim(),
+        deepseek: form.keys.deepseek.trim(),
+      },
+      baseUrl: form.baseUrl.trim(),
       model: form.model,
     });
     onOpenChange(false);
@@ -70,53 +85,66 @@ export function SettingsDialog({
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="apiKey" className="flex items-center gap-2">
+          {/* API Keys（按服务商） */}
+          <div className="space-y-4">
+            <Label className="flex items-center gap-2">
               <KeyRound className="h-4 w-4" />
-              Agnes API Key
+              API Key
             </Label>
-            <div className="relative">
-              <Input
-                id="apiKey"
-                type={showKey ? "text" : "password"}
-                placeholder="sk-...（留空则使用站点内置 Key）"
-                value={form.apiKey}
-                onChange={(e) => setForm((f) => ({ ...f, apiKey: e.target.value }))}
-                className="pr-10"
-                autoComplete="off"
-              />
-              <button
-                type="button"
-                onClick={() => setShowKey((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground hover:bg-muted"
-                aria-label="显示/隐藏 Key"
-              >
-                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              保存在浏览器 localStorage，仅用于向 Agnes 发起请求。留空则使用本站内置 Key。
-            </p>
+
+            {PROVIDER_ORDER.map((pid) => {
+              const p = PROVIDERS[pid];
+              return (
+                <div key={pid} className="space-y-1.5 rounded-xl border border-border/70 bg-card/40 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium">{p.label}</span>
+                    <a
+                      href={p.keyUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                      去申请
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      type={showKey[pid] ? "text" : "password"}
+                      placeholder={
+                        p.hasPreset ? "sk-...（留空则使用站点内置 Key）" : `sk-...（使用 ${p.label} 模型必填）`
+                      }
+                      value={form.keys[pid] ?? ""}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, keys: { ...f.keys, [pid]: e.target.value } }))
+                      }
+                      className="pr-10"
+                      autoComplete="off"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey((s) => ({ ...s, [pid]: !s[pid] }))}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+                      aria-label="显示/隐藏 Key"
+                    >
+                      {showKey[pid] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {p.hasPreset
+                      ? "保存在浏览器本地，仅用于向 Agnes 发起请求。"
+                      : "DeepSeek 无内置 Key，需填你自己的；仅保存在浏览器本地。"}
+                  </p>
+                </div>
+              );
+            })}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="baseUrl" className="flex items-center gap-2">
-              <Server className="h-4 w-4" />
-              Base URL
-            </Label>
-            <Input
-              id="baseUrl"
-              placeholder={DEFAULT_BASE_URL}
-              value={form.baseUrl}
-              onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
-              autoComplete="off"
-            />
-          </div>
-
+          {/* 模型 */}
           <div className="space-y-2">
             <Label>模型</Label>
             <div className="grid gap-2">
-              {AGNES_MODELS.map((m) => {
+              {CHAT_MODELS.map((m) => {
                 const active = form.model === m.id;
                 return (
                   <button
@@ -144,6 +172,26 @@ export function SettingsDialog({
             </div>
           </div>
 
+          {/* 高级：Base URL */}
+          <details className="rounded-xl border border-border/70 bg-card/40 px-3 py-2">
+            <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <Server className="h-4 w-4" />
+              自定义 Base URL（高级）
+            </summary>
+            <div className="mt-3 space-y-1.5">
+              <Input
+                placeholder="留空则自动使用所选模型的官方地址"
+                value={form.baseUrl}
+                onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
+                autoComplete="off"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Agnes：{PROVIDERS.agnes.baseUrl} · DeepSeek：{PROVIDERS.deepseek.baseUrl}
+              </p>
+            </div>
+          </details>
+
+          {/* 云端保存 */}
           {user ? (
             <div className="flex items-center justify-between rounded-xl border border-border/70 bg-card/40 px-3 py-3">
               <div className="pr-3">
@@ -160,6 +208,7 @@ export function SettingsDialog({
             </div>
           )}
 
+          {/* 清空 */}
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-3">
             <p className="text-sm font-medium text-destructive">清空全部数据</p>
             <p className="mt-1 text-xs text-muted-foreground">

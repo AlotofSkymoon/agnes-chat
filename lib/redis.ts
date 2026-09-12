@@ -48,6 +48,14 @@ export const KEYS = {
   chatIndex: (userId: string) => `chat:index:${userId}`,
   /** 登录限流 */
   loginRateLimit: (ip: string) => `ratelimit:login:${ip}`,
+  /** 导航站自定义数据（管理员维护） */
+  navData: "nav:data",
+  /** 域名后缀缓存 */
+  tlds: "tlds:list",
+  /** 站点公告 */
+  announcement: "site:announcement",
+  /** 站点统计：累计对话数 */
+  statMessages: "stat:messages",
 } as const;
 
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 天
