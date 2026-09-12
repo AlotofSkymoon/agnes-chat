@@ -12,6 +12,27 @@
 
 ---
 
+## 先选一种部署方式
+
+本文提供两种，**效果完全一样，选一个走到底即可**：
+
+| | 方式一：GitHub Actions | 方式二：界面部署 ⭐ |
+|---|---|---|
+| 在哪操作 | GitHub 仓库 | Cloudflare 后台 |
+| 要配 API 令牌吗 | **要**（最容易踩坑的一步） | **不要**（平台自己生成） |
+| 适合谁 | 想要 CI/CD、熟悉 GitHub | 小白、想少折腾 |
+| 章节位置 | 下面「第 1～8 步」 | [跳到方式二](#方式二cloudflare-界面部署workers-builds) |
+
+> 💡 **如果你是第一次部署，强烈建议直接看[方式二](#方式二cloudflare-界面部署workers-builds)**。
+> 它可以绕开"API 令牌权限不足"这个高频坑 —— Cloudflare 会自己生成凭证。
+
+两种方式**共用**第 2～6 步的资源准备（账户 ID、KV、D1、SESSION_SECRET、API Key），
+只有第 1 步（API 令牌）是方式一独有的。
+
+---
+
+# 方式一：GitHub Actions 部署
+
 ## 你需要准备的东西
 
 一共要往 GitHub 里填 **7 个 Secrets**。先把容器建好，再回来填。
@@ -28,9 +49,10 @@
 
 ---
 
-## 第 1 步：创建 Cloudflare API 令牌
+## 第 1 步：创建 Cloudflare API 令牌（仅方式一需要）
 
 这个令牌让 GitHub Actions 能帮你部署。
+> 走方式二（界面部署）的话，**跳过这一步**，平台会自己生成凭证。
 **这一步最容易出问题**——权限少勾一个，部署时就会报 `Authentication error [code: 10000]`。
 
 ### 方式 A：用官方模板（推荐）
@@ -188,9 +210,19 @@ sk-d5DyJCcfW9TmkeIHnfFPgHJ2ZjxfKHCx5ip3tR14abyrgZEi
 4. 点右边 **「Run workflow」** → 再点 **「Run workflow」**
 5. 等 3～5 分钟，看到绿色 ✅ 就成功了
 
-**之后每次推代码都会自动重新部署。**
-
 > 工作流文件在 `.github/workflows/deploy-cloudflare.yml`，已由上游配置好，不用你自己建。
+
+**当前默认是「手动触发」**，这样不会和方式二（界面部署）重复部署。
+想改成推送 `main` 就自动部署，把工作流文件开头的两行注释去掉：
+
+```yaml
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+```
+
+> ⚠️ **不要同时启用方式一自动部署和方式二**，否则一次推送会部署两遍，互相覆盖。
 
 ### 怎么找到你的网站地址？
 
@@ -214,6 +246,149 @@ sk-d5DyJCcfW9TmkeIHnfFPgHJ2ZjxfKHCx5ip3tR14abyrgZEi
 - `problems` 有内容 → 按提示逐条修
 
 > 常见问题里列了几个典型报错的对照表，先去那儿看一眼。
+
+---
+
+# 方式二：Cloudflare 界面部署（Workers Builds）
+
+> ⭐ **推荐小白用这个。** 全程在 Cloudflare 后台点，**不用创建 API 令牌**。
+>
+> Cloudflare 官方文档说明：使用 Workers Builds 时，
+> **平台会自动为你的账户生成 API 令牌**，你不需要自己配置凭证。
+> 这意味着方式一里最容易踩的「令牌权限不足」坑，在这里根本不存在。
+
+## 前置：两件必须手动做的事
+
+界面部署**不会**跑 GitHub Actions 里的那些步骤，所以下面两件事要你自己做一次。
+
+### ① 把 KV / D1 的真实 ID 填进 `wrangler.jsonc`
+
+打开仓库里的 `wrangler.jsonc`，找到这两处占位符，**替换成真实 ID**：
+
+```jsonc
+"kv_namespaces": [
+  { "binding": "KV", "id": "把这里换成你的 KV 命名空间 ID" }
+],
+"d1_databases": [
+  {
+    "binding": "DB",
+    "database_name": "agnes-chat-db",
+    "database_id": "把这里换成你的 D1 数据库 ID"
+  }
+]
+```
+
+- KV ID 怎么拿：见[第 3 步](#第-3-步创建-kv-命名空间)
+- D1 ID 怎么拿：见[第 4 步](#第-4-步创建-d1-数据库)
+
+> 💡 这俩 ID **不是密钥**，提交到公开仓库没问题。
+> 真正需要保密的是 `PRESET_AGNES_API_KEY` 和 `SESSION_SECRET`，那两个走下面的加密变量。
+
+改完提交到 GitHub。
+
+### ② 建一次 D1 表（只需一次）
+
+在你自己的电脑上（或用 Cloudflare 后台的 D1 控制台）跑：
+
+```bash
+npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote
+```
+
+第一次会让你登录 Cloudflare，跟着提示点就行。
+建表语句是幂等的，重复执行不会产生副作用。
+
+> 如果不想装 Node，也可以用 Cloudflare 后台：
+> **存储和数据库 → D1 → 选 agnes-chat-db → Console**，
+> 把 `schema.sql` 的内容粘贴进去执行。
+
+---
+
+## 开始部署
+
+### 第 1 步：创建 Worker 并连接 Git
+
+1. 打开 <https://dash.cloudflare.com>
+2. 左边菜单 **Workers 和 Pages**（旧版叫 Workers）
+3. 点 **创建** / **Create**
+4. 切到 **连接到 Git** / **Connect to Git** 这一页
+5. 点 **连接到 GitHub**，按提示授权 Cloudflare 访问你的仓库
+6. 选中 `agnes-chat` 仓库 → 点 **开始设置** / **Begin setup**
+
+### 第 2 步：填构建配置
+
+| 配置项 | 填什么 |
+|---|---|
+| Project name / 项目名称 | `agnes-chat`（随便起，会成为域名前缀） |
+| Production branch / 生产分支 | `main` |
+| **Build command / 构建命令** | `npm run cf:build` |
+| Deploy command / 部署命令 | `npx wrangler deploy`（默认即可，不用改） |
+| Root directory / 根目录 | 留空 |
+
+> ⚠️ **构建命令必须填 `npm run cf:build`**，不能只填 `npm run build`。
+> 前者 = Next.js 构建 + OpenNext 转换成 Worker 格式，缺了后者部署上去跑不起来。
+
+> 如果 Root directory 找不到，它在 **Advanced settings / 高级设置** 折叠面板里；
+> 项目在仓库根目录的话留空就行。
+
+### 第 3 步：点保存并部署
+
+拉到最下面点 **保存并部署** / **Save and Deploy**。
+
+Cloudflare 会：拉代码 → 装依赖 → 跑 `npm run cf:build` → `wrangler deploy` → 给你一个 `.workers.dev` 域名。
+
+首次大约 3～5 分钟。之后**每次推 `main` 都会自动重新部署**。
+
+---
+
+## 设置密钥（重要，否则聊天用不了）
+
+构建跑通后，还要把两个密钥告诉 Worker。
+
+### 方法 A：在后台界面加（推荐）
+
+1. 进刚建好的 Worker → **设置** / **Settings**
+2. 找 **变量和机密** / **Variables and Secrets**
+3. 点 **添加** / **Add**：
+   - 类型选 **机密（加密）** / **Secret**
+   - 名称 `PRESET_AGNES_API_KEY`，值填你的 Agnes Key
+   - 再添加 `SESSION_SECRET`，值填随机串（`openssl rand -base64 32` 生成）
+4. 保存后，**需要重新部署一次**才生效（Deployments → Retry deploy）
+
+### 方法 B：用命令行
+
+```bash
+npx wrangler secret put PRESET_AGNES_API_KEY
+npx wrangler secret put SESSION_SECRET
+```
+
+按提示粘贴值即可。
+
+> 想启用图片/视频上传的话，还要再加 `R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、
+> `R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL` 这 5 个，
+> 详见 [R2 教程](./R2对象存储配置教程.md)。
+
+---
+
+## 方式二常见问题
+
+### ❌ 构建日志出现 `config.default cannot be empty`
+
+`open-next.config.ts` 的字段层级写错了。正确结构是所有 override 都在
+`default.override` 里，不能直接在 `default` 顶层。上游已修好，
+如果你是同步的旧版本，重新 Sync fork 即可。
+
+### ❌ 部署后打开是空白 / 500
+
+先访问 `https://你的域名/api/health`：
+
+- `storage.backend` 是 `none` → `wrangler.jsonc` 的 KV / D1 ID 没填对
+- `storage.reachable` 是 `false` → D1 表没建，回去执行前置 ②
+- 提示缺 `PRESET_AGNES_API_KEY` → 上面的密钥没设置，或设完没重新部署
+
+### ❌ 想改回 GitHub Actions 部署
+
+去 Worker 的 **Settings → Build** 断开 Git 连接，
+然后按方式一走即可（记得把工作流开头的 `push` 注释打开）。
 
 ---
 
@@ -271,16 +446,23 @@ Vercel 部署照旧可用（需要 Upstash Redis），两条路互不影响：
 
 ---
 
-## 两种方式对比
+## 三种方式对比
 
-| | Cloudflare Workers（推荐） | Vercel |
-|---|---|---|
-| 数据库 | D1（SQLite）+ KV | Upstash Redis |
-| 需要注册外部服务 | 不需要 | 需要 Upstash |
-| 免费额度 | 很大，个人站用不完 | Upstash 每天 1 万命令 |
-| 自定义域名 | 自带 workers.dev，绑自己的也行 | 自带 vercel.app |
-| 大文件上传 | 完全没问题 | 受 Serverless 限制（已用预签名绕过） |
-| 配置复杂度 | 中（本教程） | 低 |
+| | ⭐ 方式二：界面部署 | 方式一：GitHub Actions | Vercel |
+|---|---|---|---|
+| 数据库 | KV + D1 | KV + D1 | Upstash Redis |
+| 需要注册外部服务 | 不需要 | 不需要 | 需要 Upstash |
+| **要配 API 令牌吗** | **不需要**（平台生成） | 需要（易踩坑） | 不需要 |
+| 免费额度 | 很大，个人站用不完 | 同左 | Upstash 每天 1 万命令 |
+| 自定义域名 | workers.dev，可绑自己的 | 同左 | 自带 vercel.app |
+| 大文件上传 | 完全没问题 | 同左 | 受 Serverless 限制（已预签名绕过） |
+| 自动部署 | 推 main 即部署 | 默认手动（可改自动） | 推代码即部署 |
+| 配置复杂度 | **低** | 中 | 低 |
+| 适合谁 | 小白 / 想少折腾 | 需要 CI/CD 流程 | 已有 Upstash、只是想跑起来 |
+
+> 三者的**运行时代码完全一样**，站点会自己检测所在平台并选择对应后端
+> （Cloudflare 走 KV+D1+R2，Vercel 走 Upstash+B2）。
+> 差别只在"谁来负责构建和上传"。
 
 ---
 

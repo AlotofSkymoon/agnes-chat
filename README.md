@@ -60,7 +60,9 @@
 
 ---
 
-### 方式一：Cloudflare Workers + GitHub Actions（推荐）
+### 方式一：Cloudflare Workers + GitHub Actions（需 API 令牌）
+
+> 不想配令牌？直接看[方式二（界面部署）](#方式二cloudflare-界面部署workers-builds-小白推荐)，更省事。
 
 #### 1. 准备 Cloudflare 三件套
 
@@ -133,7 +135,30 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 
 ---
 
-### 方式二：Vercel（不推荐，但仍可用）
+### 方式二：Cloudflare 界面部署（Workers Builds，⭐ 小白推荐）
+
+**不用创建 API 令牌** —— Cloudflare 会自动为你的账户生成凭证，
+绕开方式一里最容易踩的「令牌权限不足」坑。
+
+1. 打开仓库的 `wrangler.jsonc`，把 `__KV_ID__` / `__D1_ID__`
+   两个占位符替换成**真实 ID**（不是密钥，提交到仓库无妨）
+2. 建一次 D1 表（只需一次）：
+   `npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote`
+3. Cloudflare 后台 → **Workers 和 Pages** → **创建** → **连接到 Git**
+   → 选本仓库 → 构建命令填 **`npm run cf:build`** → 保存并部署
+4. 部署完成后，Worker → **设置 → 变量和机密**，添加两个加密变量：
+   - `PRESET_AGNES_API_KEY` = 站点内置 Key
+   - `SESSION_SECRET` = `openssl rand -base64 32` 生成的随机串
+5. **重新部署一次**让密钥生效
+
+之后每次推 `main` 都会自动重新部署。
+
+> ⚠️ 不要同时启用方式一的自动部署和方式二，否则一次推送会部署两遍。
+> 详细图解见 [Cloudflare部署教程.md](./Cloudflare部署教程.md) 的「方式二」。
+
+---
+
+### 方式三：Vercel（不推荐，但仍可用）
 
 1. [Upstash](https://console.upstash.com/redis) 创建 Redis，复制 **REST URL** 和 **REST TOKEN**
    （⚠️ 一定是带 `REST` 字样的两个值）
