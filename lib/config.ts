@@ -41,9 +41,19 @@ export interface ModelOption {
 /** 可选模型（纯聊天，不含 Agent / 工具调用） */
 export const CHAT_MODELS: ModelOption[] = [
   {
+    // 2026-09 上线的次世代模型：512K 上下文、65.5K 输出、支持图像 URL 输入，
+    // 官方主打 Agent 执行链路（工具编排、长任务上下文、可信交付），当前全免费。
+    // 纯聊天同样可用，故设为默认。
+    id: "agnes-3.0-flash",
+    label: "agnes-3.0-flash",
+    desc: "最新一代 · Agent 执行强，支持识图",
+    provider: "agnes",
+    vision: true,
+  },
+  {
     id: "agnes-2.5-flash",
     label: "agnes-2.5-flash",
-    desc: "更快，日常聊天首选，支持识图",
+    desc: "编码 / 推理见长，支持识图",
     provider: "agnes",
     vision: true,
   },
@@ -77,7 +87,7 @@ export const AGNES_MODELS = CHAT_MODELS.filter((m) => m.provider === "agnes");
  * 默认模型。站长可用 UPSTREAM_MODEL 换成自己中转服务的模型名，
  * 这样连"换中转服务"都不用改代码。
  */
-export const DEFAULT_MODEL = process.env.UPSTREAM_MODEL?.trim() || "agnes-2.5-flash";
+export const DEFAULT_MODEL = process.env.UPSTREAM_MODEL?.trim() || "agnes-3.0-flash";
 
 /**
  * 默认上游地址。站长可用 UPSTREAM_BASE_URL 指向自己的中转服务

@@ -204,7 +204,7 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 |---|---|---|
 | `PRESET_AGNES_API_KEY` | Agnes 内置 Key | 站长提供的 Key，访客不填时用这个 |
 | `UPSTREAM_BASE_URL` | `https://apihub.agnes-ai.com/v1` | 中转地址 |
-| `UPSTREAM_MODEL` | `agnes-2.5-flash` | 默认模型 |
+| `UPSTREAM_MODEL` | `agnes-3.0-flash` | 默认模型 |
 | `NEXT_PUBLIC_ALLOW_CUSTOM_KEY` | `true` | 设 `false` 锁死：访客只能用站长的 Key |
 | `NEXT_PUBLIC_ALLOW_CUSTOM_BASE_URL` | `true` | 设 `false` 锁死 Base URL |
 

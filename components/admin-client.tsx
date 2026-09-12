@@ -375,7 +375,7 @@ function SiteSettingsCard() {
               <Label htmlFor="ss-model">默认模型</Label>
               <Input
                 id="ss-model"
-                placeholder="留空则使用内置默认（agnes-2.5-flash）"
+                placeholder="留空则使用内置默认（agnes-3.0-flash）"
                 value={form.defaultModel}
                 onChange={(e) => setForm((f) => ({ ...f, defaultModel: e.target.value }))}
                 autoComplete="off"
