@@ -226,15 +226,36 @@ export async function POST(request: Request) {
     if (upstream.status === 429) {
       /**
        * 重试一次仍然是 429，说明不是偶发。
-       * 这里必须说清楚「是谁限流、等多久」，否则用户只能干等。
-       * 常见原因：免费额度按分钟计数被打满；或多个站点共用同一个 Key 互相抢占。
+       *
+       * 关键：把上游的原始说明一起带回来。
+       * 「请求过快」是个筐，实际可能是按 Key 限流、按出口 IP 限流、
+       * 按并发限流、甚至是账号被标记 —— 不看上游原文根本分不清。
+       * Workers 的出口 IP 由大量站点共用，即便你一分钟只发一条也可能被按 IP 拒。
        */
       const wait = retryAfterSeconds(upstream);
+      const raw = await upstream.text().catch(() => "");
+      let upstreamMsg = "";
+      try {
+        const j = JSON.parse(raw) as { error?: { message?: string }; message?: string };
+        upstreamMsg = j?.error?.message ?? j?.message ?? "";
+      } catch {
+        upstreamMsg = raw.slice(0, 200);
+      }
+
+      const plat = detectPlatform();
+      const tip =
+        plat === "cloudflare"
+          ? "本站跑在 Cloudflare Workers 上，出口 IP 由大量站点共用，上游可能按「出口 IP」而非你的用量限流。可让访客自带 API Key，或改用 Vercel 部署。"
+          : "若多个站点共用了同一个 API Key，它们会互相抢占额度，建议各站用各自的 Key。";
+
       return NextResponse.json(
         {
-          error: `${target.label} 提示请求过快（429）。免费额度通常按「每分钟次数」计算，已自动重试一次仍被限流。请等待约 ${wait} 秒后再试。若多个站点共用了同一个 API Key，它们会互相抢占额度，建议各站用各自的 Key。`,
+          error: `${target.label} 返回 429（已自动重试一次仍被限流）。${tip}`,
+          upstreamMessage: upstreamMsg || "（上游未给出具体说明）",
           code: "RATE_LIMIT",
           retryAfter: wait,
+          platform: plat,
+          diagnoseUrl: "/api/diagnose",
         },
         { status: 429, headers: { "Retry-After": String(wait) } },
       );

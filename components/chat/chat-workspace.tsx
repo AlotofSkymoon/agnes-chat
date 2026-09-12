@@ -309,13 +309,20 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
 
         if (!res.ok || !res.body) {
           let message = "请求失败，请稍后重试";
-          // 优先用服务端给的文案（429 时会带上「等几秒」和排查方向）
+          // 优先用服务端给的文案（429 时会带上原因、上游原文与排查方向）
           let fromServer = false;
           try {
-            const data = (await res.json()) as { error?: string };
+            const data = (await res.json()) as {
+              error?: string;
+              upstreamMessage?: string;
+            };
             if (data?.error) {
               message = data.error;
               fromServer = true;
+              // 上游原文单独一行，便于一眼看清到底是谁在限流
+              if (data.upstreamMessage && data.upstreamMessage !== "（上游未给出具体说明）") {
+                message += `\n上游原文：${data.upstreamMessage}`;
+              }
             }
           } catch {
             /* 非 JSON 响应，走下面的兜底 */
