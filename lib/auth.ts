@@ -1,7 +1,6 @@
 import "server-only";
 
 import crypto from "crypto";
-import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
 import {
@@ -46,13 +45,8 @@ export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }
 
-export function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
-}
-
-export function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
-}
+// 密码哈希实现在 ./password（按平台自动选 bcrypt / PBKDF2）
+export { hashPassword, verifyPassword, passwordAlgo } from "./password";
 
 /** 32 字节随机 sessionId（URL 安全） */
 export function createSessionId(): string {

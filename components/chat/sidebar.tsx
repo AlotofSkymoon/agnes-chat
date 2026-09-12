@@ -73,7 +73,7 @@ export function Sidebar({
           {/* 顶部：Logo + 收起/关闭 */}
           <div className="flex items-center justify-between px-3 py-3">
             <Link href="/" className="flex items-center gap-2">
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-[#4D6BFE] to-[#7B8CFF] p-1.5 text-white">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#4D6BFE] p-1.5 text-white">
                 <AgnesIcon />
               </span>
               <span className="text-sm font-semibold">Agnes AI</span>
