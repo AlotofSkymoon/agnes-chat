@@ -105,13 +105,208 @@ export function supportsVision(modelId: string): boolean {
   return getModel(modelId)?.vision ?? false;
 }
 
+/* --------------------------- 自定义供应商（用户自建） --------------------------- */
+
+/**
+ * 用户在设置里自行添加的 OpenAI 兼容供应商。
+ * 存 localStorage，随聊天请求一起提交给服务端。
+ */
+export interface CustomProviderConfig {
+  /** 稳定唯一 id，形如 custom:myapi */
+  id: string;
+  /** 显示名 */
+  label: string;
+  /** OpenAI 兼容根地址，如 https://api.example.com/v1 */
+  baseUrl: string;
+  /** 该供应商下的模型 id 列表 */
+  models: string[];
+  /** 这些模型是否支持识图 */
+  vision?: boolean;
+}
+
+/** 内置服务商 id 不能占用 */
+export const BUILTIN_PROVIDER_IDS = ["agnes", "deepseek"] as const;
+
+/** 自定义供应商 id 必须以 custom: 开头，避免与内置 id 冲突 */
+export const CUSTOM_PROVIDER_PREFIX = "custom:";
+
+export function isCustomProviderId(id: string): boolean {
+  return id.startsWith(CUSTOM_PROVIDER_PREFIX);
+}
+
+/**
+ * 解析请求里携带的自定义供应商，剔除不合法的条目。
+ * 任何一条格式不对就整条丢弃，不让脏数据污染后续流程。
+ */
+export function sanitizeCustomProviders(input: unknown): CustomProviderConfig[] {
+  if (!Array.isArray(input)) return [];
+
+  const seen = new Set<string>();
+  const out: CustomProviderConfig[] = [];
+
+  for (const raw of input) {
+    if (!raw || typeof raw !== "object") continue;
+    const c = raw as Record<string, unknown>;
+
+    const id = typeof c.id === "string" ? c.id.trim() : "";
+    // 必须带 custom: 前缀，防止有人伪造 agnes/deepseek 覆盖内置配置
+    if (!isCustomProviderId(id) || seen.has(id)) continue;
+
+    const baseUrl = typeof c.baseUrl === "string" ? c.baseUrl.trim().replace(/\/+$/, "") : "";
+    if (!baseUrl || !/^https?:\/\//i.test(baseUrl)) continue;
+
+    let hostnameOk = false;
+    try {
+      hostnameOk = Boolean(new URL(baseUrl).hostname);
+    } catch {
+      hostnameOk = false;
+    }
+    if (!hostnameOk) continue;
+
+    // SSRF 防护：挡掉内网 / 本机 / 云元数据地址
+    if (isBlockedBaseUrl(baseUrl)) continue;
+
+    const models = Array.isArray(c.models)
+      ? c.models
+          .filter((m): m is string => typeof m === "string" && m.trim().length > 0)
+          .map((m) => m.trim())
+          .slice(0, 50)
+      : [];
+    if (models.length === 0) continue;
+
+    const label =
+      (typeof c.label === "string" ? c.label.trim() : "") || id.replace(CUSTOM_PROVIDER_PREFIX, "");
+
+    seen.add(id);
+    out.push({ id, label, baseUrl, models, vision: c.vision === true });
+  }
+
+  // 最多 10 个自定义供应商，防止请求体被撑爆
+  return out.slice(0, 10);
+}
+
+/* ---------------------------- 按供应商解析模型 ---------------------------- */
+
+export interface ResolvedTarget {
+  /** 供应商 id（内置或 custom:xxx） */
+  providerId: string;
+  label: string;
+  baseUrl: string;
+  vision: boolean;
+  isCustom: boolean;
+}
+
+/**
+ * 解析某个模型该打到哪里。
+ *
+ * @param modelId    模型 id
+ * @param custom     请求携带的自定义供应商
+ * @param baseUrls   用户为各供应商单独配置的 Base URL 覆盖值
+ */
+export function resolveTarget(
+  modelId: string,
+  custom: CustomProviderConfig[],
+  baseUrls: Record<string, string> = {},
+): ResolvedTarget | null {
+  // 1) 先在内置模型里找
+  const builtin = CHAT_MODELS.find((m) => m.id === modelId);
+  if (builtin) {
+    const cfg = PROVIDERS[builtin.provider];
+    const override = (baseUrls[builtin.provider] ?? "").trim().replace(/\/+$/, "");
+    return {
+      providerId: builtin.provider,
+      label: cfg.label,
+      baseUrl: override || cfg.baseUrl,
+      vision: builtin.vision,
+      isCustom: false,
+    };
+  }
+
+  // 2) 再在自定义供应商里找
+  for (const c of custom) {
+    if (!c.models.includes(modelId)) continue;
+    const override = (baseUrls[c.id] ?? "").trim().replace(/\/+$/, "");
+    return {
+      providerId: c.id,
+      label: c.label,
+      baseUrl: override || c.baseUrl,
+      vision: c.vision === true,
+      isCustom: true,
+    };
+  }
+
+  return null;
+}
+
+/** 模型是否可用（内置 + 自定义） */
+export function isAllowedModelWith(
+  modelId: string,
+  custom: CustomProviderConfig[],
+): boolean {
+  if (CHAT_MODELS.some((m) => m.id === modelId)) return true;
+  return custom.some((c) => c.models.includes(modelId));
+}
+
+/* ------------------------------ SSRF 防护 ------------------------------ */
+
+/**
+ * 判断 Base URL 是否指向内网 / 本机 / 云元数据服务。
+ *
+ * 自定义供应商允许用户填任意地址，若不设防，攻击者可以借本站做跳板去打
+ * 内网服务或 `169.254.169.254`（云厂商元数据，能拿到临时凭证）。
+ * 这里是 SSRF 防护，不是功能限制 —— 正常的公网 API 地址都不受影响。
+ */
+export function isBlockedBaseUrl(rawUrl: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    return true;
+  }
+
+  // 只允许 http/https，挡掉 file://、gopher:// 等危险协议
+  if (u.protocol !== "http:" && u.protocol !== "https:") return true;
+
+  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+  // 云元数据地址
+  if (host === "169.254.169.254" || host === "metadata.google.internal" || host === "metadata") {
+    return true;
+  }
+
+  // 本机
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "0.0.0.0") {
+    return true;
+  }
+  if (host.endsWith(".localhost") || host.endsWith(".local")) return true;
+
+  // IPv4 私有网段 10/8、172.16/12、192.168/16，以及 169.254/16 链路本地
+  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (a === 10) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 127) return true;
+    if (a === 0) return true;
+  }
+
+  // IPv6 私有 / 链路本地
+  if (host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80")) return true;
+
+  return false;
+}
+
 /* ---------------------------- localStorage Keys ---------------------------- */
 
 export const LS_KEYS = {
   // 各服务商的 Key 分开存
   keys: "agnes:keys", // JSON: { agnes?: string; deepseek?: string }
   apiKey: "agnes:apiKey",
-  baseUrl: "agnes:baseUrl",
+  baseUrl: "agnes:baseUrl", // 旧字段，仅用于迁移
+  baseUrls: "agnes:baseUrls", // JSON: { agnes?: string; deepseek?: string; "custom:x"?: string }
+  customProviders: "agnes:customProviders", // JSON: CustomProviderConfig[]
   model: "agnes:model",
   messages: "agnes:messages",
   conversationId: "agnes:conversationId",

@@ -4,9 +4,10 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   DEFAULT_MODEL,
   PROVIDERS,
-  getProvider,
-  isAllowedModel,
-  supportsVision,
+  isAllowedModelWith,
+  isBlockedBaseUrl,
+  resolveTarget,
+  sanitizeCustomProviders,
 } from "@/lib/config";
 import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
 
@@ -28,9 +29,16 @@ interface ChatRequestBody {
   model?: string;
   /** 用户自己的 Key（来自 localStorage，可选） */
   apiKey?: string;
-  /** 各服务商的 Key：{ agnes?: string; deepseek?: string } */
-  keys?: { agnes?: string; deepseek?: string };
-  baseUrl?: string;
+  /** 各服务商的 Key：{ agnes?: string; deepseek?: string; "custom:x"?: string } */
+  keys?: Record<string, string>;
+  /**
+   * 各服务商「独立」的 Base URL 覆盖值。
+   * ⚠️ 必须是按供应商分开的字典，不能是单个字符串 ——
+   *    否则改 DeepSeek 的地址会连带把 Agnes 也指过去。
+   */
+  baseUrls?: Record<string, string>;
+  /** 用户自建的 OpenAI 兼容供应商 */
+  customProviders?: unknown;
   /** 云端保存开关打开时才传 */
   conversationId?: string;
   saveToCloud?: boolean;
@@ -53,7 +61,8 @@ export async function POST(request: Request) {
     model = DEFAULT_MODEL,
     apiKey,
     keys,
-    baseUrl,
+    baseUrls,
+    customProviders,
     conversationId,
     saveToCloud,
   } = body;
@@ -61,7 +70,9 @@ export async function POST(request: Request) {
   if (!Array.isArray(messages) || messages.length === 0) {
     return errorResponse(400, "BAD_REQUEST", "消息不能为空");
   }
-  if (!isAllowedModel(model)) {
+  const custom = sanitizeCustomProviders(customProviders);
+
+  if (!isAllowedModelWith(model, custom)) {
     return errorResponse(400, "BAD_MODEL", "不支持的模型");
   }
 
@@ -71,30 +82,35 @@ export async function POST(request: Request) {
     return errorResponse(413, "TOO_LARGE", "单条消息内容过大，请减少附件后再试");
   }
 
-  const provider = getProvider(model);
-  const providerCfg = PROVIDERS[provider];
+  // 解析：这个模型属于哪个供应商、该打哪个地址
+  const target = resolveTarget(model, custom, baseUrls);
+  if (!target) {
+    return errorResponse(400, "BAD_MODEL", "找不到该模型所属的供应商");
+  }
 
-  // 按服务商取 Key：Agnes 可回落到服务端预设 Key，DeepSeek 必须用户自备
+  // Key 严格按供应商取，绝不串台
+  // - agnes：用户 Key 优先，回落服务端预设
+  // - deepseek / 自定义：必须用用户自己的 Key
   let finalKey = "";
-  if (provider === "agnes") {
+  if (target.providerId === "agnes") {
     const presetKey = process.env.PRESET_AGNES_API_KEY?.trim() ?? "";
     finalKey = (keys?.agnes ?? apiKey ?? "").trim() || presetKey;
   } else {
-    finalKey = (keys?.deepseek ?? "").trim();
+    finalKey = (keys?.[target.providerId] ?? "").trim();
   }
 
   if (!finalKey) {
     return errorResponse(
       401,
       "NO_API_KEY",
-      provider === "agnes"
+      target.providerId === "agnes"
         ? "未配置 Agnes API Key，请在设置中填写你的 Key"
-        : `使用 ${providerCfg.label} 模型需要填写你自己的 ${providerCfg.label} API Key（设置中填写）`,
+        : `使用 ${target.label} 需要填写你自己的 ${target.label} API Key（设置中填写）`,
     );
   }
 
   // 不支持识图的模型：把图片片段降级为占位文字，避免上游报错
-  const visionOk = supportsVision(model);
+  const visionOk = target.vision;
   let outbound = messages;
   if (!visionOk) {
     outbound = messages.map((m) => {
@@ -108,7 +124,13 @@ export async function POST(request: Request) {
     });
   }
 
-  const targetBase = (baseUrl?.trim() || providerCfg.baseUrl).replace(/\/+$/, "");
+  const targetBase = target.baseUrl;
+
+  // SSRF 防护：内置地址一定安全，只校验用户可能改写的部分
+  if (target.isCustom && isBlockedBaseUrl(targetBase)) {
+    return errorResponse(400, "BLOCKED_URL", "该 Base URL 指向内网或受限地址，已被拒绝");
+  }
+
   const upstreamUrl = `${targetBase}/chat/completions`;
 
   let upstream: Response;
@@ -128,7 +150,7 @@ export async function POST(request: Request) {
       signal: request.signal,
     });
   } catch {
-    return errorResponse(502, "NETWORK_ERROR", "无法连接 Agnes 服务，请检查网络后重试");
+    return errorResponse(502, "NETWORK_ERROR", `无法连接 ${target.label} 服务，请检查网络与 Base URL 后重试`);
   }
 
   if (!upstream.ok || !upstream.body) {
@@ -136,7 +158,7 @@ export async function POST(request: Request) {
       return errorResponse(
         401,
         "INVALID_KEY",
-        `${providerCfg.label} API Key 无效，请检查后重试`,
+        `${target.label} API Key 无效，请检查后重试`,
       );
     }
     if (upstream.status === 429) {

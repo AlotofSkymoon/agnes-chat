@@ -4,6 +4,7 @@ import * as React from "react";
 import { ArrowUp, FileText, FileVideo, Paperclip, Square, X } from "lucide-react";
 
 import { ModelPicker } from "@/components/chat/model-picker";
+import type { CustomProviderConfig } from "@/lib/config";
 import { formatBytes, type Attachment } from "@/lib/types";
 
 interface ChatInputProps {
@@ -16,6 +17,8 @@ interface ChatInputProps {
   variant?: "default" | "hero";
   model?: string;
   onModelChange?: (modelId: string) => void;
+  /** 用户自建供应商，透传给模型选择框 */
+  customProviders?: CustomProviderConfig[];
   placeholder?: string;
   /* ---- 附件 ---- */
   attachments?: Attachment[];
@@ -32,6 +35,7 @@ export function ChatInput({
   variant = "default",
   model,
   onModelChange,
+  customProviders = [],
   placeholder = "给 Agnes 发送消息",
   attachments = [],
   onPickFiles,
@@ -136,7 +140,7 @@ export function ChatInput({
         {/* 左侧：模型选择小框 + 附件按钮 */}
         <div className="flex min-w-0 items-center gap-1.5">
           {model && onModelChange ? (
-            <ModelPicker value={model} onChange={onModelChange} />
+            <ModelPicker value={model} onChange={onModelChange} customProviders={customProviders} />
           ) : null}
           {onPickFiles ? (
             <>

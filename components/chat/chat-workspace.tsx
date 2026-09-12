@@ -20,7 +20,13 @@ import { SettingsDialog, type ChatSettings } from "@/components/chat/settings-di
 import { Sidebar } from "@/components/chat/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { DEFAULT_MODEL, LS_KEYS, supportsVision } from "@/lib/config";
+import {
+  CHAT_MODELS,
+  DEFAULT_MODEL,
+  LS_KEYS,
+  supportsVision,
+  type CustomProviderConfig,
+} from "@/lib/config";
 import { DEFAULT_S3_CONFIG, type S3Config } from "@/lib/s3-presets";
 import {
   createId,
@@ -42,9 +48,16 @@ interface SafeUser {
   createdAt: string;
 }
 
+/** 该模型是否支持识图（内置 + 自定义供应商都要考虑） */
+function visionEnabled(modelId: string, custom: CustomProviderConfig[]): boolean {
+  if (CHAT_MODELS.some((m) => m.id === modelId)) return supportsVision(modelId);
+  return custom.some((c) => c.models.includes(modelId) && c.vision === true);
+}
+
 const DEFAULT_SETTINGS: ChatSettings = {
   keys: { agnes: "", deepseek: "" },
-  baseUrl: "",
+  baseUrls: {},
+  customProviders: [],
   model: DEFAULT_MODEL,
 };
 
@@ -117,9 +130,33 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         }
       }
 
+      // Base URL：新版按服务商分开存；老版本是单个字符串，迁移到 agnes 名下
+      let baseUrls: Record<string, string> = {};
+      const rawBaseUrls = localStorage.getItem(LS_KEYS.baseUrls);
+      if (rawBaseUrls) {
+        try {
+          baseUrls = JSON.parse(rawBaseUrls) as Record<string, string>;
+        } catch {
+          baseUrls = {};
+        }
+      }
+      const legacyBaseUrl = localStorage.getItem(LS_KEYS.baseUrl) ?? "";
+      if (legacyBaseUrl && !baseUrls.agnes) baseUrls.agnes = legacyBaseUrl;
+
+      let customProviders: CustomProviderConfig[] = [];
+      const rawCustom = localStorage.getItem(LS_KEYS.customProviders);
+      if (rawCustom) {
+        try {
+          customProviders = JSON.parse(rawCustom) as CustomProviderConfig[];
+        } catch {
+          customProviders = [];
+        }
+      }
+
       const saved: ChatSettings = {
         keys: keys as ChatSettings["keys"],
-        baseUrl: localStorage.getItem(LS_KEYS.baseUrl) ?? "",
+        baseUrls,
+        customProviders,
         model: localStorage.getItem(LS_KEYS.model) ?? DEFAULT_MODEL,
         s3,
       };
@@ -194,7 +231,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   return { role: m.role, content: past };
                 }
 
-                const visionOk = supportsVision(settings.model);
+                const visionOk = visionEnabled(settings.model, settings.customProviders);
                 const textAtts = atts.filter((a) => a.kind === "text" && a.content);
                 const imgAtts = visionOk
                   ? atts.filter((a) => a.kind === "image" && a.content)
@@ -233,7 +270,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
               }),
             model: settings.model,
             keys: settings.keys,
-            baseUrl: settings.baseUrl,
+            baseUrls: settings.baseUrls,
+            customProviders: settings.customProviders,
             conversationId,
             saveToCloud: Boolean(user) && cloudSync,
           }),
@@ -292,7 +330,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         abortRef.current = null;
       }
     },
-    [cloudSync, settings.baseUrl, settings.keys, settings.model, setMessages, user],
+    [cloudSync, settings.baseUrls, settings.customProviders, settings.keys, settings.model, setMessages, user],
   );
 
   const send = React.useCallback(
@@ -555,7 +593,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     setSettings(next);
     try {
       localStorage.setItem(LS_KEYS.keys, JSON.stringify(next.keys));
-      localStorage.setItem(LS_KEYS.baseUrl, next.baseUrl);
+      localStorage.setItem(LS_KEYS.baseUrls, JSON.stringify(next.baseUrls));
+      localStorage.setItem(LS_KEYS.customProviders, JSON.stringify(next.customProviders));
       localStorage.setItem(LS_KEYS.model, next.model);
       if (next.s3) localStorage.setItem(LS_KEYS.s3, JSON.stringify(next.s3));
     } catch {
@@ -681,6 +720,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   streaming={status === "streaming"}
                   model={mounted ? settings.model : undefined}
                   onModelChange={changeModel}
+                  customProviders={settings.customProviders}
                   placeholder="给 Agnes 发送消息，可拖拽文件到此处"
                   attachments={attachments}
                   onPickFiles={addFiles}
@@ -700,6 +740,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   streaming={status === "streaming"}
                   model={mounted ? settings.model : undefined}
                   onModelChange={changeModel}
+                  customProviders={settings.customProviders}
                   placeholder="给 Agnes 发送消息，可拖拽文件到此处"
                   attachments={attachments}
                   onPickFiles={addFiles}

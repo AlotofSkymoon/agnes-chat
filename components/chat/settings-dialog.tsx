@@ -25,7 +25,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { AGENT_TIP, PROVIDERS, type ProviderId } from "@/lib/config";
+import {
+  AGENT_TIP,
+  CUSTOM_PROVIDER_PREFIX,
+  DEFAULT_MODEL,
+  PROVIDERS,
+  isBlockedBaseUrl,
+  type CustomProviderConfig,
+  type ProviderId,
+} from "@/lib/config";
+import { Plus, Pencil, Check as CheckIcon, X as XIcon } from "lucide-react";
 import {
   ALLOW_CUSTOM_BASE_URL,
   ALLOW_CUSTOM_KEY,
@@ -40,10 +49,15 @@ import {
 } from "@/lib/s3-presets";
 
 export interface ChatSettings {
-  /** 各服务商的 Key */
-  keys: Record<ProviderId, string>;
-  /** 自定义 Base URL，留空则用模型所属服务商的默认地址 */
-  baseUrl: string;
+  /** 各服务商的 Key：{ agnes, deepseek, "custom:xxx" } */
+  keys: Record<string, string>;
+  /**
+   * 各服务商「独立」的 Base URL 覆盖值。
+   * ⚠️ 必须按服务商分开存 —— 共用一个字符串会导致改 DeepSeek 地址把 Agnes 也带跑。
+   */
+  baseUrls: Record<string, string>;
+  /** 用户自建的 OpenAI 兼容供应商 */
+  customProviders: CustomProviderConfig[];
   model: string;
   /** 对象存储配置（图片 / 视频上传） */
   s3?: S3Config;
@@ -73,10 +87,7 @@ export function SettingsDialog({
   onClearAll,
 }: SettingsDialogProps) {
   const [form, setForm] = React.useState<ChatSettings>(settings);
-  const [showKey, setShowKey] = React.useState<Record<ProviderId, boolean>>({
-    agnes: false,
-    deepseek: false,
-  });
+  const [showKey, setShowKey] = React.useState<Record<string, boolean>>({});
   const [showSecret, setShowSecret] = React.useState(false);
   const [siteInfo, setSiteInfo] = React.useState<{
     siteManaged: boolean;
@@ -125,14 +136,162 @@ export function SettingsDialog({
     if (open) setForm(settings);
   }, [open, settings]);
 
+  /** 内置 + 自定义，统一成一个列表渲染 */
+  const allProviders = React.useMemo(() => {
+    const builtin = PROVIDER_ORDER.map((pid) => {
+      const p = PROVIDERS[pid];
+      return { id: pid as string, label: p.label, baseUrl: p.baseUrl, hasPreset: p.hasPreset, keyUrl: p.keyUrl };
+    });
+    const custom = form.customProviders.map((c) => ({
+      id: c.id,
+      label: c.label,
+      baseUrl: (form.baseUrls[c.id] ?? "").trim() || c.baseUrl,
+      hasPreset: false,
+      keyUrl: "",
+      isCustom: true,
+    }));
+    return [...builtin, ...custom];
+  }, [form.customProviders, form.baseUrls]);
+
+  function removeCustomProvider(id: string) {
+    setForm((f) => ({
+      ...f,
+      customProviders: f.customProviders.filter((c) => c.id !== id),
+      // 同时清掉它的 Key 和 Base URL，避免残留脏数据
+      keys: Object.fromEntries(Object.entries(f.keys).filter(([k]) => k !== id)),
+      baseUrls: Object.fromEntries(Object.entries(f.baseUrls).filter(([k]) => k !== id)),
+      // 若当前正选中该供应商的模型，回落到默认模型
+      model: f.customProviders.find((c) => c.id === id)?.models.includes(f.model)
+        ? DEFAULT_MODEL
+        : f.model,
+    }));
+  }
+
+  /** 新增 / 编辑自定义供应商的内联表单 */
+  function CustomProviderEditor() {
+    const [editing, setEditing] = React.useState(false);
+    const [label, setLabel] = React.useState("");
+    const [url, setUrl] = React.useState("");
+    const [modelsRaw, setModelsRaw] = React.useState("");
+    const [vision, setVision] = React.useState(false);
+    const [err, setErr] = React.useState("");
+
+    function reset() {
+      setEditing(false);
+      setLabel("");
+      setUrl("");
+      setModelsRaw("");
+      setVision(false);
+      setErr("");
+    }
+
+    function add() {
+      const name = label.trim();
+      const base = url.trim().replace(/\/+$/, "");
+      const models = modelsRaw
+        .split(/[\n,]/)
+        .map((m) => m.trim())
+        .filter(Boolean);
+
+      if (!name) return setErr("请填写名称");
+      if (!base) return setErr("请填写 Base URL");
+      if (!/^https?:\/\//i.test(base)) return setErr("Base URL 必须以 http:// 或 https:// 开头");
+      if (isBlockedBaseUrl(base)) return setErr("不允许填写内网 / 本机地址");
+      if (models.length === 0) return setErr("至少填写一个模型 id");
+
+      const id = `${CUSTOM_PROVIDER_PREFIX}${name.toLowerCase().replace(/[^a-z0-9_-]/g, "") || Date.now()}`;
+      if (form.customProviders.some((c) => c.id === id)) return setErr("已存在同名供应商");
+
+      setForm((f) => ({
+        ...f,
+        customProviders: [...f.customProviders, { id, label: name, baseUrl: base, models, vision }],
+        // 默认选中第一个模型，省得再手动切
+        model: models[0],
+      }));
+      reset();
+    }
+
+    if (!editing) {
+      return (
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border px-3 py-2.5 text-xs text-fg-secondary hover:border-primary/50 hover:text-primary"
+        >
+          <Plus className="h-4 w-4" />
+          添加自定义 API 供应商（兼容 OpenAI 接口）
+        </button>
+      );
+    }
+
+    return (
+      <div className="space-y-2 rounded-xl border border-border/70 bg-card/40 p-3">
+        <Label className="flex items-center gap-2 text-sm font-medium">
+          <Pencil className="h-4 w-4" />
+          自定义供应商
+        </Label>
+        <Input
+          placeholder="名称，例如：我的中转站"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          autoComplete="off"
+        />
+        <Input
+          placeholder="Base URL，例如：https://api.example.com/v1"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          autoComplete="off"
+        />
+        <div className="space-y-1">
+          <Input
+            placeholder="模型 id，多个用逗号或换行分隔"
+            value={modelsRaw}
+            onChange={(e) => setModelsRaw(e.target.value)}
+            autoComplete="off"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            例如：gpt-4o, claude-3-5-sonnet。填的名字要和上游一致。
+          </p>
+        </div>
+        <label className="flex items-center gap-2 text-xs text-fg-secondary">
+          <input
+            type="checkbox"
+            checked={vision}
+            onChange={(e) => setVision(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-border"
+          />
+          这些模型支持识图（vision）
+        </label>
+        {err ? <p className="text-[11px] text-destructive">{err}</p> : null}
+        <div className="flex gap-2">
+          <Button type="button" size="sm" onClick={add}>
+            <CheckIcon className="h-4 w-4" />
+            添加
+          </Button>
+          <Button type="button" size="sm" variant="ghost" onClick={reset}>
+            取消
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    const trimmedKeys: Record<string, string> = {};
+    for (const [k, v] of Object.entries(form.keys)) trimmedKeys[k] = (v ?? "").trim();
+    // 自定义供应商的 Key 也要一起带上
+    for (const c of form.customProviders) {
+      trimmedKeys[c.id] = (form.keys[c.id] ?? "").trim();
+    }
+
+    const trimmedBaseUrls: Record<string, string> = {};
+    for (const [k, v] of Object.entries(form.baseUrls)) trimmedBaseUrls[k] = (v ?? "").trim();
+
     onSave({
-      keys: {
-        agnes: form.keys.agnes.trim(),
-        deepseek: form.keys.deepseek.trim(),
-      },
-      baseUrl: form.baseUrl.trim(),
+      keys: trimmedKeys,
+      baseUrls: trimmedBaseUrls,
+      customProviders: form.customProviders,
       model: form.model,
       s3: form.s3,
     });
@@ -194,21 +353,40 @@ export function SettingsDialog({
 
             <div className={ALLOW_CUSTOM_KEY ? "space-y-4" : "hidden"}>
 
-            {PROVIDER_ORDER.map((pid) => {
-              const p = PROVIDERS[pid];
+            {allProviders.map((p) => {
+              const pid = p.id;
+              const isCustom = "isCustom" in p && p.isCustom;
               return (
                 <div key={pid} className="space-y-1.5 rounded-xl border border-border/70 bg-card/40 p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">{p.label}</span>
-                    <a
-                      href={p.keyUrl}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                    >
-                      去申请
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+                    <span className="flex items-center gap-1.5 text-sm font-medium">
+                      {p.label}
+                      {isCustom ? (
+                        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                          自定义
+                        </span>
+                      ) : null}
+                    </span>
+                    {isCustom ? (
+                      <button
+                        type="button"
+                        onClick={() => removeCustomProvider(pid)}
+                        className="inline-flex items-center gap-1 text-xs text-destructive hover:underline"
+                      >
+                        <XIcon className="h-3 w-3" />
+                        删除
+                      </button>
+                    ) : (
+                      <a
+                        href={p.keyUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        去申请
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
                   </div>
                   <div className="relative">
                     <Input
@@ -233,42 +411,57 @@ export function SettingsDialog({
                     </button>
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    {p.hasPreset
-                      ? "保存在浏览器本地，仅用于向 Agnes 发起请求。"
-                      : "DeepSeek 无内置 Key，需填你自己的；仅保存在浏览器本地。"}
+                    {isCustom
+                      ? `发往 ${p.baseUrl}`
+                      : p.hasPreset
+                        ? "保存在浏览器本地，仅用于向 Agnes 发起请求。"
+                        : "DeepSeek 无内置 Key，需填你自己的；仅保存在浏览器本地。"}
                   </p>
+
+                  {/* 每个供应商独立的 Base URL —— 互不干扰 */}
+                  {isAdmin && ALLOW_CUSTOM_BASE_URL ? (
+                    <div className="space-y-1 border-t border-border/60 pt-2">
+                      <Label
+                        htmlFor={`bu-${pid}`}
+                        className="flex items-center gap-1.5 text-[11px] text-fg-tertiary"
+                      >
+                        <Server className="h-3 w-3" />
+                        {p.label} 的 Base URL（仅影响本服务商）
+                      </Label>
+                      <Input
+                        id={`bu-${pid}`}
+                        placeholder={p.baseUrl || "https://api.example.com/v1"}
+                        value={form.baseUrls[pid] ?? ""}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            baseUrls: { ...f.baseUrls, [pid]: e.target.value },
+                          }))
+                        }
+                        autoComplete="off"
+                        className="h-8 text-xs"
+                      />
+                      {form.baseUrls[pid] && isBlockedBaseUrl(form.baseUrls[pid]) ? (
+                        <p className="text-[11px] text-destructive">
+                          该地址指向内网或受限地址，会被服务端拒绝。
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
             </div>
           </div>
 
+          {/* 添加自定义供应商 */}
+          {isAdmin && ALLOW_CUSTOM_BASE_URL ? <CustomProviderEditor /> : null}
+
           {/* 模型：已移到输入框左下角的小选择框 */}
           <div className="rounded-xl border border-border/70 bg-card/40 px-3 py-2.5 text-xs text-muted-foreground">
             模型可在聊天输入框左下角的小框里切换（当前：
             <span className="font-medium text-foreground">{form.model}</span>）。
           </div>
-
-          {/* 高级：Base URL —— 仅管理员可见 */}
-          {!isAdmin || !ALLOW_CUSTOM_BASE_URL ? null : (
-          <details className="rounded-xl border border-border/70 bg-card/40 px-3 py-2">
-            <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-              <Server className="h-4 w-4" />
-              自定义 Base URL（高级）
-            </summary>
-            <div className="mt-3 space-y-1.5">
-              <Input
-                placeholder="留空则自动使用所选模型的官方地址"
-                value={form.baseUrl}
-                onChange={(e) => setForm((f) => ({ ...f, baseUrl: e.target.value }))}
-                autoComplete="off"
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Agnes：{PROVIDERS.agnes.baseUrl} · DeepSeek：{PROVIDERS.deepseek.baseUrl}
-              </p>
-            </div>
-          </details>
-          )}
 
           {/* 对象存储：图片 / 视频上传 —— 仅管理员可见 */}
           {!isAdmin ? null : (
