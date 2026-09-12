@@ -114,12 +114,45 @@ jobs:
       - name: 构建（OpenNext）
         run: npm run cf:build
 
+      # ------------------------------------------------------------------
+      # 体积诊断：Next.js 应用最容易在这里踩坑 ——
+      # Cloudflare 免费版 Worker 脚本上限 1 MiB（压缩后），超出即部署失败。
+      # 先打印出来，失败时能一眼看出是不是体积问题。
+      # ------------------------------------------------------------------
+      - name: 报告构建产物体积
+        run: |
+          echo "=== .open-next 产物 ==="
+          du -sh .open-next/ 2>/dev/null || true
+          if [ -f .open-next/worker.js ]; then
+            raw=$(stat -c%s .open-next/worker.js)
+            gz=$(gzip -c .open-next/worker.js | wc -c)
+            echo "worker.js 原始: $((raw/1024)) KB"
+            echo "worker.js 压缩后: $((gz/1024)) KB  (上限 1024 KB = 1 MiB)"
+            if [ "$gz" -gt 1048576 ]; then
+              echo "::warning::压缩后超过 1 MiB，免费版会部署失败。需升级 Workers 付费版（上限 10 MiB）"
+            fi
+          fi
+
       - name: 部署到 Workers
         id: deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy
+        run: |
+          set -o pipefail
+          if ! npx wrangler deploy 2>&1 | tee deploy.log; then
+            echo "::error::wrangler deploy 失败，完整输出见上方日志"
+            echo ""
+            echo "================ 常见原因 ================"
+            echo "1) 脚本体积超标：看上一步「报告构建产物体积」，"
+            echo "   免费版上限 1 MiB，需升级 Workers 付费版"
+            echo "2) 未注册 workers.dev 子域名："
+            echo "   dash.cloudflare.com → Workers 和 Pages → 设置子域名"
+            echo "3) API 令牌权限不足：需要「Workers 脚本 → 编辑」"
+            echo "4) KV / D1 ID 填错：核对 Secrets 与 Cloudflare 后台是否一致"
+            echo "=========================================="
+            exit 1
+          fi
 
       # ------------------------------------------------------------------
       # 密钥：必须用 secret put，不能写进 wrangler.jsonc（会提交到仓库）

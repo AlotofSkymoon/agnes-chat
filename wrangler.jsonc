@@ -3,9 +3,10 @@
   "name": "agnes-chat",
   // OpenNext 构建产物入口，不要手改
   "main": ".open-next/worker.js",
-  // 兼容日期：设为今天，避免「尚未发布」报错。
-  // 上线稳定后可改成更早的日期以获得更长兼容保障，但不要设为未来日期。
-  "compatibility_date": "2025-09-12",
+  // 兼容日期：必须是「今天或更早」，不能是未来日期（否则报尚未发布）。
+  // 也不要设得太旧——Next.js 14 依赖较新的 nodejs_compat 行为。
+  // 这里取当月初，既已发布又足够新。
+  "compatibility_date": "2026-09-01",
   // Next.js 需要 Node 兼容层
   "compatibility_flags": ["nodejs_compat"],
 
