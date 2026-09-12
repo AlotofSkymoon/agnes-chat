@@ -407,7 +407,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   onModelChange={changeModel}
                   placeholder="给 Agnes 发送消息"
                 />
-                <p className="mt-3 text-center text-xs text-muted-foreground">
+                <p className="mt-3 text-center text-xs text-fg-quaternary">
                   内容由 AI 生成，仅供参考 · 仅聊天，无 Agent / 联网 / 文件上传
                 </p>
               </>
@@ -423,7 +423,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   onModelChange={changeModel}
                   placeholder="给 Agnes 发送消息"
                 />
-                <p className="mt-2 text-center text-xs text-muted-foreground">
+                <p className="mt-2 text-center text-xs text-fg-quaternary">
                   内容由 AI 生成，仅供参考
                 </p>
               </>

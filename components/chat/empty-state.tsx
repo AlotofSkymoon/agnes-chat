@@ -35,7 +35,7 @@ export function EmptyState({ onPick }: { onPick: (text: string) => void }) {
         <h1 className="text-[26px] font-semibold tracking-tight sm:text-[30px]">
           我是 Agnes，很高兴见到你！
         </h1>
-        <p className="mt-2.5 text-[15px] text-muted-foreground">有什么可以帮到你？</p>
+        <p className="mt-2.5 text-[15px] text-fg-secondary">有什么可以帮到你？</p>
         <p className="mt-3 inline-flex items-center rounded-full border border-border bg-muted/50 px-3 py-1 text-xs text-muted-foreground">
           仅聊天，无 Agent 功能
         </p>
@@ -51,7 +51,7 @@ export function EmptyState({ onPick }: { onPick: (text: string) => void }) {
             className="group rounded-xl border border-border bg-card px-4 py-3 text-left transition-all hover:border-primary/50 hover:bg-accent/60"
           >
             <span className="block text-sm font-medium text-foreground">{s.title}</span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">{s.sub}</span>
+            <span className="mt-0.5 block text-xs text-fg-tertiary">{s.sub}</span>
           </button>
         ))}
       </div>

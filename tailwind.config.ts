@@ -11,16 +11,28 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
+        // SuperPingFangV1 = SF Pro Display（拉丁）+ 苹方（中日韩）
         sans: [
-          "Inter",
+          "SuperPingFangV1",
           "-apple-system",
           "BlinkMacSystemFont",
-          "Segoe UI",
+          "SF Pro Display",
           "system-ui",
           "PingFang SC",
           "Hiragino Sans GB",
           "Microsoft YaHei",
           "sans-serif",
+        ],
+        // SuperSFMonoV1 = SF Mono（拉丁）+ 苹方（中日韩）
+        mono: [
+          "SuperSFMonoV1",
+          "SF Mono",
+          "SFMono-Regular",
+          "ui-monospace",
+          "Menlo",
+          "Consolas",
+          "Liberation Mono",
+          "monospace",
         ],
       },
       colors: {
@@ -46,6 +58,12 @@ const config: Config = {
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
+        },
+        fg: {
+          DEFAULT: "hsl(var(--foreground))",
+          secondary: "hsl(var(--text-secondary))",
+          tertiary: "hsl(var(--text-tertiary))",
+          quaternary: "hsl(var(--text-quaternary))",
         },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",

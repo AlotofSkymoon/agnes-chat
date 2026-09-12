@@ -99,7 +99,7 @@ export function Sidebar({
 
         {/* 历史对话 */}
         <div className="flex min-h-0 flex-1 flex-col px-3">
-          <p className="px-1 pb-1.5 pt-2 text-xs font-medium text-muted-foreground">历史对话</p>
+          <p className="px-1 pb-1.5 pt-2 text-xs font-medium text-fg-tertiary">历史对话</p>
           <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
             {conversations.length === 0 ? (
               <p className="px-1 py-6 text-center text-xs text-muted-foreground">

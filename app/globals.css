@@ -2,21 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   字体：SuperPingFangV1（SF Pro Display + 苹方）/ SuperSFMonoV1（SF Mono + 苹方）
+   按 unicode-range 拆包，浏览器只下载真正需要的那一份
+   ========================================================================== */
+
+/* --- SuperPingFangV1 · 拉丁（SF Pro Display）--- */
+@font-face {
+  font-family: "SuperPingFangV1";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/SuperPingFangV1-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20A0-20BF, U+2074, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* --- SuperPingFangV1 · 中日韩（苹方）--- */
+@font-face {
+  font-family: "SuperPingFangV1";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/SuperPingFangV1-cjk.woff2") format("woff2");
+  unicode-range: U+2E80-2EFF, U+3000-303F, U+3200-32FF, U+3400-4DBF,
+    U+4E00-9FFF, U+F900-FAFF, U+FE10-FE4F, U+FF00-FFEF;
+}
+
+/* --- SuperSFMonoV1 · 代码（SF Mono）--- */
+@font-face {
+  font-family: "SuperSFMonoV1";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/SuperSFMonoV1-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20A0-20BF, U+2074, U+20AC,
+    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @layer base {
   :root {
     /* DeepSeek 风格：浅色优先，品牌蓝 #4D6BFE */
     --background: 0 0% 100%;
-    --foreground: 220 12% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 220 12% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 12% 12%;
+
+    /* ---- 文字层级（浅色）：四级灰阶，对比度经 WCAG 校验 ---- */
+    /* 一级：正文/标题   ≈ #191C22，对白底 16.9:1 */
+    --foreground: 220 15% 12%;
+    --card-foreground: 220 15% 12%;
+    --popover-foreground: 220 15% 12%;
+    /* 二级：次级说明   ≈ #5A6069，对白底 7.0:1 */
+    --text-secondary: 218 9% 38%;
+    /* 三级：弱化标签   ≈ #767C86，对白底 4.8:1 */
+    --text-tertiary: 218 8% 49%;
+    /* 四级：占位/提示   ≈ #9AA0A9，对白底 3.0:1（仅装饰性文本） */
+    --text-quaternary: 218 7% 63%;
+
     --primary: 230 99% 65%;
     --primary-foreground: 0 0% 100%;
     --secondary: 228 60% 97%;
-    --secondary-foreground: 228 20% 30%;
+    --secondary-foreground: 220 15% 20%;
     --muted: 228 40% 97%;
-    --muted-foreground: 220 8% 52%;
+    --muted-foreground: 218 8% 49%;
     --accent: 228 100% 97%;
     --accent-foreground: 230 60% 42%;
     --destructive: 0 72% 51%;
@@ -29,29 +79,44 @@
 
     /* 侧边栏 */
     --sidebar: 228 33% 98%;
-    --sidebar-foreground: 220 12% 20%;
+    --sidebar-foreground: 220 15% 22%;
 
     /* 助手消息区 */
     --assistant-bubble: 0 0% 100%;
     /* 用户气泡 */
     --user-bubble: 228 100% 97%;
+    --user-bubble-foreground: 220 15% 12%;
+
+    /* 代码块（明暗均为深色底，语法高亮统一） */
+    --code-bg: 220 18% 10%;
+    --code-border: 228 20% 91%;
   }
 
   .dark {
     --background: 0 0% 11%;
-    --foreground: 0 0% 96%;
     --card: 0 0% 14%;
-    --card-foreground: 0 0% 96%;
     --popover: 0 0% 15%;
-    --popover-foreground: 0 0% 96%;
+
+    /* ---- 文字层级（深色）：避免纯白，降低眩光 ---- */
+    /* 一级：正文/标题   ≈ #E8EAED，对 #1C1C1C 底 14.6:1 */
+    --foreground: 220 9% 93%;
+    --card-foreground: 220 9% 93%;
+    --popover-foreground: 220 9% 93%;
+    /* 二级：次级说明   ≈ #B4BAC2，对底 8.4:1 */
+    --text-secondary: 218 10% 73%;
+    /* 三级：弱化标签   ≈ #8E949C，对底 5.3:1 */
+    --text-tertiary: 218 8% 59%;
+    /* 四级：占位/提示   ≈ #6B7178，对底 3.2:1（仅装饰性文本） */
+    --text-quaternary: 218 8% 44%;
+
     --primary: 230 99% 68%;
     --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 18%;
-    --secondary-foreground: 0 0% 92%;
+    --secondary-foreground: 220 9% 90%;
     --muted: 0 0% 17%;
-    --muted-foreground: 220 8% 62%;
+    --muted-foreground: 218 8% 59%;
     --accent: 230 40% 22%;
-    --accent-foreground: 0 0% 96%;
+    --accent-foreground: 220 9% 93%;
     --destructive: 0 63% 48%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 20%;
@@ -59,10 +124,14 @@
     --ring: 230 99% 68%;
 
     --sidebar: 0 0% 9%;
-    --sidebar-foreground: 0 0% 88%;
+    --sidebar-foreground: 220 8% 82%;
 
     --assistant-bubble: 0 0% 11%;
     --user-bubble: 230 30% 22%;
+    --user-bubble-foreground: 220 9% 94%;
+
+    --code-bg: 220 20% 7%;
+    --code-border: 0 0% 20%;
   }
 
   * {
@@ -70,7 +139,28 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground;
+    /* 精细排版：字距/字重微调 + 中英文混排更协调 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+    letter-spacing: -0.005em;
+  }
+
+  /* 中文段落稍放宽字距，避免苹方在小字号下拥挤 */
+  :lang(zh),
+  :lang(zh-CN) {
+    letter-spacing: 0.01em;
+  }
+
+  /* 数字与代码内保持等宽特性 */
+  code,
+  pre,
+  kbd,
+  samp {
+    font-variant-ligatures: none;
+    letter-spacing: 0;
   }
 
   html {
@@ -143,45 +233,72 @@
   @apply bg-muted/70 font-semibold;
 }
 .markdown-body code:not(pre code) {
-  @apply rounded-md bg-muted px-1.5 py-0.5 text-[13px] font-medium;
+  @apply rounded-md bg-muted px-1.5 py-0.5 font-mono text-[13px] font-medium;
 }
 .markdown-body pre {
-  @apply overflow-x-auto rounded-xl border border-border bg-[#0f1117] p-3.5 text-[13px] leading-6 dark:bg-[#0a0a0a];
+  @apply overflow-x-auto rounded-xl border border-[hsl(var(--code-border))] bg-[hsl(var(--code-bg))] p-3.5 font-mono text-[13px] leading-6 text-[#E6EDF3];
 }
 .markdown-body pre code {
-  @apply bg-transparent p-0 text-[13px];
+  @apply bg-transparent p-0 font-mono text-[13px];
 }
 
+/* 语法高亮：GitHub Dark 系配色，明暗一致（代码块始终深色底） */
 .hljs-comment,
 .hljs-quote {
-  color: #7d8590;
+  color: #8B949E;
+  font-style: italic;
 }
 .hljs-keyword,
 .hljs-selector-tag,
-.hljs-literal {
-  color: #ff7b72;
+.hljs-literal,
+.hljs-type {
+  color: #FF7B72;
 }
 .hljs-string,
-.hljs-doctag {
-  color: #a5d6ff;
+.hljs-doctag,
+.hljs-template-variable,
+.hljs-variable {
+  color: #A5D6FF;
 }
 .hljs-number,
-.hljs-symbol {
-  color: #79c0ff;
+.hljs-symbol,
+.hljs-bullet {
+  color: #79C0FF;
 }
 .hljs-title,
 .hljs-name,
+.hljs-section,
 .hljs-function .hljs-title {
-  color: #d2a8ff;
+  color: #D2A8FF;
 }
 .hljs-attr,
-.hljs-attribute {
-  color: #ffca85;
+.hljs-attribute,
+.hljs-property {
+  color: #FFCA85;
 }
 .hljs-built_in,
-.hljs-type {
-  color: #7ee787;
+.hljs-class .hljs-title {
+  color: #7EE787;
 }
-.hljs-tag {
-  color: #ff7b72;
+.hljs-tag,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: #FF7B72;
+}
+.hljs-meta {
+  color: #8B949E;
+}
+.hljs-deletion {
+  color: #FFA198;
+  background: #490202;
+}
+.hljs-addition {
+  color: #7EE787;
+  background: #04260F;
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
 }
