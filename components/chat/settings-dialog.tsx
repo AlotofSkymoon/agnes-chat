@@ -1,7 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Eye, EyeOff, ExternalLink, KeyRound, Server, Trash2 } from "lucide-react";
+import {
+  CloudUpload,
+  Eye,
+  EyeOff,
+  ExternalLink,
+  KeyRound,
+  Server,
+  Trash2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +23,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 import { AGENT_TIP, PROVIDERS, type ProviderId } from "@/lib/config";
+import { DEFAULT_S3_CONFIG, S3_PRESETS, type S3Config } from "@/lib/s3-presets";
 
 export interface ChatSettings {
   /** 各服务商的 Key */
@@ -23,6 +33,8 @@ export interface ChatSettings {
   /** 自定义 Base URL，留空则用模型所属服务商的默认地址 */
   baseUrl: string;
   model: string;
+  /** 对象存储配置（图片 / 视频上传） */
+  s3?: S3Config;
 }
 
 interface SettingsDialogProps {
@@ -53,6 +65,11 @@ export function SettingsDialog({
     agnes: false,
     deepseek: false,
   });
+  const [showSecret, setShowSecret] = React.useState(false);
+
+  const s3 = form.s3 ?? DEFAULT_S3_CONFIG;
+  const patchS3 = (patch: Partial<S3Config>) =>
+    setForm((f) => ({ ...f, s3: { ...(f.s3 ?? DEFAULT_S3_CONFIG), ...patch } }));
 
   React.useEffect(() => {
     if (open) setForm(settings);
@@ -67,6 +84,7 @@ export function SettingsDialog({
       },
       baseUrl: form.baseUrl.trim(),
       model: form.model,
+      s3: form.s3,
     });
     onOpenChange(false);
   }
@@ -157,6 +175,162 @@ export function SettingsDialog({
               <p className="text-[11px] text-muted-foreground">
                 Agnes：{PROVIDERS.agnes.baseUrl} · DeepSeek：{PROVIDERS.deepseek.baseUrl}
               </p>
+            </div>
+          </details>
+
+          {/* 对象存储：图片 / 视频上传 */}
+          <details className="rounded-xl border border-border/70 bg-card/40 px-3 py-2">
+            <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+              <CloudUpload className="h-4 w-4" />
+              对象存储（图片 / 视频上传）
+              {form.s3?.enabled ? (
+                <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary">
+                  已启用
+                </span>
+              ) : null}
+            </summary>
+
+            <div className="mt-3 space-y-3">
+              <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
+                <div className="pr-3">
+                  <p className="text-sm">启用对象存储</p>
+                  <p className="text-xs text-muted-foreground">
+                    开启后图片 / 视频上传到你的存储桶，只回传链接
+                  </p>
+                </div>
+                <Switch
+                  checked={Boolean(form.s3?.enabled)}
+                  onCheckedChange={(v) => patchS3({ enabled: v })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">服务商预设</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {S3_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() =>
+                        patchS3({
+                          endpoint: preset.endpointHint,
+                          region: preset.regionHint,
+                        })
+                      }
+                      title={preset.note}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-[11px] transition-colors",
+                        preset.discouraged
+                          ? "border-destructive/40 text-destructive/80 hover:bg-destructive/10"
+                          : preset.recommended
+                            ? "border-primary/40 text-primary hover:bg-primary/10"
+                            : "border-border text-muted-foreground hover:bg-muted",
+                      )}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  点击预设会填入 Endpoint 与 Region 示例，把尖括号部分换成你自己的。
+                </p>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Endpoint</Label>
+                  <Input
+                    placeholder="https://<accountid>.r2.cloudflarestorage.com"
+                    value={s3.endpoint}
+                    onChange={(e) => patchS3({ endpoint: e.target.value })}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Region</Label>
+                  <Input
+                    placeholder="auto"
+                    value={s3.region}
+                    onChange={(e) => patchS3({ region: e.target.value })}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Bucket</Label>
+                  <Input
+                    placeholder="my-bucket"
+                    value={s3.bucket}
+                    onChange={(e) => patchS3({ bucket: e.target.value })}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">目录前缀</Label>
+                  <Input
+                    placeholder="agnes-chat"
+                    value={s3.prefix ?? ""}
+                    onChange={(e) => patchS3({ prefix: e.target.value })}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Access Key ID</Label>
+                  <Input
+                    placeholder="AKIA... / R2 的 Access Key ID"
+                    value={s3.accessKeyId}
+                    onChange={(e) => patchS3({ accessKeyId: e.target.value })}
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Secret Access Key</Label>
+                  <div className="relative">
+                    <Input
+                      type={showSecret ? "text" : "password"}
+                      placeholder="Secret Access Key"
+                      value={s3.secretAccessKey}
+                      onChange={(e) => patchS3({ secretAccessKey: e.target.value })}
+                      className="pr-10"
+                      autoComplete="off"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSecret((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground hover:bg-muted"
+                      aria-label="显示/隐藏 Secret"
+                    >
+                      {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">公开访问域名（可选）</Label>
+                <Input
+                  placeholder="https://cdn.example.com（留空则用 Endpoint 拼）"
+                  value={s3.publicBaseUrl ?? ""}
+                  onChange={(e) => patchS3({ publicBaseUrl: e.target.value })}
+                  autoComplete="off"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  填了自定义域名就用它拼外链；留空则用 Endpoint/Bucket/Key。
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+                <p className="font-medium text-amber-600 dark:text-amber-400">两个必要设置</p>
+                <p className="mt-1">
+                  1. 存储桶要允许<strong>公开读</strong>，否则模型打不开链接；
+                </p>
+                <p>
+                  2. 存储桶 CORS 要允许你的站点域名做 <code className="rounded bg-muted px-1">PUT</code>
+                  ，否则浏览器直传会被拦。R2 在「设置 → CORS 策略」里加。
+                </p>
+                <p className="mt-1">
+                  凭证只存在你的浏览器，上传链接由服务端签名，文件<strong>不经过本站服务器</strong>。
+                </p>
+              </div>
             </div>
           </details>
 

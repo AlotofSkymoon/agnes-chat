@@ -109,4 +109,5 @@ export const LS_KEYS = {
   theme: "agnes:theme",
   cloudSync: "agnes:cloudSync",
   sidebarCollapsed: "agnes:sidebarCollapsed",
+  s3: "agnes:s3",
 } as const;

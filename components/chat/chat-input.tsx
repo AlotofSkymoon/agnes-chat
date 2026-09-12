@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUp, FileText, ImageIcon, Paperclip, Square, X } from "lucide-react";
+import { ArrowUp, FileText, FileVideo, Paperclip, Square, X } from "lucide-react";
 
 import { ModelPicker } from "@/components/chat/model-picker";
 import { formatBytes, type Attachment } from "@/lib/types";
@@ -88,10 +88,12 @@ export function ChatInput({
                   alt={a.name}
                   className="h-6 w-6 shrink-0 rounded object-cover"
                 />
+              ) : a.kind === "video" ? (
+                <FileVideo className="h-3.5 w-3.5 shrink-0 text-primary" />
               ) : a.kind === "text" ? (
                 <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
               ) : (
-                <ImageIcon className="h-3.5 w-3.5 shrink-0 text-fg-tertiary" />
+                <Paperclip className="h-3.5 w-3.5 shrink-0 text-fg-tertiary" />
               )}
               <span className="truncate text-fg-secondary">{a.name}</span>
               <span className="shrink-0 text-[10px] text-fg-quaternary">

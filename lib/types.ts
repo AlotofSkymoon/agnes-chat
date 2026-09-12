@@ -1,4 +1,4 @@
-export type AttachmentKind = "text" | "image" | "file";
+export type AttachmentKind = "text" | "image" | "video" | "file";
 
 export interface Attachment {
   id: string;
@@ -62,6 +62,11 @@ export function isImageFile(file: File): boolean {
   return file.type.startsWith("image/");
 }
 
+export function isVideoFile(file: File): boolean {
+  if (file.type.startsWith("video/")) return true;
+  return ["mp4", "webm", "mov", "m4v", "avi", "mkv"].includes(extOf(file.name));
+}
+
 /** 人类可读的体积 */
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -103,6 +108,10 @@ export async function readFileToAttachment(file: File): Promise<Attachment> {
         content: clipped,
         note: text.length > 100_000 ? "内容过长，只取前 100000 字符" : undefined,
       };
+    }
+
+    if (isVideoFile(file)) {
+      return { ...base, kind: "video", note: "未配置对象存储，视频未上传" };
     }
 
     return { ...base, kind: "file", note: "暂不支持解析该类型，仅记录文件名" };

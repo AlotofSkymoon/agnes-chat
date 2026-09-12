@@ -21,11 +21,16 @@ import { Sidebar } from "@/components/chat/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { DEFAULT_MODEL, LS_KEYS, supportsVision } from "@/lib/config";
+import { DEFAULT_S3_CONFIG, type S3Config } from "@/lib/s3-presets";
 import {
   createId,
+  isImageFile,
+  isTextFile,
+  isVideoFile,
   MAX_FILES,
   readFileToAttachment,
   type Attachment,
+  type AttachmentKind,
   type ChatMessage,
 } from "@/lib/types";
 import { useConversations } from "@/lib/use-conversations";
@@ -101,10 +106,22 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         localStorage.setItem(LS_KEYS.keys, JSON.stringify(keys));
       }
 
+      // 对象存储配置
+      let s3: S3Config = { ...DEFAULT_S3_CONFIG };
+      const rawS3 = localStorage.getItem(LS_KEYS.s3);
+      if (rawS3) {
+        try {
+          s3 = { ...DEFAULT_S3_CONFIG, ...(JSON.parse(rawS3) as Partial<S3Config>) };
+        } catch {
+          /* 忽略 */
+        }
+      }
+
       const saved: ChatSettings = {
         keys: keys as ChatSettings["keys"],
         baseUrl: localStorage.getItem(LS_KEYS.baseUrl) ?? "",
         model: localStorage.getItem(LS_KEYS.model) ?? DEFAULT_MODEL,
+        s3,
       };
       setSettings(saved);
       setCloudSync(localStorage.getItem(LS_KEYS.cloudSync) === "true");
@@ -189,7 +206,11 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                 const textBlocks = [
                   m.content,
                   ...textAtts.map((a) => `\n---\n【附件：${a.name}】\n${a.content}`),
-                  ...otherAtts.map((a) => `\n【附件：${a.name}】${a.note ?? "（内容不可用）"}`),
+                  ...otherAtts.map((a) =>
+                    a.content && /^https?:\/\//.test(a.content)
+                      ? `\n【${a.kind === "video" ? "视频" : "附件"}：${a.name}】${a.content}`
+                      : `\n【附件：${a.name}】${a.note ?? "（内容不可用）"}`,
+                  ),
                   ...(atts.length > 0 && !visionOk && atts.some((a) => a.kind === "image")
                     ? ["\n（当前模型不支持识图，图片未发送）"]
                     : []),
@@ -360,6 +381,57 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     toast.success("已清空全部本地数据");
   }
 
+  /* --------------------------- 对象存储上传 --------------------------- */
+  const s3Ref = React.useRef<S3Config>(DEFAULT_S3_CONFIG);
+  React.useEffect(() => {
+    s3Ref.current = settings.s3 ?? DEFAULT_S3_CONFIG;
+  }, [settings.s3]);
+
+  const uploadViaS3 = React.useCallback(async (file: File): Promise<Attachment> => {
+    const cfg = s3Ref.current;
+    const res = await fetch("/api/upload/presign", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: file.name,
+        contentType: file.type || "application/octet-stream",
+        size: file.size,
+        config: cfg,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      uploadUrl?: string;
+      publicUrl?: string;
+      kind?: string;
+    };
+    if (!res.ok || !data.uploadUrl || !data.publicUrl) {
+      throw new Error(data.error ?? `预签名失败（${res.status}）`);
+    }
+
+    // 直传对象存储：文件不经过本站服务器（Vercel 请求体上限 4.5MB）
+    const put = await fetch(data.uploadUrl, {
+      method: "PUT",
+      body: file,
+      headers: { "content-type": file.type || "application/octet-stream" },
+    });
+    if (!put.ok) {
+      throw new Error(`上传失败（${put.status}）：请检查存储桶 CORS 与公开读设置`);
+    }
+
+    const kind: AttachmentKind =
+      data.kind === "video" ? "video" : data.kind === "image" ? "image" : "file";
+
+    return {
+      id: createId(),
+      name: file.name,
+      size: file.size,
+      mime: file.type || "application/octet-stream",
+      kind,
+      content: data.publicUrl,
+    };
+  }, []);
+
   const toggleSidebar = React.useCallback(() => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
@@ -396,11 +468,40 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     }
 
     const picked = list.slice(0, room);
-    const parsed = await Promise.all(picked.map(readFileToAttachment));
+    const s3 = s3Ref.current;
+    // 图片 / 视频 / 非文本文件走对象存储；文本文件本地抽取，直接进上下文
+    const needsRemote = (f: File) => isImageFile(f) || isVideoFile(f) || !isTextFile(f);
+    const willUpload = s3.enabled && picked.some(needsRemote);
+
+    let toastId: string | number | undefined;
+    if (willUpload) toastId = toast.loading("正在上传到对象存储…");
+
+    const parsed = await Promise.all(
+      picked.map(async (f) => {
+        if (s3.enabled && needsRemote(f)) {
+          try {
+            return await uploadViaS3(f);
+          } catch (err) {
+            toast.error(
+              `${f.name}：${err instanceof Error ? err.message : "上传失败"}`,
+            );
+            return readFileToAttachment(f);
+          }
+        }
+        return readFileToAttachment(f);
+      }),
+    );
+
+    if (toastId !== undefined) {
+      const okCount = parsed.filter((a) => a.content?.startsWith("http")).length;
+      if (okCount > 0) toast.success(`已上传 ${okCount} 个文件`, { id: toastId });
+      else toast.dismiss(toastId);
+    }
+
     setAttachments((prev) => [...prev, ...parsed]);
     const failed = parsed.filter((a) => a.note);
     if (failed.length) toast.warning(failed[0].note);
-  }, [attachments.length]);
+  }, [attachments.length, uploadViaS3]);
 
   const removeAttachment = React.useCallback((id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
@@ -456,6 +557,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       localStorage.setItem(LS_KEYS.keys, JSON.stringify(next.keys));
       localStorage.setItem(LS_KEYS.baseUrl, next.baseUrl);
       localStorage.setItem(LS_KEYS.model, next.model);
+      if (next.s3) localStorage.setItem(LS_KEYS.s3, JSON.stringify(next.s3));
     } catch {
       /* 忽略 */
     }

@@ -48,6 +48,7 @@ export const KEYS = {
   chatIndex: (userId: string) => `chat:index:${userId}`,
   /** 登录限流 */
   loginRateLimit: (ip: string) => `ratelimit:login:${ip}`,
+  ratelimitUpload: (ip: string) => `ratelimit:upload:${ip}`,
   /** 导航站自定义数据（管理员维护） */
   navData: "nav:data",
   /** 域名后缀缓存 */

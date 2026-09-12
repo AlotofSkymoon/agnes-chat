@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, FileText, RotateCw, TriangleAlert } from "lucide-react";
+import { Check, Copy, FileText, FileVideo, RotateCw, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { AgnesIcon } from "@/components/agnes-logo";
@@ -45,6 +45,8 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
               >
                 {a.kind === "image" && a.content ? (
                   <img src={a.content} alt={a.name} className="h-6 w-6 shrink-0 rounded object-cover" />
+                ) : a.kind === "video" ? (
+                  <FileVideo className="h-3.5 w-3.5 shrink-0 text-primary" />
                 ) : (
                   <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
                 )}
