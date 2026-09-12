@@ -1,0 +1,227 @@
+# Cloudflare Workers 部署教程（推荐）
+
+> 用 Cloudflare 三件套：**KV + D1 + R2**，不需要 Redis，免费额度更大。
+> 全程在网页上点，不用装任何东西。约 20 分钟。
+
+**为什么推荐这个方式？**
+- 不需要注册 Upstash，少一个外部服务
+- 免费额度：D1 每天 500 万次读、KV 每天 10 万次读，个人站用不完
+- 没有「自定义域名备案/认证」的麻烦（Workers 自带 `.workers.dev` 域名）
+
+不想用 Cloudflare 也可以走 Vercel + Upstash，见文末对比。
+
+---
+
+## 你需要准备的东西
+
+一共要往 GitHub 里填 **7 个 Secrets**。先把容器建好，再回来填。
+
+| Secret 名字 | 是什么 | 从哪来 |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | 操作 Cloudflare 的令牌 | 第 1 步 |
+| `CLOUDFLARE_ACCOUNT_ID` | 账户 ID | 第 2 步 |
+| `KV_NAMESPACE_ID` | KV 命名空间 ID | 第 3 步 |
+| `D1_DATABASE_ID` | D1 数据库 ID | 第 4 步 |
+| `SESSION_SECRET` | 登录会话密钥（随便编） | 第 5 步 |
+| `PRESET_AGNES_API_KEY` | 站点内置 Agnes Key | 第 6 步 |
+| `R2_*` 共 5 个 | 对象存储（可选） | 见 [R2 教程](./R2对象存储配置教程.md) |
+
+---
+
+## 第 1 步：创建 Cloudflare API 令牌
+
+这个令牌让 GitHub Actions 能帮你部署。
+
+1. 打开 <https://dash.cloudflare.com/profile/api-tokens>
+2. 点 **「创建令牌」** / **Create Token**
+3. 找到 **「编辑 Cloudflare Workers」** / **Edit Cloudflare Workers** 这一行，
+   点右边的 **「使用模板」** / **Use template**
+
+   > 如果找不到这个模板，就用 **「创建自定义令牌」**，权限按下面勾：
+   > - 账户 → **Workers 脚本** → 编辑
+   > - 账户 → **Workers KV 存储** → 编辑
+   > - 账户 → **D1** → 编辑
+   > - 账户 → **Workers R2 存储** → 编辑
+   > - 区域 → **Workers 路由** → 编辑（可选）
+
+4. **账户资源**：选「包括 → 你的账户」
+5. **区域资源**：选「包括 → 所有区域」（或指定你的域名）
+6. 点 **「继续到摘要」** → **「创建令牌」**
+7. **复制显示的令牌**（只显示一次！）存到记事本
+
+---
+
+## 第 2 步：拿到账户 ID
+
+- 打开 <https://dash.cloudflare.com/>，登录后
+- 右边中间位置（或 R2 概览页右侧）能看到 **「账户 ID」**
+- 32 位字符，复制下来
+
+---
+
+## 第 3 步：创建 KV 命名空间
+
+KV 用来存登录会话（session）和缓存。
+
+1. 左边菜单：**Workers 和 Pages** → **KV**
+2. 点 **「创建命名空间」** / **Create a namespace**
+3. 名称填：`agnes-chat-kv`
+4. 点 **「添加」**
+5. 创建成功后，列表里会显示这一行，**复制它的 ID**（一串 32 位字符）
+
+---
+
+## 第 4 步：创建 D1 数据库
+
+D1 是 SQLite 数据库，存用户账号。
+
+1. 左边菜单：**Workers 和 Pages** → **D1**
+2. 点 **「创建数据库」** / **Create database**
+3. 名称填：**`agnes-chat-db`**（必须完全一致，部署脚本按这个名字找）
+4. 位置选离你近的
+5. 点 **「创建」**
+6. 创建好后**点进这个数据库**，在概览页找到 **「数据库 ID」**，复制下来
+
+> 建表不用手动做 —— GitHub Actions 会自动执行 `schema.sql`。
+
+---
+
+## 第 5 步：生成 SESSION_SECRET
+
+这是给登录 Cookie 加密用的，随便编一串够长的乱码就行。
+
+**方法**：在本机终端执行（任选一个）：
+
+```bash
+openssl rand -base64 32
+```
+
+或者用 Node：
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+没有终端？也可以在这生成：<https://www.random.org/strings/>（长度 32，选所有字符集）
+
+**复制生成的字符串。**
+
+---
+
+## 第 6 步：准备 Agnes API Key
+
+填站点内置的 Agnes Key，用户不填自己的 Key 时用它。
+
+默认值（可以直接用）：
+
+```
+sk-d5DyJCcfW9TmkeIHnfFPgHJ2ZjxfKHCx5ip3tR14abyrgZEi
+```
+
+> 这个 Key 只有管理员能在 `/admin` 看到完整值，普通用户看不到。
+> 想换自己的，去 <https://platform.agnes-ai.com/> 申请。
+
+---
+
+## 第 7 步：填进 GitHub Secrets
+
+1. 打开你的 GitHub 仓库（fork 出来的那个）
+2. 点 **Settings**（仓库页面的右上角标签）
+3. 左边菜单：**Secrets and variables** → **Actions**
+4. 点 **「New repository secret」**
+5. **一个一个添加**（Name 和 Secret 分两次填）：
+
+   | Name | Secret |
+   |---|---|
+   | `CLOUDFLARE_API_TOKEN` | 第 1 步的令牌 |
+   | `CLOUDFLARE_ACCOUNT_ID` | 第 2 步的账户 ID |
+   | `KV_NAMESPACE_ID` | 第 3 步的 KV ID |
+   | `D1_DATABASE_ID` | 第 4 步的 D1 ID |
+   | `SESSION_SECRET` | 第 5 步生成的随机串 |
+   | `PRESET_AGNES_API_KEY` | 第 6 步的 Key |
+
+6. **如果要启用图片/视频上传**，再加这 5 个（详见 [R2 教程](./R2对象存储配置教程.md)）：
+
+   | Name | Secret |
+   |---|---|
+   | `R2_ACCOUNT_ID` | 账户 ID（同第 2 步） |
+   | `R2_ACCESS_KEY_ID` | R2 令牌的 Access Key |
+   | `R2_SECRET_ACCESS_KEY` | R2 令牌的 Secret Key |
+   | `R2_BUCKET` | `agnes-chat` |
+   | `R2_PUBLIC_BASE_URL` | `https://pub-xxx.r2.dev` |
+
+> 💡 **Name 必须一模一样**（全大写 + 下划线），填错了部署会失败。
+
+---
+
+## 第 8 步：触发部署
+
+1. 确保代码已经推到 GitHub（fork 的仓库要先 **Sync fork** 同步上游）
+2. 打开仓库的 **Actions** 标签
+3. 左边选 **「部署到 Cloudflare Workers」**
+4. 点右边 **「Run workflow」** → 再点 **「Run workflow」**
+5. 等 3～5 分钟，看到绿色 ✅ 就成功了
+
+**之后每次推代码都会自动重新部署。**
+
+### 怎么找到你的网站地址？
+
+- 部署日志里会有一行 `https://agnes-chat.xxxx.workers.dev`
+- 或者 Cloudflare 后台：**Workers 和 Pages** → 点你的项目 → 看「预览 URL」
+
+---
+
+## 常见问题
+
+### ❌ Actions 报「缺少 Secret D1_DATABASE_ID」
+
+说明第 7 步的 Name 拼错了。回去检查拼写，必须完全一致（大小写敏感）。
+
+### ❌ 报「Couldn't find a D1 database」
+
+D1 数据库名字必须是 **`agnes-chat-db`**，一个字都不能差。
+
+### ❌ 部署成功但注册/登录报错
+
+大概率是 D1 表没建成。手动执行一次：
+
+```bash
+npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote
+```
+
+### ❌ 提示「Cloudflare 部署缺少 KV 绑定」
+
+`wrangler.jsonc` 里的占位符没被替换成功。
+检查 `KV_NAMESPACE_ID` 这个 Secret 有没有填。
+
+### ❌ 想换回 Vercel
+
+Vercel 部署照旧可用（需要 Upstash Redis），两条路互不影响：
+有 KV/D1 绑定就走 Cloudflare，否则走 Upstash。
+
+---
+
+## 两种方式对比
+
+| | Cloudflare Workers（推荐） | Vercel |
+|---|---|---|
+| 数据库 | D1（SQLite）+ KV | Upstash Redis |
+| 需要注册外部服务 | 不需要 | 需要 Upstash |
+| 免费额度 | 很大，个人站用不完 | Upstash 每天 1 万命令 |
+| 自定义域名 | 自带 workers.dev，绑自己的也行 | 自带 vercel.app |
+| 大文件上传 | 完全没问题 | 受 Serverless 限制（已用预签名绕过） |
+| 配置复杂度 | 中（本教程） | 低 |
+
+---
+
+## 附：本地开发怎么跑？
+
+本地用 Upstash 更简单（不用模拟 KV/D1）：
+
+```bash
+cp .env.example .env.local   # 填入 Upstash 的两个值
+npm install
+npm run dev
+```
+
+没有 Upstash 也能跑，只是不能注册登录 —— 聊天功能照常可用。
