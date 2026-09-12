@@ -97,6 +97,16 @@
 
     --radius: 0.85rem;
 
+    /* ==========================================================================
+       iOS 26 连续圆角（Continuous Corner）
+       iOS 的"圆"不是标准圆弧，而是超椭圆（squircle）——转角处过渡更顺，
+       视觉上比同尺寸的普通圆角更柔和、更贴近硬件感。
+       纯 CSS 无法完美还原，这里用"大圆角 + 高光内描边"来近似。
+       ========================================================================== */
+    --radius-ios: 1.125rem;   /* 18px  控件：按钮、输入框 */
+    --radius-ios-lg: 1.5rem;  /* 24px  卡片：消息气泡、设置块 */
+    --radius-ios-xl: 2rem;    /* 32px  大容器：弹窗、面板 */
+
     /* 侧边栏 */
     --sidebar: 228 33% 98%;
     --sidebar-foreground: 220 15% 22%;
@@ -289,6 +299,66 @@
   .glass:hover {
     background-color: hsl(var(--glass-bg) / 0.75);
     border-color: hsl(var(--glass-border) / 0.9);
+  }
+
+  /* ==========================================================================
+     iOS 26 液态玻璃（Liquid Glass）
+     与 .glass 的区别：圆角更大、层次更分明、带折射感的双层高光。
+     ========================================================================== */
+  .ios-glass {
+    border-radius: var(--radius-ios-lg);
+    background-color: hsl(var(--glass-bg) / 0.62);
+    -webkit-backdrop-filter: blur(24px) saturate(185%);
+    backdrop-filter: blur(24px) saturate(185%);
+    border: 1px solid hsl(var(--glass-border) / 0.55);
+    box-shadow:
+      /* 顶部高光：模拟玻璃上沿的受光 */
+      inset 0 1px 1px 0 hsl(0 0% 100% / 0.30),
+      /* 底部暗边：模拟玻璃厚度带来的折射 */
+      inset 0 -1px 1px 0 hsl(0 0% 0% / 0.07),
+      /* 外部投影，柔和扩散 */
+      0 8px 28px -8px hsl(230 30% 12% / 0.22),
+      0 2px 8px -3px hsl(230 30% 12% / 0.12);
+    color: hsl(var(--foreground));
+    transition:
+      background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .ios-glass:hover {
+    background-color: hsl(var(--glass-bg) / 0.76);
+    box-shadow:
+      inset 0 1px 1px 0 hsl(0 0% 100% / 0.36),
+      inset 0 -1px 1px 0 hsl(0 0% 0% / 0.07),
+      0 12px 34px -10px hsl(230 30% 12% / 0.26),
+      0 2px 8px -3px hsl(230 30% 12% / 0.14);
+  }
+
+  /* 按下时轻微下沉，给一点"实体感" */
+  .ios-glass:active {
+    transform: scale(0.985);
+  }
+
+  /* iOS 26 圆角卡片：给非玻璃材质的普通容器用 */
+  .ios-card {
+    border-radius: var(--radius-ios-lg);
+    border: 1px solid hsl(var(--border) / 0.7);
+    background-color: hsl(var(--card));
+    box-shadow:
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.14),
+      0 2px 10px -3px hsl(230 30% 12% / 0.14);
+  }
+
+  /* iOS 26 胶囊控件：按钮、标签、小开关 */
+  .ios-pill {
+    border-radius: 999px;
+    box-shadow:
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.20),
+      0 1px 4px -1px hsl(230 30% 12% / 0.16);
+    transition:
+      background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   /* 尊重系统的"减少动态效果"设置 */

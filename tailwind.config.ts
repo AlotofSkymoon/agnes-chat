@@ -90,6 +90,10 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // iOS 26 连续圆角层级：控件更圆，容器最圆
+        ios: "var(--radius-ios)",
+        "ios-lg": "var(--radius-ios-lg)",
+        "ios-xl": "var(--radius-ios-xl)",
       },
       keyframes: {
         "accordion-down": {

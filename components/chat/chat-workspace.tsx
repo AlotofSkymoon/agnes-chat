@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   Compass,
+  Monitor,
   Eraser,
   Menu,
   PanelLeftOpen,
@@ -17,6 +18,7 @@ import { ChatInput } from "@/components/chat/chat-input";
 import { EmptyState } from "@/components/chat/empty-state";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { SettingsDialog, type ChatSettings } from "@/components/chat/settings-dialog";
+import { fileToDataUrl, probeImageUrl } from "@/lib/image-probe";
 import { ALLOW_WEB_SEARCH, REQUIRE_LOGIN } from "@/lib/site";
 import { Sidebar } from "@/components/chat/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -737,7 +739,42 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       picked.map(async (f) => {
         if (s3.enabled && needsRemote(f)) {
           try {
-            return await uploadViaS3(f);
+            const att = await uploadViaS3(f);
+
+            /**
+             * 上传"成功"不等于 AI 看得到。
+             * 桶没开公开读、自定义域名没生效时，URL 是死的，
+             * AI 在服务端拉不到 —— 表现为"配了存储还是看不见图"。
+             *
+             * 这里主动探测一次，不通就把图转回 base64 内嵌。
+             * 内嵌是一定能让 AI 读到的，代价只是请求体变大。
+             */
+            /**
+             * 上传成功后 content 里存的是公开链接。
+             * 判断它是不是真能加载 —— 不能就换成 base64 内嵌。
+             */
+            if (
+              att.kind === "image" &&
+              att.content &&
+              /^https?:\/\//i.test(att.content)
+            ) {
+              const reachable = await probeImageUrl(att.content);
+              if (!reachable) {
+                const inline = await fileToDataUrl(f).catch(() => "");
+                if (inline && inline.length <= INLINE_LIMIT) {
+                  toast.warning(
+                    `${f.name}：存储链接无法公开访问，已自动转为内嵌发送（建议检查桶的公开读设置）`,
+                  );
+                  // 用 base64 覆盖链接：AI 一定能读到内嵌内容
+                  return { ...att, content: inline };
+                }
+                return {
+                  ...att,
+                  note: `${f.name}：上传成功但链接无法公开访问，且图片太大无法内嵌。请在存储桶开启「公开读」，或在设置里改用自定义公开域名`,
+                };
+              }
+            }
+            return att;
           } catch (err) {
             // ⚠️ 不能无条件回落到 base64：大文件内嵌必然触发「单条消息过大」。
             //    只有小文件才值得降级内嵌；大文件要如实告诉用户上传没成功。
@@ -947,6 +984,11 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
             <Button variant="ghost" size="icon" asChild title="导航站">
               <Link href="/nav">
                 <Compass className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button variant="ghost" size="icon" asChild title="云电脑">
+              <Link href="/pc">
+                <Monitor className="h-4 w-4" />
               </Link>
             </Button>
             {!isEmpty ? (
