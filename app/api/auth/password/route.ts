@@ -9,7 +9,8 @@ import {
   verifyPassword,
   type UserRecord,
 } from "@/lib/auth";
-import { getRedis, getValue, hasRedisConfig, hgetAll, KEYS } from "@/lib/redis";
+import { getRedis, getValue, hasRedisConfig,
+  storageErrorMessage, hgetAll, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
     if (!hasRedisConfig()) {
-      return NextResponse.json({ error: "服务端未配置 Redis" }, { status: 500 });
+      return NextResponse.json({ error: storageErrorMessage() }, { status: 500 });
     }
 
     const redis = getRedis();

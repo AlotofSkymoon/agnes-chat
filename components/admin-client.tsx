@@ -13,6 +13,9 @@ import {
   KeyRound,
   Loader2,
   RefreshCw,
+  Save,
+  Server,
+  Settings2,
   Shield,
   Trash2,
   User as UserIcon,
@@ -22,6 +25,9 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { SiteFooter } from "@/components/site-footer";
 
 interface AdminUser {
@@ -189,6 +195,8 @@ export function AdminClient({ me }: { me: AdminUser }) {
           </CardContent>
         </Card>
 
+        <SiteSettingsCard />
+
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
             <div className="space-y-1.5">
@@ -264,5 +272,136 @@ export function AdminClient({ me }: { me: AdminUser }) {
       </div>
       <SiteFooter />
     </main>
+  );
+}
+
+
+/* ========================================================================== */
+/* 站点配置：原本散落在用户设置里的高级项，统一收归管理员                      */
+/* ========================================================================== */
+
+interface SiteSettings {
+  defaultBaseUrl: string;
+  defaultModel: string;
+  cloudSaveDefault: boolean;
+}
+
+function SiteSettingsCard() {
+  const [form, setForm] = React.useState<SiteSettings>({
+    defaultBaseUrl: "",
+    defaultModel: "",
+    cloudSaveDefault: false,
+  });
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/settings");
+      const data = (await res.json()) as { settings?: SiteSettings };
+      if (data.settings) setForm(data.settings);
+    } catch {
+      toast.error("读取站点配置失败");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        toast.error(data.error ?? "保存失败");
+        return;
+      }
+      toast.success("站点配置已保存，全站生效");
+    } catch {
+      toast.error("保存失败");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+        <div className="space-y-1.5">
+          <CardTitle className="flex items-center gap-2">
+            <Settings2 className="h-4 w-4" />
+            站点配置
+          </CardTitle>
+          <CardDescription>
+            Base URL、默认模型、云端保存等站点级设置。普通用户的设置面板不显示这些项。
+          </CardDescription>
+        </div>
+        <Button variant="ghost" size="icon" onClick={() => void load()} title="刷新">
+          <RefreshCw className="h-4 w-4" />
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <p className="text-sm text-muted-foreground">读取中…</p>
+        ) : (
+          <>
+            <div className="space-y-1.5">
+              <Label htmlFor="ss-base" className="flex items-center gap-2">
+                <Server className="h-4 w-4" />
+                默认 Base URL
+              </Label>
+              <Input
+                id="ss-base"
+                placeholder="留空则使用内置地址（如 https://apihub.agnes-ai.com/v1）"
+                value={form.defaultBaseUrl}
+                onChange={(e) => setForm((f) => ({ ...f, defaultBaseUrl: e.target.value }))}
+                autoComplete="off"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                兼容 OpenAI /chat/completions 的中转地址均可。用户未自定义时生效。
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="ss-model">默认模型</Label>
+              <Input
+                id="ss-model"
+                placeholder="留空则使用内置默认（agnes-2.5-flash）"
+                value={form.defaultModel}
+                onChange={(e) => setForm((f) => ({ ...f, defaultModel: e.target.value }))}
+                autoComplete="off"
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border border-border/70 bg-muted/30 px-3 py-3">
+              <div className="pr-3">
+                <p className="text-sm font-medium">默认开启云端保存</p>
+                <p className="text-xs text-muted-foreground">
+                  新用户是否默认把聊天记录存到服务端（用户仍可自行关闭）
+                </p>
+              </div>
+              <Switch
+                checked={form.cloudSaveDefault}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, cloudSaveDefault: v }))}
+              />
+            </div>
+
+            <Button onClick={() => void save()} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              保存配置
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

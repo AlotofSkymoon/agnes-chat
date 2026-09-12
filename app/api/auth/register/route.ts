@@ -8,7 +8,8 @@ import {
   setSessionCookie,
   toSafeUser,
 } from "@/lib/auth";
-import { getRedis, getValue, hasRedisConfig, KEYS } from "@/lib/redis";
+import { getRedis, getValue, hasRedisConfig,
+  storageErrorMessage, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
   try {
     if (!hasRedisConfig()) {
       return NextResponse.json(
-        { error: "服务端未配置 Upstash Redis，无法注册。请检查环境变量。" },
+        { error: storageErrorMessage() },
         { status: 500 },
       );
     }

@@ -119,3 +119,19 @@ export async function readFileToAttachment(file: File): Promise<Attachment> {
     return { ...base, note: "读取失败" };
   }
 }
+
+/** 站点级配置（仅管理员可改，全站生效） */
+export interface SiteSettings {
+  /** 全站默认 Base URL，留空则用内置地址 */
+  defaultBaseUrl: string;
+  /** 全站默认模型，留空则用内置默认 */
+  defaultModel: string;
+  /** 是否默认开启「保存聊天记录到云端」 */
+  cloudSaveDefault: boolean;
+}
+
+export const DEFAULT_SITE_SETTINGS: SiteSettings = {
+  defaultBaseUrl: "",
+  defaultModel: "",
+  cloudSaveDefault: false,
+};

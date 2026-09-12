@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/auth";
 import { DEFAULT_NAV, type NavCategory } from "@/lib/nav-data";
-import { getRedis, hasRedisConfig, KEYS, getValue } from "@/lib/redis";
+import { getRedis, hasRedisConfig,
+  storageErrorMessage, KEYS, getValue } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     await requireAdmin();
-    if (!hasRedisConfig()) return NextResponse.json({ error: "未配置 Redis，无法保存" }, { status: 500 });
+    if (!hasRedisConfig()) return NextResponse.json({ error: storageErrorMessage() }, { status: 500 });
 
     const body = (await request.json()) as { categories?: unknown };
     if (!Array.isArray(body.categories)) {

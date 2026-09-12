@@ -14,6 +14,7 @@ import {
   getStore,
   hasStore as hasStoreBackend,
 } from "@/lib/storage";
+import { detectPlatform } from "@/lib/platform";
 import type { Store, UserRecord } from "@/lib/storage/types";
 
 export const KEYS = {
@@ -29,6 +30,7 @@ export const KEYS = {
   navData: "nav:data",
   tlds: "tlds:list",
   announcement: "site:announcement",
+  siteSettings: "site:settings",
   statMessages: "stat:messages",
 } as const;
 
@@ -37,6 +39,19 @@ export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 天
 /** 是否配置了任意可用的存储后端 */
 export function hasRedisConfig(): boolean {
   return hasStoreBackend();
+}
+
+/**
+ * 存储不可用时的提示文案。
+ *
+ * ⚠️ 必须按平台给不同指引：
+ * Cloudflare 走 KV + D1，压根不需要 Upstash；
+ * 若在这儿统一提示「请配置 Upstash」，会把 Cloudflare 用户引向完全错误的排障方向。
+ */
+export function storageErrorMessage(): string {
+  return detectPlatform() === "cloudflare"
+    ? "未检测到 KV / D1 绑定，无法完成此操作。请检查 wrangler.jsonc 里的 kv_namespaces 与 d1_databases，ID 需填真实值（不能留 __KV_ID__ / __D1_ID__ 占位符）。"
+    : "服务端未配置 Upstash Redis，无法完成此操作。请检查环境变量 UPSTASH_REDIS_REST_URL 与 UPSTASH_REDIS_REST_TOKEN。";
 }
 
 /** 当前生效的后端名称，用于 /admin 展示与排障 */

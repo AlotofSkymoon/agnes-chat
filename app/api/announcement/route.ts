@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getRedis, hasRedisConfig, KEYS, getValue } from "@/lib/redis";
+import { getRedis, hasRedisConfig,
+  storageErrorMessage, KEYS, getValue } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
   try {
     const { requireAdmin } = await import("@/lib/auth");
     await requireAdmin();
-    if (!hasRedisConfig()) return NextResponse.json({ error: "未配置 Redis" }, { status: 500 });
+    if (!hasRedisConfig()) return NextResponse.json({ error: storageErrorMessage() }, { status: 500 });
 
     const body = (await request.json()) as { text?: string; enabled?: boolean };
     const payload: Announcement = {

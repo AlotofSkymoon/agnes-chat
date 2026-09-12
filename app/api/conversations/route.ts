@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth";
-import { getRedis, getValue, hasRedisConfig, KEYS, setMembers } from "@/lib/redis";
+import { getRedis, getValue, hasRedisConfig,
+  storageErrorMessage, KEYS, setMembers } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!hasRedisConfig()) return NextResponse.json({ error: "服务端未配置 Redis" }, { status: 500 });
+  if (!hasRedisConfig()) return NextResponse.json({ error: storageErrorMessage() }, { status: 500 });
 
   const redis = getRedis();
   const ids = await setMembers(KEYS.chatIndex(user.id));
@@ -34,7 +35,7 @@ export async function GET() {
 export async function DELETE() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
-  if (!hasRedisConfig()) return NextResponse.json({ error: "服务端未配置 Redis" }, { status: 500 });
+  if (!hasRedisConfig()) return NextResponse.json({ error: storageErrorMessage() }, { status: 500 });
 
   const redis = getRedis();
   const ids = await setMembers(KEYS.chatIndex(user.id));

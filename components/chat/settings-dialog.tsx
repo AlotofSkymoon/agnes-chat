@@ -110,6 +110,13 @@ export function SettingsDialog({
 
   const { preset, setPreset } = useTheme();
 
+  /**
+   * 权限分流：普通用户只能改「配色主题」和「自己的 API Key」。
+   * Base URL、对象存储、云端保存等属于站点级配置，只有管理员可见，
+   * 并已在 /admin 面板提供。
+   */
+  const isAdmin = user?.role === "admin";
+
   const s3 = form.s3 ?? DEFAULT_S3_CONFIG;
   const patchS3 = (patch: Partial<S3Config>) =>
     setForm((f) => ({ ...f, s3: { ...(f.s3 ?? DEFAULT_S3_CONFIG), ...patch } }));
@@ -242,8 +249,8 @@ export function SettingsDialog({
             <span className="font-medium text-foreground">{form.model}</span>）。
           </div>
 
-          {/* 高级：Base URL（站长可隐藏） */}
-          {!ALLOW_CUSTOM_BASE_URL ? null : (
+          {/* 高级：Base URL —— 仅管理员可见 */}
+          {!isAdmin || !ALLOW_CUSTOM_BASE_URL ? null : (
           <details className="rounded-xl border border-border/70 bg-card/40 px-3 py-2">
             <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
               <Server className="h-4 w-4" />
@@ -263,7 +270,8 @@ export function SettingsDialog({
           </details>
           )}
 
-          {/* 对象存储：图片 / 视频上传 */}
+          {/* 对象存储：图片 / 视频上传 —— 仅管理员可见 */}
+          {!isAdmin ? null : (
           <details className="rounded-xl border border-border/70 bg-card/40 px-3 py-2">
             <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
               <CloudUpload className="h-4 w-4" />
@@ -467,14 +475,15 @@ export function SettingsDialog({
               </div>
             </div>
           </details>
+          )}
 
-          {/* 云端保存 */}
-          {user ? (
+          {/* 云端保存 —— 仅管理员可见（站点级配置已移到 /admin） */}
+          {!isAdmin ? null : user ? (
             <div className="flex items-center justify-between rounded-xl border border-border/70 bg-card/40 px-3 py-3">
               <div className="pr-3">
                 <p className="text-sm font-medium">保存聊天记录到云端</p>
                 <p className="text-xs text-muted-foreground">
-                  关闭时聊天记录只存本地；开启后会同步到 Upstash Redis（仅本人可见）
+                  关闭时聊天记录只存本地；开启后会同步到服务端存储（仅本人可见）
                 </p>
               </div>
               <Switch checked={cloudSync} onCheckedChange={onCloudSyncChange} />
@@ -482,6 +491,13 @@ export function SettingsDialog({
           ) : (
             <div className="rounded-xl border border-dashed border-border px-3 py-3 text-xs text-muted-foreground">
               登录后可把聊天记录保存到云端（默认关闭）。
+            </div>
+          )}
+
+          {/* 普通用户提示：高级配置已移至管理员面板 */}
+          {isAdmin ? null : (
+            <div className="rounded-xl border border-border/70 bg-muted/40 px-3 py-2.5 text-[11px] text-fg-tertiary">
+              Base URL、对象存储、云端保存等站点级配置仅限管理员调整，详见「管理员面板」。
             </div>
           )}
 
