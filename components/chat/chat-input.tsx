@@ -3,6 +3,8 @@
 import * as React from "react";
 import { ArrowUp, Square } from "lucide-react";
 
+import { ModelPicker } from "@/components/chat/model-picker";
+
 interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -12,6 +14,7 @@ interface ChatInputProps {
   /** 空状态时用大号样式 */
   variant?: "default" | "hero";
   model?: string;
+  onModelChange?: (modelId: string) => void;
   placeholder?: string;
 }
 
@@ -23,6 +26,7 @@ export function ChatInput({
   streaming,
   variant = "default",
   model,
+  onModelChange,
   placeholder = "给 Agnes 发送消息",
 }: ChatInputProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -67,12 +71,10 @@ export function ChatInput({
       />
 
       <div className="mt-2 flex items-center justify-between gap-2">
-        {/* 左侧：模型标识（仅对话态显示） */}
+        {/* 左侧：模型选择小框 */}
         <div className="min-w-0">
-          {!isHero && model ? (
-            <span className="truncate rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
-              {model}
-            </span>
+          {model && onModelChange ? (
+            <ModelPicker value={model} onChange={onModelChange} />
           ) : null}
         </div>
 

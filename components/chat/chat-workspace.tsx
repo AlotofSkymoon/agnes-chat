@@ -277,6 +277,19 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     toast.success("已清空全部本地数据");
   }
 
+  /** 在输入框里直接切模型 */
+  function changeModel(modelId: string) {
+    setSettings((prev) => {
+      const next = { ...prev, model: modelId };
+      try {
+        localStorage.setItem(LS_KEYS.model, modelId);
+      } catch {
+        /* 忽略 */
+      }
+      return next;
+    });
+  }
+
   function saveSettings(next: ChatSettings) {
     setSettings(next);
     try {
@@ -390,6 +403,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   onSubmit={() => send(input)}
                   onStop={stop}
                   streaming={status === "streaming"}
+                  model={mounted ? settings.model : undefined}
+                  onModelChange={changeModel}
                   placeholder="给 Agnes 发送消息"
                 />
                 <p className="mt-3 text-center text-xs text-muted-foreground">
@@ -405,6 +420,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   onStop={stop}
                   streaming={status === "streaming"}
                   model={mounted ? settings.model : undefined}
+                  onModelChange={changeModel}
                   placeholder="给 Agnes 发送消息"
                 />
                 <p className="mt-2 text-center text-xs text-muted-foreground">

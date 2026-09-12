@@ -15,12 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  AGENT_TIP,
-  CHAT_MODELS,
-  PROVIDERS,
-  type ProviderId,
-} from "@/lib/config";
+import { AGENT_TIP, PROVIDERS, type ProviderId } from "@/lib/config";
 
 export interface ChatSettings {
   /** 各服务商的 Key */
@@ -140,36 +135,10 @@ export function SettingsDialog({
             })}
           </div>
 
-          {/* 模型 */}
-          <div className="space-y-2">
-            <Label>模型</Label>
-            <div className="grid gap-2">
-              {CHAT_MODELS.map((m) => {
-                const active = form.model === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setForm((f) => ({ ...f, model: m.id }))}
-                    className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-left transition-all ${
-                      active
-                        ? "border-primary/60 bg-primary/10"
-                        : "border-border/70 bg-card/40 hover:border-primary/30"
-                    }`}
-                  >
-                    <span>
-                      <span className="block text-sm font-medium">{m.label}</span>
-                      <span className="block text-xs text-muted-foreground">{m.desc}</span>
-                    </span>
-                    <span
-                      className={`h-4 w-4 rounded-full border-2 ${
-                        active ? "border-primary bg-primary" : "border-muted-foreground/40"
-                      }`}
-                    />
-                  </button>
-                );
-              })}
-            </div>
+          {/* 模型：已移到输入框左下角的小选择框 */}
+          <div className="rounded-xl border border-border/70 bg-card/40 px-3 py-2.5 text-xs text-muted-foreground">
+            模型可在聊天输入框左下角的小框里切换（当前：
+            <span className="font-medium text-foreground">{form.model}</span>）。
           </div>
 
           {/* 高级：Base URL */}
