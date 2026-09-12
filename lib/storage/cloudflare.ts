@@ -48,6 +48,8 @@ const P_USER_SESSIONS = "user:sessions:";
 const P_USER = "user:";
 const P_SESSION = "session:";
 const P_RATELIMIT = "ratelimit:";
+const P_CHAT = "chat:";
+const P_CHAT_INDEX = "chat:index:";
 const KEY_USERS_COUNT = "users:count";
 
 /** 是否为 user:{id}（排除 user:email: / user:sessions:） */
@@ -59,6 +61,24 @@ function isUserKey(key: string): boolean {
 
 function isUserEmailKey(key: string): boolean {
   return key.startsWith(P_USER_EMAIL);
+}
+
+/** chat:{userId}:{conversationId} —— 单条会话，存 D1 */
+function isChatKey(key: string): boolean {
+  return key.startsWith(P_CHAT) && !key.startsWith(P_CHAT_INDEX);
+}
+
+/** chat:index:{userId} —— 会话索引，由 conversations 表查询得出 */
+function isChatIndexKey(key: string): boolean {
+  return key.startsWith(P_CHAT_INDEX);
+}
+
+/** 从 chat:{userId}:{conversationId} 拆出两段 */
+function splitChatKey(key: string): { userId: string; conversationId: string } | null {
+  const rest = key.slice(P_CHAT.length);
+  const i = rest.indexOf(":");
+  if (i <= 0) return null;
+  return { userId: rest.slice(0, i), conversationId: rest.slice(i + 1) };
 }
 
 /* ------------------------------ 实现 ------------------------------ */
@@ -87,6 +107,52 @@ export class CloudflareStore implements Store {
         .first<{ id: string }>();
       return (row?.id as unknown as T) ?? null;
     }
+
+    // 会话正文：conversations + messages 两张表拼回原结构
+    if (isChatKey(key)) {
+      const parts = splitChatKey(key);
+      if (!parts) return null;
+      const conv = await this.db
+        .prepare(
+          "SELECT id, title, model, created_at, updated_at FROM conversations WHERE id = ? AND user_id = ?",
+        )
+        .bind(parts.conversationId, parts.userId)
+        .first<{
+          id: string;
+          title: string;
+          model: string;
+          created_at: number;
+          updated_at: number;
+        }>();
+      if (!conv) return null;
+
+      const { results } = await this.db
+        .prepare("SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY id ASC")
+        .bind(parts.conversationId)
+        .all<{ role: string; content: string; created_at: number }>();
+
+      const messages = (results ?? []).map((m) => {
+        // content 可能是 JSON（多模态片段数组），尽量还原；失败则当纯文本
+        let content: unknown = m.content;
+        try {
+          const parsed = JSON.parse(m.content);
+          if (Array.isArray(parsed) || typeof parsed === "object") content = parsed;
+        } catch {
+          /* 纯文本，保持原样 */
+        }
+        return { role: m.role, content, createdAt: m.created_at };
+      });
+
+      return {
+        conversationId: conv.id,
+        title: conv.title ?? "",
+        model: conv.model ?? "",
+        createdAt: conv.created_at,
+        updatedAt: conv.updated_at,
+        messages,
+      } as unknown as T;
+    }
+
     const raw = await this.kv.get(key, "json");
     return (raw as T) ?? null;
   }
@@ -101,6 +167,55 @@ export class CloudflareStore implements Store {
       const rec = value as Partial<UserRecord> | null;
       if (rec && typeof rec === "object" && rec.id && rec.email) {
         await this.hset(key, rec as Record<string, unknown>);
+      }
+      return;
+    }
+
+    // 会话正文 → D1：先 upsert 会话，再整段替换消息
+    if (isChatKey(key)) {
+      const parts = splitChatKey(key);
+      if (!parts) return;
+      const data = value as
+        | { messages?: { role: string; content: unknown; createdAt?: number }[]; model?: string; title?: string; updatedAt?: number; createdAt?: number }
+        | null;
+      const list = Array.isArray(data?.messages) ? data!.messages! : [];
+      const now = Date.now();
+      const updatedAt = typeof data?.updatedAt === "number" ? data.updatedAt : now;
+      const createdAt = typeof data?.createdAt === "number" ? data.createdAt : now;
+      const title = String(data?.title ?? "").slice(0, 200);
+      const model = String(data?.model ?? "");
+
+      await this.db
+        .prepare(
+          `INSERT INTO conversations (id, user_id, title, model, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             title = CASE WHEN excluded.title <> '' THEN excluded.title ELSE conversations.title END,
+             model = excluded.model,
+             updated_at = excluded.updated_at`,
+        )
+        .bind(parts.conversationId, parts.userId, title, model, createdAt, updatedAt)
+        .run();
+
+      // 整段替换：先清该会话旧消息，再批量写入。
+      // 聊天记录是「整体覆盖式保存」，不是增量追加，这样最简单也最不容易不一致。
+      await this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").bind(parts.conversationId).run();
+
+      if (list.length > 0) {
+        const stmts = list.map((m) =>
+          this.db
+            .prepare("INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)")
+            .bind(
+              parts.conversationId,
+              String(m.role ?? "user"),
+              typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
+              typeof m.createdAt === "number" ? m.createdAt : now,
+            ),
+        );
+        // D1 每次 batch 有语句数上限，分片提交
+        for (let i = 0; i < stmts.length; i += 50) {
+          await this.db.batch(stmts.slice(i, i + 50));
+        }
       }
       return;
     }
@@ -122,6 +237,31 @@ export class CloudflareStore implements Store {
         const email = key.slice(P_USER_EMAIL.length);
         const res = await this.db.prepare("DELETE FROM users WHERE email = ?").bind(email).run();
         if (res.success) count += 1;
+        continue;
+      }
+      if (isChatKey(key)) {
+        const parts = splitChatKey(key);
+        if (parts) {
+          await this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").bind(parts.conversationId).run();
+          await this.db
+            .prepare("DELETE FROM conversations WHERE id = ? AND user_id = ?")
+            .bind(parts.conversationId, parts.userId)
+            .run();
+          count += 1;
+          continue;
+        }
+      }
+      if (isChatIndexKey(key)) {
+        // 清空该用户全部会话：先删消息，再删会话
+        const userId = key.slice(P_CHAT_INDEX.length);
+        await this.db
+          .prepare(
+            "DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = ?)",
+          )
+          .bind(userId)
+          .run();
+        await this.db.prepare("DELETE FROM conversations WHERE user_id = ?").bind(userId).run();
+        count += 1;
         continue;
       }
       await this.kv.delete(key);
@@ -281,6 +421,9 @@ export class CloudflareStore implements Store {
 
   /* ------------------------------ sadd ----------------------------- */
   async sadd(key: string, ...members: string[]): Promise<number> {
+    // 会话索引由 conversations 表天然维护（写会话时已 upsert），无需额外记 Set
+    if (isChatIndexKey(key)) return members.length;
+
     const cur = (await this.kv.get(key, "json")) as string[] | null;
     const set = new Set(Array.isArray(cur) ? cur : []);
     let added = 0;
@@ -295,6 +438,15 @@ export class CloudflareStore implements Store {
   }
 
   async smembers(key: string): Promise<string[]> {
+    // 会话索引：直接查 conversations 表，按更新时间倒序
+    if (isChatIndexKey(key)) {
+      const userId = key.slice(P_CHAT_INDEX.length);
+      const { results } = await this.db
+        .prepare("SELECT id FROM conversations WHERE user_id = ? ORDER BY updated_at DESC")
+        .bind(userId)
+        .all<{ id: string }>();
+      return (results ?? []).map((r) => r.id);
+    }
     const cur = (await this.kv.get(key, "json")) as string[] | null;
     return Array.isArray(cur) ? cur : [];
   }
@@ -363,5 +515,29 @@ CREATE INDEX IF NOT EXISTS idx_users_role  ON users(role);
 CREATE TABLE IF NOT EXISTS meta (
   k TEXT PRIMARY KEY,
   v INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS conversations (
+  id          TEXT PRIMARY KEY,
+  user_id     TEXT NOT NULL,
+  title       TEXT DEFAULT '',
+  model       TEXT DEFAULT '',
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_conv_user ON conversations(user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS messages (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id TEXT NOT NULL,
+  role            TEXT NOT NULL,
+  content         TEXT NOT NULL,
+  created_at      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id, id);
+
+CREATE TABLE IF NOT EXISTS site_settings (
+  k TEXT PRIMARY KEY,
+  v TEXT NOT NULL
 );
 `;

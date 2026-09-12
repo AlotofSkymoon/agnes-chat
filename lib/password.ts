@@ -1,6 +1,6 @@
 import "server-only";
 
-import { backendKind } from "@/lib/storage";
+import { detectPlatform } from "@/lib/platform";
 
 /**
  * 密码哈希：双算法，按平台自动选择。
@@ -35,9 +35,16 @@ function fromBase64(b64: string): Uint8Array {
   return out;
 }
 
-/** 是否运行在 Cloudflare Workers（用 PBKDF2） */
+/**
+ * 是否用 PBKDF2（按**运行时平台**判定，不按存储后端）。
+ *
+ * 注意：存储后端已统一为 Upstash（跨平台共用数据），
+ * 但哈希算法仍要按运行环境选 —— Workers 上跑 bcryptjs 太耗 CPU 配额。
+ * 两个算法写进同一个库，verifyPassword 会按 hash 前缀自动识别，
+ * 所以同一份数据在 Vercel / Workers 上都能正常登录。
+ */
 function usePbkdf2(): boolean {
-  return backendKind() === "cloudflare";
+  return detectPlatform() === "cloudflare";
 }
 
 async function pbkdf2Hash(password: string): Promise<string> {

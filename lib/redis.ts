@@ -11,6 +11,7 @@
 
 import {
   backendKind,
+  getCloudflareEnv,
   getStore,
   hasStore as hasStoreBackend,
 } from "@/lib/storage";
@@ -44,13 +45,17 @@ export function hasRedisConfig(): boolean {
 /**
  * 存储不可用时的提示文案。
  *
- * ⚠️ 必须按平台给不同指引：
- * Cloudflare 走 KV + D1，压根不需要 Upstash；
- * 若在这儿统一提示「请配置 Upstash」，会把 Cloudflare 用户引向完全错误的排障方向。
+ * Upstash 是跨平台统一存储（Vercel / Cloudflare Workers 都用它），
+ * 所以两边主提示一致；只有在 Workers 上明确检测到 KV/D1 绑定、
+ * 且完全没配 Upstash 时，才给出 KV/D1 的排查方向。
  */
 export function storageErrorMessage(): string {
+  const cfBindings = Boolean(getCloudflareEnv());
+  if (!cfBindings) {
+    return "服务端未配置 Upstash Redis，无法完成此操作。请检查环境变量 UPSTASH_REDIS_REST_URL 与 UPSTASH_REDIS_REST_TOKEN。";
+  }
   return detectPlatform() === "cloudflare"
-    ? "未检测到 KV / D1 绑定，无法完成此操作。请检查 wrangler.jsonc 里的 kv_namespaces 与 d1_databases，ID 需填真实值（不能留 __KV_ID__ / __D1_ID__ 占位符）。"
+    ? "未检测到可用存储。请配置 UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN（推荐，可与 Vercel 部署共用数据）；或检查 wrangler.jsonc 里的 kv_namespaces 与 d1_databases，ID 需填真实值（不能留 __KV_ID__ / __D1_ID__ 占位符）。"
     : "服务端未配置 Upstash Redis，无法完成此操作。请检查环境变量 UPSTASH_REDIS_REST_URL 与 UPSTASH_REDIS_REST_TOKEN。";
 }
 

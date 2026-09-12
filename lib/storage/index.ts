@@ -5,10 +5,19 @@ import type { BackendKind, Store } from "@/lib/storage/types";
 import { UpstashStore } from "@/lib/storage/upstash";
 
 /**
- * 后端选择：
- * 1. 有 Cloudflare KV/D1 绑定 → 用 KV + D1（Cloudflare Workers 部署）
- * 2. 否则有 Upstash 配置 → 用 Redis（Vercel 部署 / 本地开发）
+ * 后端选择：按**部署平台**各用各的原生存储，不强行统一。
+ *
+ * 1. Cloudflare Workers（检测到 KV / D1 binding）→ **KV + D1 三件套**
+ *    - D1：用户账号 + 聊天记录（关系型，可索引、可聚合查询）
+ *    - KV ：登录态 session、限流计数、缓存（纯 KV 场景，读极快）
+ *    - R2 ：图片 / 视频等文件
+ * 2. Vercel / 本地 → Upstash Redis
  * 3. 都没有 → 无存储（仍可聊天，只是不能注册登录）
+ *
+ * 为什么不再强行统一到 Upstash：
+ * Cloudflare 上走 Upstash 等于让边缘请求跨洋回源到一个外部 Redis，
+ * 既多一跳延迟，又凭空多一个外部依赖和故障点。Workers 原生三件套
+ * 就在同一个区域里，免费额度也更大（D1 每天 500 万次读、KV 每天 10 万次读）。
  */
 
 let cfEnvOverride: CloudflareEnv | null = null;
@@ -95,7 +104,9 @@ export function getUpstash(): Redis {
 }
 
 export function backendKind(): BackendKind {
-  if (getCloudflareEnv()) return "cloudflare";
+  // Cloudflare Workers：优先用平台原生的 KV + D1
+  const cf = getCloudflareEnv();
+  if (cf && (cf.KV || cf.DB)) return "cloudflare";
   if (hasUpstashConfig()) return "upstash";
   return "none";
 }
@@ -104,19 +115,21 @@ export function backendKind(): BackendKind {
 export function getStore(): Store {
   if (storeSingleton) return storeSingleton;
 
+  // 1) Cloudflare Workers → KV + D1
   const cf = getCloudflareEnv();
   if (cf && (cf.KV || cf.DB)) {
     storeSingleton = new CloudflareStore(cf);
     return storeSingleton;
   }
 
+  // 2) Vercel / 本地 → Upstash Redis
   if (hasUpstashConfig()) {
     storeSingleton = new UpstashStore(getUpstash());
     return storeSingleton;
   }
 
   throw new Error(
-    "未配置任何存储后端：Cloudflare 部署请绑定 KV + D1；Vercel 部署请设置 UPSTASH_REDIS_REST_URL 与 UPSTASH_REDIS_REST_TOKEN",
+    "未配置任何存储后端：Cloudflare Workers 请绑定 KV + D1（见 wrangler.jsonc）；Vercel 请设置 UPSTASH_REDIS_REST_URL 与 UPSTASH_REDIS_REST_TOKEN",
   );
 }
 

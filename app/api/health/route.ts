@@ -36,7 +36,7 @@ export async function GET() {
   if (backend === "none") {
     problems.push(
       platform === "cloudflare"
-        ? "未检测到 KV / D1 binding：检查 wrangler.jsonc 里的 kv_namespaces 与 d1_databases，以及 Actions 的 KV_NAMESPACE_ID / D1_DATABASE_ID 是否正确"
+        ? "未检测到可用存储：推荐设置 UPSTASH_REDIS_REST_URL 与 UPSTASH_REDIS_REST_TOKEN（可与 Vercel 部署共用同一份账号数据）；或检查 wrangler.jsonc 里的 kv_namespaces 与 d1_databases，以及 Actions 的 KV_NAMESPACE_ID / D1_DATABASE_ID 是否正确"
         : "未配置存储：Vercel 需设置 UPSTASH_REDIS_REST_URL 与 UPSTASH_REDIS_REST_TOKEN",
     );
   }
@@ -57,6 +57,8 @@ export async function GET() {
       reachable: storeOk,
       error: storeError || null,
       upstashConfigured: hasUpstashConfig(),
+      // 用 Upstash 时，Vercel 与 Cloudflare 部署指向同一个库即可共用账号数据
+      sharedAcrossPlatforms: backend === "upstash",
     },
     objectStorage: {
       kind: s3.kind,

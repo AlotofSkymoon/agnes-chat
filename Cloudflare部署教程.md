@@ -286,7 +286,22 @@ on:
 
 改完提交到 GitHub。
 
-### ② 建一次 D1 表（只需一次）
+### ② 建一次 R2 桶（必须先建，否则部署会失败）
+
+`wrangler.jsonc` 里已启用 R2 binding，但**桶必须提前存在**，
+否则 `wrangler deploy` 会报 `bucket not found`。
+
+```bash
+npx wrangler r2 bucket create agnes-chat
+```
+
+或用 Cloudflare 后台：**存储和数据库 → R2 → 创建存储桶** → 名字填 `agnes-chat`。
+
+> 💡 R2 免费额度 10 GB 存储，**零出站流量费**（这是它比 S3/B2 香的地方）。
+> 图片、视频、大文件都走它，且是浏览器直传，不经过 Worker，
+> 所以文件大小不受 Workers 请求体限制（R2 单次 PUT 上限 5 GB）。
+
+### ③ 建一次 D1 表（只需一次）
 
 在你自己的电脑上（或用 Cloudflare 后台的 D1 控制台）跑：
 
@@ -296,6 +311,8 @@ npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote
 
 第一次会让你登录 Cloudflare，跟着提示点就行。
 建表语句是幂等的，重复执行不会产生副作用。
+现在会建 4 张表：`users`（账号）、`meta`（计数器）、
+`conversations` + `messages`（聊天记录）。
 
 > 如果不想装 Node，也可以用 Cloudflare 后台：
 > **存储和数据库 → D1 → 选 agnes-chat-db → Console**，

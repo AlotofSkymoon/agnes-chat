@@ -30,7 +30,20 @@ export function createId(): string {
 
 /* ----------------------------- 附件工具 ----------------------------- */
 
-export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+/**
+ * 浏览器「本地读取」的大小上限。
+ *
+ * ⚠️ 这只限制「是否把文件内容读进浏览器内存」，
+ *    不限制上传到对象存储的文件大小 —— 图片/视频走 R2 预签名直传时，
+ *    文件根本不经过浏览器转 base64，多大的文件都能传（R2 单次 PUT 上限 5 GB）。
+ *
+ * 未配置对象存储时才会走本地读取，此时才受这里的限制。
+ * 按类型区分：文本文件本来就该进上下文，给足额度；
+ * 图片走 base64 会膨胀约 33%，保守一些。
+ */
+export const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB（普通文件）
+export const MAX_IMAGE_SIZE = 20 * 1024 * 1024; // 20 MB（图片本地读取）
+export const MAX_TEXT_SIZE = 5 * 1024 * 1024; // 5 MB（文本抽正文，再大就截断）
 export const MAX_FILES = 5;
 
 const TEXT_EXT = new Set([
@@ -84,8 +97,14 @@ export async function readFileToAttachment(file: File): Promise<Attachment> {
     kind: "file",
   };
 
+  // 超过本地读取上限：不读内容，但文件仍在附件列表里。
+  // 真正能传大文件的路径是「配置对象存储 → 预签名直传」，
+  // 所以这里把用户往那个方向引导，而不是简单说"太大了"。
   if (file.size > MAX_FILE_SIZE) {
-    return { ...base, note: "文件超过 5MB，已跳过内容读取" };
+    return {
+      ...base,
+      note: `${file.name} 超过 ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB，未读取内容。如需上传大文件，请在设置里配置对象存储（Cloudflare R2）`,
+    };
   }
 
   try {
