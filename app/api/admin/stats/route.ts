@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/auth";
-import { hasRedisConfig, hgetAll, KEYS, listKeys, getValue } from "@/lib/redis";
+import { getRedis, hasRedisConfig, hgetAll, KEYS, listKeys, getValue } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

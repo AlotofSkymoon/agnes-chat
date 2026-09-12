@@ -12,7 +12,6 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     if (hasRedisConfig()) {
-      const redis = getRedis();
       const saved = await getValue<unknown>(KEYS.navData);
       if (saved && Array.isArray(saved) && saved.length > 0) {
         return Response.json({ categories: saved, source: "redis" });
