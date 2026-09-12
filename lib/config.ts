@@ -108,4 +108,5 @@ export const LS_KEYS = {
   conversationId: "agnes:conversationId",
   theme: "agnes:theme",
   cloudSync: "agnes:cloudSync",
+  sidebarCollapsed: "agnes:sidebarCollapsed",
 } as const;

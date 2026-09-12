@@ -2,7 +2,15 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Compass, Eraser, Menu, Settings2, Upload } from "lucide-react";
+import {
+  Compass,
+  Eraser,
+  Menu,
+  PanelLeftOpen,
+  Plus,
+  Settings2,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatInput } from "@/components/chat/chat-input";
@@ -60,6 +68,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
   /* ---- 附件 + 拖拽 ---- */
   const [attachments, setAttachments] = React.useState<Attachment[]>([]);
   const [dragging, setDragging] = React.useState(false);
+  /* 桌面端侧边栏收起状态（记忆到 localStorage） */
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const dragDepth = React.useRef(0);
 
   const abortRef = React.useRef<AbortController | null>(null);
@@ -98,6 +108,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       };
       setSettings(saved);
       setCloudSync(localStorage.getItem(LS_KEYS.cloudSync) === "true");
+      setSidebarCollapsed(localStorage.getItem(LS_KEYS.sidebarCollapsed) === "1");
     } catch {
       /* 忽略 */
     }
@@ -349,6 +360,27 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     toast.success("已清空全部本地数据");
   }
 
+  const toggleSidebar = React.useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(LS_KEYS.sidebarCollapsed, next ? "1" : "0");
+      } catch {
+        /* 忽略 */
+      }
+      return next;
+    });
+  }, []);
+
+  /** 顶栏按钮：移动端打开抽屉，桌面端切换收起 */
+  const handleSidebarButton = React.useCallback(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches) {
+      toggleSidebar();
+    } else {
+      setSidebarOpen(true);
+    }
+  }, [toggleSidebar]);
+
   /* ------------------------------ 附件 ------------------------------ */
   const addFiles = React.useCallback(async (incoming: FileList | File[]) => {
     const list = Array.from(incoming);
@@ -452,6 +484,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         user={user}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
       />
 
       {/* 主区域 */}
@@ -462,12 +496,29 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden"
-              onClick={() => setSidebarOpen(true)}
-              aria-label="打开侧边栏"
+              onClick={handleSidebarButton}
+              aria-label={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
+              title={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
             >
-              <Menu className="h-4 w-4" />
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="h-4 w-4" />
+              ) : (
+                <Menu className="h-4 w-4" />
+              )}
             </Button>
+            {/* 收起时把「新对话」挪到顶栏，避免找不到入口 */}
+            {sidebarCollapsed ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleNew}
+                aria-label="开启新对话"
+                title="开启新对话"
+                className="hidden md:inline-flex"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            ) : null}
             <span className="truncate text-sm text-fg-secondary">
               {isEmpty
                 ? "新对话"
