@@ -129,14 +129,14 @@
     --lg-saturate: 190%;
     /* 玻璃底色：浅色模式偏白，深色模式偏灰 */
     --lg-tint: 0 0% 100%;
-    --lg-tint-a1: 0.58;   /* 受光面不透明度 */
-    --lg-tint-a2: 0.34;   /* 背光面不透明度 */
+    --lg-tint-a1: 0.42;   /* 受光面不透明度 */
+    --lg-tint-a2: 0.26;   /* 背光面不透明度 */
     /* 折射描边 */
     --lg-edge: 0 0% 100%;
     --lg-edge-a: 0.55;
     /* 镜面高光 */
     --lg-spec: 0 0% 100%;
-    --lg-spec-a: 0.70;
+    --lg-spec-a: 0.14;
     /* 底边暗线，模拟玻璃厚度 */
     --lg-thick-a: 0.06;
 
@@ -164,182 +164,307 @@
      放在 :root 与 .dark 之后，通过更高特异性覆盖明暗基础色
      ========================================================================== */
 
-  /* --- Fuwari：清透蓝，淡雅留白，圆角卡片 --- */
-  [data-theme="fuwari"] {
-    --primary: 217 91% 60%;
+  /* ==========================================================================
+     Anthropic —— 暖米白 / 赤陶橙 / 克制
+     参考 Anthropic 官网的观感：不是蓝紫渐变那一套，
+     而是"纸感"的暖色底 + 一个低饱和的赤陶色作点缀。
+     圆角收小、边框变细、几乎不用阴影，靠留白和层级划分区域。
+     ========================================================================== */
+  [data-theme="anthropic"] {
+    --background: 39 23% 94%;        /* #F0EEE6 米白 */
+    --foreground: 30 8% 12%;         /* #1F1E1D 近黑棕 */
+    --card: 0 0% 100%;
+    --card-foreground: 30 8% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 30 8% 12%;
+
+    --primary: 16 62% 59%;           /* #D97757 赤陶橙 */
     --primary-foreground: 0 0% 100%;
-    --ring: 217 91% 60%;
-    --accent: 214 95% 96%;
-    --accent-foreground: 217 91% 42%;
-    --secondary: 214 60% 97%;
-    --muted: 214 40% 97%;
-    --sidebar: 214 33% 98%;
-    --user-bubble: 214 100% 96%;
+    --secondary: 39 18% 88%;
+    --secondary-foreground: 30 8% 20%;
+    --muted: 39 16% 90%;
+    --muted-foreground: 35 6% 42%;
+    --accent: 39 20% 88%;
+    --accent-foreground: 30 8% 20%;
+    --destructive: 6 63% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 38 18% 86%;            /* #E5E1D8 细边框 */
+    --input: 38 18% 86%;
+    --ring: 16 62% 59%;
+
+    --sidebar: 39 20% 91%;
+    --sidebar-foreground: 30 8% 16%;
+    --assistant-bubble: 0 0% 100%;
+    --user-bubble: 39 26% 88%;
+    --user-bubble-foreground: 30 8% 14%;
+
+    /* 文字层级：暖灰，不用冷灰 */
+    --text-secondary: 32 6% 34%;
+    --text-tertiary: 34 5% 48%;
+    --text-quaternary: 34 4% 60%;
+
+    /* Anthropic 不追求玻璃感：低模糊、低饱和，几乎只做一层薄纱 */
+    --lg-tint: 39 30% 98%;
+    --lg-tint-a1: 0.66;
+    --lg-tint-a2: 0.50;
+    --lg-blur: 16px;
+    --lg-saturate: 130%;
+    --lg-edge-a: 0.55;
+    --lg-spec-a: 0.10;
+    --lg-thick-a: 0.04;
     --glass-bg: 0 0% 100%;
-    --glass-border: 214 20% 84%;
+    --glass-border: 38 18% 86%;
+    /* 圆角收小：Anthropic 是克制的矩形感，不是大圆角 */
+    --radius: 0.5rem;
+    --radius-ios: 0.625rem;
+    --radius-ios-lg: 0.75rem;
+    --radius-ios-xl: 1rem;
+  }
+
+  [data-theme="anthropic"].dark {
+    --background: 60 3% 11%;         /* #1F1E1D 深棕黑 */
+    --foreground: 39 23% 90%;
+    --card: 40 4% 15%;
+    --card-foreground: 39 23% 90%;
+    --popover: 40 4% 16%;
+    --popover-foreground: 39 23% 90%;
+
+    --primary: 16 62% 63%;
+    --primary-foreground: 30 20% 12%;
+    --secondary: 40 4% 20%;
+    --secondary-foreground: 39 20% 88%;
+    --muted: 40 4% 19%;
+    --muted-foreground: 38 6% 62%;
+    --accent: 40 5% 22%;
+    --accent-foreground: 39 20% 90%;
+
+    --border: 40 5% 24%;
+    --input: 40 5% 24%;
+    --ring: 16 62% 63%;
+
+    --sidebar: 60 3% 9%;
+    --sidebar-foreground: 39 18% 86%;
+    --assistant-bubble: 40 4% 16%;
+    --user-bubble: 40 5% 22%;
+    --user-bubble-foreground: 39 23% 90%;
+
+    --text-secondary: 38 10% 74%;
+    --text-tertiary: 38 6% 58%;
+    --text-quaternary: 38 5% 44%;
+
+    --lg-tint: 40 5% 26%;
+    --lg-tint-a1: 0.44;
+    --lg-tint-a2: 0.30;
+    --lg-edge-a: 0.14;
+    --lg-spec-a: 0.05;
+    --lg-thick-a: 0.18;
+    --glass-bg: 40 5% 24%;
+    --glass-border: 40 5% 28%;
+  }
+
+  /* ==========================================================================
+     Fuwari —— 静态博客主题的观感
+     重点不是"蓝色"，而是：极简、卡片化、大留白、色相可调。
+     原版用 OKLCH 且整站配色由单一 --hue 驱动，这里用 HSL 达到同样效果：
+     改 --hue 一个数就能整体换色，默认是清透的青蓝。
+     ========================================================================== */
+  [data-theme="fuwari"] {
+    --hue: 205;                      /* 色相：改这一个数即可整体换色 */
+
+    --background: var(--hue) 20% 97%;
+    --foreground: var(--hue) 15% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: var(--hue) 15% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: var(--hue) 15% 15%;
+
+    --primary: var(--hue) 78% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: var(--hue) 30% 95%;
+    --secondary-foreground: var(--hue) 30% 28%;
+    --muted: var(--hue) 24% 96%;
+    --muted-foreground: var(--hue) 8% 45%;
+    --accent: var(--hue) 40% 94%;
+    --accent-foreground: var(--hue) 45% 32%;
+
+    --border: var(--hue) 18% 90%;
+    --input: var(--hue) 18% 90%;
+    --ring: var(--hue) 78% 52%;
+
+    --sidebar: var(--hue) 22% 98%;
+    --sidebar-foreground: var(--hue) 15% 20%;
+    --assistant-bubble: 0 0% 100%;
+    --user-bubble: var(--hue) 55% 95%;
+    --user-bubble-foreground: var(--hue) 25% 18%;
+
+    --text-secondary: var(--hue) 10% 35%;
+    --text-tertiary: var(--hue) 8% 50%;
+    --text-quaternary: var(--hue) 6% 62%;
+
+    /* Fuwari 有 card-glass：很轻的玻璃，主要靠边框和留白 */
+    --lg-tint: 0 0% 100%;
+    --lg-tint-a1: 0.62;
+    --lg-tint-a2: 0.46;
+    --lg-blur: 14px;
+    --lg-saturate: 120%;
+    --lg-edge-a: 0.60;
+    --lg-spec-a: 0.10;
+    --lg-thick-a: 0.03;
+    --glass-bg: 0 0% 100%;
+    --glass-border: var(--hue) 18% 88%;
+    /* 圆角适中：博客的卡片感 */
+    --radius: 0.75rem;
+    --radius-ios: 0.875rem;
+    --radius-ios-lg: 1rem;
+    --radius-ios-xl: 1.25rem;
   }
 
   [data-theme="fuwari"].dark {
-    --primary: 213 94% 68%;
-    --ring: 213 94% 68%;
-    --accent: 217 40% 22%;
-    --accent-foreground: 213 20% 93%;
-    --secondary: 217 12% 18%;
-    --muted: 217 10% 17%;
-    --sidebar: 217 12% 9%;
-    --user-bubble: 217 30% 22%;
-    --glass-bg: 217 10% 20%;
-    --glass-border: 217 8% 34%;
+    --background: var(--hue) 12% 9%;
+    --foreground: var(--hue) 10% 92%;
+    --card: var(--hue) 10% 13%;
+    --card-foreground: var(--hue) 10% 92%;
+    --popover: var(--hue) 10% 14%;
+    --popover-foreground: var(--hue) 10% 92%;
+
+    --primary: var(--hue) 80% 66%;
+    --primary-foreground: var(--hue) 30% 12%;
+    --secondary: var(--hue) 8% 18%;
+    --secondary-foreground: var(--hue) 10% 88%;
+    --muted: var(--hue) 8% 17%;
+    --muted-foreground: var(--hue) 6% 62%;
+    --accent: var(--hue) 16% 20%;
+    --accent-foreground: var(--hue) 12% 90%;
+
+    --border: var(--hue) 8% 20%;
+    --input: var(--hue) 8% 20%;
+    --ring: var(--hue) 80% 66%;
+
+    --sidebar: var(--hue) 12% 8%;
+    --sidebar-foreground: var(--hue) 10% 86%;
+    --assistant-bubble: var(--hue) 10% 14%;
+    --user-bubble: var(--hue) 22% 20%;
+    --user-bubble-foreground: var(--hue) 10% 92%;
+
+    --text-secondary: var(--hue) 8% 76%;
+    --text-tertiary: var(--hue) 6% 60%;
+    --text-quaternary: var(--hue) 5% 46%;
+
+    --lg-tint: var(--hue) 10% 24%;
+    --lg-tint-a1: 0.42;
+    --lg-tint-a2: 0.28;
+    --lg-edge-a: 0.14;
+    --lg-spec-a: 0.05;
+    --lg-thick-a: 0.16;
+    --glass-bg: var(--hue) 10% 22%;
+    --glass-border: var(--hue) 8% 26%;
   }
 
-  /* --- Violet Rose：紫玫瑰，柔光渐变 --- */
+  /* ==========================================================================
+     Violet Rose —— 紫粉渐变 + 白色圆角卡片（玫瑰点缀）
+     参考布吉岛的登录页：背景是紫粉柔光渐变，
+     内容区是**不透明的白色圆角卡片**浮在上面，而不是全站半透明。
+     渐变只用在背景和主按钮，卡片保持干净的白。
+     ========================================================================== */
   [data-theme="violet-rose"] {
-    --primary: 292 84% 61%;
+    --background: 295 45% 96%;
+    --foreground: 285 20% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 285 20% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 285 20% 16%;
+
+    --primary: 292 72% 58%;          /* 玫瑰紫 */
     --primary-foreground: 0 0% 100%;
-    --ring: 292 84% 61%;
-    --accent: 300 100% 97%;
-    --accent-foreground: 292 60% 40%;
-    --secondary: 295 60% 97%;
-    --muted: 295 40% 97%;
-    --sidebar: 295 33% 98%;
-    --user-bubble: 300 100% 97%;
-    --border: 295 20% 91%;
-    --input: 295 20% 91%;
+    --secondary: 300 40% 96%;
+    --secondary-foreground: 292 40% 32%;
+    --muted: 295 30% 96%;
+    --muted-foreground: 292 10% 48%;
+    --accent: 320 60% 96%;
+    --accent-foreground: 320 50% 34%;
+
+    --border: 295 22% 90%;
+    --input: 295 22% 90%;
+    --ring: 292 72% 58%;
+
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 285 20% 18%;
+    --assistant-bubble: 0 0% 100%;
+    --user-bubble: 315 55% 95%;
+    --user-bubble-foreground: 292 30% 20%;
+
+    --text-secondary: 292 12% 36%;
+    --text-tertiary: 292 10% 50%;
+    --text-quaternary: 292 8% 62%;
+
+    /* 卡片是实心的，玻璃感留给顶栏/浮层：背景渐变已经很花，
+       再让所有东西半透明会糊成一片 */
+    --lg-tint: 0 0% 100%;
+    --lg-tint-a1: 0.72;
+    --lg-tint-a2: 0.58;
+    --lg-blur: 18px;
+    --lg-saturate: 140%;
+    --lg-edge-a: 0.65;
+    --lg-spec-a: 0.12;
+    --lg-thick-a: 0.04;
     --glass-bg: 0 0% 100%;
-    --glass-border: 295 20% 84%;
+    --glass-border: 295 20% 88%;
+    /* 圆角偏大：配合柔光渐变的柔和感 */
+    --radius: 1rem;
+    --radius-ios: 1.125rem;
+    --radius-ios-lg: 1.375rem;
+    --radius-ios-xl: 1.75rem;
   }
 
   [data-theme="violet-rose"].dark {
-    --background: 280 12% 10%;
-    --card: 285 10% 13%;
-    --popover: 285 10% 14%;
-    --sidebar: 285 12% 8%;
-    --primary: 292 84% 72%;
-    --primary-foreground: 285 40% 12%;
-    --ring: 292 84% 72%;
-    --accent: 292 40% 22%;
-    --accent-foreground: 290 20% 93%;
-    --secondary: 290 12% 18%;
-    --muted: 290 10% 17%;
-    --user-bubble: 292 30% 24%;
-    --border: 285 8% 20%;
-    --input: 285 8% 22%;
-    --glass-bg: 285 10% 20%;
-    --glass-border: 292 10% 34%;
+    --background: 285 18% 10%;
+    --foreground: 295 15% 92%;
+    --card: 288 14% 14%;
+    --card-foreground: 295 15% 92%;
+    --popover: 288 14% 15%;
+    --popover-foreground: 295 15% 92%;
+
+    --primary: 292 76% 70%;
+    --primary-foreground: 288 40% 12%;
+    --secondary: 290 12% 19%;
+    --secondary-foreground: 295 15% 90%;
+    --muted: 290 10% 18%;
+    --muted-foreground: 292 8% 64%;
+    --accent: 300 18% 22%;
+    --accent-foreground: 295 15% 92%;
+
+    --border: 288 10% 22%;
+    --input: 288 10% 22%;
+    --ring: 292 76% 70%;
+
+    --sidebar: 288 14% 12%;
+    --sidebar-foreground: 295 15% 88%;
+    --assistant-bubble: 288 14% 15%;
+    --user-bubble: 300 22% 22%;
+    --user-bubble-foreground: 295 15% 92%;
+
+    --text-secondary: 292 10% 76%;
+    --text-tertiary: 292 8% 60%;
+    --text-quaternary: 292 6% 46%;
+
+    --lg-tint: 290 12% 28%;
+    --lg-tint-a1: 0.46;
+    --lg-tint-a2: 0.32;
+    --lg-edge-a: 0.16;
+    --lg-spec-a: 0.06;
+    --lg-thick-a: 0.18;
+    --glass-bg: 290 12% 26%;
+    --glass-border: 288 10% 30%;
   }
 
-  .dark {
-    --background: 0 0% 11%;
-    --card: 0 0% 14%;
-    --popover: 0 0% 15%;
-
-    /* 深色模式玻璃：底色转灰、高光减弱，否则会像一块发白的塑料 */
-    --lg-tint: 220 10% 26%;
-    --lg-tint-a1: 0.50;
-    --lg-tint-a2: 0.28;
-    --lg-edge-a: 0.20;
-    --lg-spec-a: 0.16;
-    --lg-thick-a: 0.16;
-
-    /* ---- 文字层级（深色）：避免纯白，降低眩光 ---- */
-    /* 一级：正文/标题   ≈ #E8EAED，对 #1C1C1C 底 14.6:1 */
-    --foreground: 220 9% 93%;
-    --card-foreground: 220 9% 93%;
-    --popover-foreground: 220 9% 93%;
-    /* 二级：次级说明   ≈ #B4BAC2，对底 8.4:1 */
-    --text-secondary: 218 10% 73%;
-    /* 三级：弱化标签   ≈ #8E949C，对底 5.3:1 */
-    --text-tertiary: 218 8% 59%;
-    /* 四级：占位/提示   ≈ #6B7178，对底 3.2:1（仅装饰性文本） */
-    --text-quaternary: 218 8% 44%;
-
-    --primary: 230 99% 68%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 18%;
-    --secondary-foreground: 220 9% 90%;
-    --muted: 0 0% 17%;
-    --muted-foreground: 218 8% 59%;
-    --accent: 230 40% 22%;
-    --accent-foreground: 220 9% 93%;
-    --destructive: 0 63% 48%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 20%;
-    --input: 0 0% 22%;
-    --ring: 230 99% 68%;
-
-    --sidebar: 0 0% 9%;
-    --sidebar-foreground: 220 8% 82%;
-
-    --assistant-bubble: 0 0% 11%;
-    --user-bubble: 230 30% 22%;
-    --user-bubble-foreground: 220 9% 94%;
-
-    --code-bg: 220 20% 7%;
-    --code-border: 0 0% 20%;
-
-    /* 液态玻璃 */
-    --glass-bg: 0 0% 20%;
-    --glass-border: 0 0% 34%;
-  }
-
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-    /* 精细排版：字距/字重微调 + 中英文混排更协调 */
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
-    letter-spacing: -0.005em;
-  }
-
-  /* 中文段落稍放宽字距，避免苹方在小字号下拥挤 */
-  :lang(zh),
-  :lang(zh-CN) {
-    letter-spacing: 0.01em;
-  }
-
-  /* 数字与代码内保持等宽特性 */
-  code,
-  pre,
-  kbd,
-  samp {
-    font-variant-ligatures: none;
-    letter-spacing: 0;
-  }
-
-  html {
-    scroll-behavior: smooth;
-  }
-}
-
-@layer components {
-  /* -------- 液态玻璃（超透玻璃） --------
-     透明度 60% + 20px 背景模糊 + 饱和度提升，
-     明暗模式都能看清内容，不会糊成一团。 */
-  .glass {
-    background-color: hsl(var(--glass-bg) / 0.6);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid hsl(var(--glass-border) / 0.7);
-    box-shadow:
-      inset 0 1px 0 0 hsl(0 0% 100% / 0.22),
-      inset 0 -1px 0 0 hsl(0 0% 0% / 0.06),
-      0 2px 10px -2px hsl(230 30% 10% / 0.18);
-    color: hsl(var(--foreground));
-    /* 优雅的缓出曲线：起步轻快、尾部柔和停靠，比 linear/ease 更有质感 */
-    transition:
-      background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-      border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-      box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-      transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-  .glass:hover {
-    background-color: hsl(var(--glass-bg) / 0.75);
-    border-color: hsl(var(--glass-border) / 0.9);
+  /* Violet Rose 的背景渐变：只在浅色下铺，深色下用纯色更耐看 */
+  [data-theme="violet-rose"] body {
+    background-image:
+      radial-gradient(ellipse 80% 60% at 12% 8%, hsl(320 70% 95% / 0.9), transparent 60%),
+      radial-gradient(ellipse 70% 55% at 88% 12%, hsl(285 65% 95% / 0.9), transparent 58%),
+      radial-gradient(ellipse 90% 60% at 50% 100%, hsl(340 60% 96% / 0.7), transparent 62%);
+    background-attachment: fixed;
   }
 
   /* ==========================================================================
@@ -433,6 +558,18 @@
    * 用伪元素而非 box-shadow，因为需要"弧形"而不只是直线，
    * 这是玻璃和"半透明圆角矩形"的分界线。
    */
+  /**
+   * 2) 镜面高光：上沿一道很窄的亮弧。
+   *
+   * ⚠️ 上一版做成了"顶部 42% 区域、70% 不透明度的白色渐变"，
+   * 结果整个元素上半部像蒙了一层雾 —— 左上角尤其明显。
+   *
+   * 真实的高光只是一条**细亮线**：沿上边缘 1~2px，
+   * 中间稍亮、向两侧收窄渐隐。所以这里：
+   *   - 渐变范围压到 0%→5%（而不是 42%）
+   *   - 不透明度降到 0.14（而不是 0.70）
+   *   - 弧形遮罩收窄，只覆盖上沿
+   */
   .liquid-glass::before {
     content: "";
     position: absolute;
@@ -442,16 +579,15 @@
     background: linear-gradient(
       to bottom,
       hsl(var(--lg-spec) / var(--lg-spec-a)) 0%,
-      hsl(var(--lg-spec) / 0) 42%
+      hsl(var(--lg-spec) / 0) 5%
     );
-    /* 顶部收窄成弧：中间厚、两侧薄 */
     -webkit-mask-image: radial-gradient(
-      130% 100% at 50% 0%,
+      120% 62% at 50% 0%,
       #000 0%,
-      #000 42%,
-      transparent 78%
+      #000 30%,
+      transparent 62%
     );
-    mask-image: radial-gradient(130% 100% at 50% 0%, #000 0%, #000 42%, transparent 78%);
+    mask-image: radial-gradient(120% 62% at 50% 0%, #000 0%, #000 30%, transparent 62%);
   }
 
   .liquid-glass:hover {

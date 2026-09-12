@@ -97,7 +97,7 @@ export function Sidebar({
       {/* 外层控制宽度（可收起），内层保持固定 260px，收起时内容被裁切而非挤压变形 */}
       <aside
         className={cn(
-          "liquid-glass fixed inset-y-0 left-0 z-50 shrink-0 overflow-hidden border-r border-[hsl(var(--lg-edge)/var(--lg-edge-a))] transition-[width,transform] duration-[420ms] ease-elegant md:relative md:w-[260px] md:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 shrink-0 overflow-hidden border-r border-border bg-[hsl(var(--sidebar))] backdrop-blur-xl transition-[width,transform] duration-[420ms] ease-elegant md:relative md:w-[260px] md:translate-x-0",
           open ? "w-[260px] translate-x-0" : "w-0 -translate-x-full",
           collapsed && "md:w-0 md:border-r-0",
         )}

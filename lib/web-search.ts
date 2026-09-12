@@ -11,6 +11,8 @@
  * 绝不因为搜索失败就阻断对话，由调用方决定怎么提示。
  */
 
+import { buildQueryCandidates, filterRelevant } from "@/lib/search-query";
+
 export interface SearchResult {
   title: string;
   url: string;
@@ -157,35 +159,74 @@ export interface SearchOutcome {
   via?: "bing" | "duckduckgo";
 }
 
-/** 执行搜索：先 Bing，失败再 DuckDuckGo */
 /** 搜索结果上限放宽：想要多少给多少，靠压缩显示而非砍条数 */
 export const MAX_SEARCH_RESULTS = 100;
 
-export async function webSearch(query: string, limit = 30): Promise<SearchOutcome> {
-  const q = query.trim();
-  if (!q) return { ok: false, results: [], error: "搜索词为空" };
-  if (q.length > 200) return { ok: false, results: [], error: "搜索词过长" };
+/**
+ * 执行搜索。
+ *
+ * 三层保障，缺一不可：
+ *   1. 先把整句提问压缩成关键词（否则 Bing 会返回"写"字的字典解释）
+ *   2. 多候选查询依次重试
+ *   3. 结果做相关性过滤，不相关的直接丢掉
+ *
+ * 全部候选都不相关时返回 ok=false —— 调用方会照常用模型自身知识回答，
+ * 而不是把一堆垃圾塞进上下文再让模型"基于以下内容作答"。
+ */
+export async function webSearch(rawQuery: string, limit = 30): Promise<SearchOutcome> {
+  const raw = rawQuery.trim();
+  if (!raw) return { ok: false, results: [], error: "搜索词为空" };
+  if (raw.length > 500) return { ok: false, results: [], error: "搜索词过长" };
+
+  const candidates = buildQueryCandidates(raw);
+  if (candidates.length === 0) {
+    return { ok: false, results: [], error: "无法从提问中提取搜索词" };
+  }
 
   const errors: string[] = [];
 
-  for (const [name, run] of [
-    ["bing", fetchBing],
-    ["duckduckgo", fetchDuck],
-  ] as const) {
-    try {
-      const results = await run(q, limit);
-      if (results.length > 0) return { ok: true, results, via: name };
-      errors.push(`${name}：无结果`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      errors.push(`${name}：${msg}`);
+  // 依次尝试候选查询词：第一个通常就够了，后面的用于兜底
+  for (const q of candidates) {
+    for (const [name, run] of [
+      ["bing", fetchBing],
+      ["duckduckgo", fetchDuck],
+    ] as const) {
+      let results: SearchResult[] = [];
+      try {
+        results = await run(q, limit);
+      } catch (err) {
+        errors.push(`${name}/${q}：${err instanceof Error ? err.message : String(err)}`);
+        continue;
+      }
+
+      if (results.length === 0) {
+        errors.push(`${name}/${q}：无结果`);
+        continue;
+      }
+
+      /**
+       * 相关性过滤：这是"牛头不对马嘴"的最后一道防线。
+       * 搜索引擎偶尔会返回完全跑题的内容，与其让模型强行
+       * "基于以下（无关的）结果回答"，不如直接判定没搜到。
+       */
+      const relevant = filterRelevant(results, q);
+
+      if (relevant.length > 0) {
+        return {
+          ok: true,
+          results: relevant.slice(0, limit),
+          via: name,
+        };
+      }
+
+      errors.push(`${name}/${q}：${results.length} 条结果均不相关`);
     }
   }
 
   return {
     ok: false,
     results: [],
-    error: `所有搜索源都失败了（${errors.join("；")}）`,
+    error: `未搜到相关内容（${errors.slice(0, 2).join("；")}）`,
   };
 }
 

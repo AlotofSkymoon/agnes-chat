@@ -29,16 +29,26 @@ export const SITE_DESCRIPTION: string =
   process.env.NEXT_PUBLIC_SITE_DESCRIPTION?.trim() ||
   `${SITE_NAME} 官方演示站。开箱即用的纯文本 AI 聊天，支持自带 API Key 与中转 Base URL。`;
 
-/** 主题：fuwari（清透蓝）/ violet-rose（紫玫瑰），用户可在设置里切换 */
-export type ThemePreset = "fuwari" | "violet-rose";
+/**
+ * 主题预设。
+ * - fuwari：静态博客主题的观感 —— 极简、卡片、大留白，色相可调
+ * - violet-rose：紫粉渐变 + 白色圆角卡片（玫瑰点缀）
+ * - anthropic：克制的暖色调 —— 米白底、赤陶橙点缀、细边框
+ */
+export type ThemePreset = "fuwari" | "violet-rose" | "anthropic";
 
 export const THEME_PRESETS: { id: ThemePreset; label: string; desc: string }[] = [
-  { id: "fuwari", label: "Fuwari", desc: "清透蓝 · 淡雅留白" },
-  { id: "violet-rose", label: "Violet Rose", desc: "紫玫瑰 · 柔光渐变" },
+  { id: "anthropic", label: "Anthropic", desc: "暖米白 · 赤陶橙 · 克制" },
+  { id: "fuwari", label: "Fuwari", desc: "极简卡片 · 淡雅留白" },
+  { id: "violet-rose", label: "Violet Rose", desc: "紫粉渐变 · 玫瑰卡片" },
 ];
 
-const DEFAULT_THEME: ThemePreset =
-  process.env.NEXT_PUBLIC_THEME?.trim() === "violet-rose" ? "violet-rose" : "fuwari";
+export const THEME_IDS: ThemePreset[] = ["anthropic", "fuwari", "violet-rose"];
+
+const DEFAULT_THEME: ThemePreset = (() => {
+  const t = process.env.NEXT_PUBLIC_THEME?.trim();
+  return THEME_IDS.includes(t as ThemePreset) ? (t as ThemePreset) : "anthropic";
+})();
 
 export const SITE_THEME: ThemePreset = DEFAULT_THEME;
 

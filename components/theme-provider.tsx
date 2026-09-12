@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { SITE_THEME, type ThemePreset } from "@/lib/site";
+import { SITE_THEME, THEME_IDS, type ThemePreset } from "@/lib/site";
 
 type Theme = "dark" | "light";
 
@@ -13,7 +13,7 @@ interface ThemeContextValue {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
-  /** 配色预设：fuwari / violet-rose */
+  /** 配色预设：anthropic / fuwari / violet-rose */
   preset: ThemePreset;
   setPreset: (preset: ThemePreset) => void;
 }
@@ -31,8 +31,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.toggle("dark", initial === "dark");
 
     const storedPreset = localStorage.getItem(PRESET_KEY) as ThemePreset | null;
-    const initialPreset: ThemePreset =
-      storedPreset === "violet-rose" || storedPreset === "fuwari" ? storedPreset : SITE_THEME;
+    const initialPreset: ThemePreset = THEME_IDS.includes(storedPreset as ThemePreset)
+      ? (storedPreset as ThemePreset)
+      : SITE_THEME;
     setPresetState(initialPreset);
     document.documentElement.dataset.theme = initialPreset;
   }, []);
@@ -76,5 +77,5 @@ var d=t?t==='dark':false;
 var r=document.documentElement;
 if(d)r.classList.add('dark');else r.classList.remove('dark');
 var p=localStorage.getItem('${PRESET_KEY}');
-r.dataset.theme=(p==='violet-rose'||p==='fuwari')?p:'${SITE_THEME}';
+r.dataset.theme=${JSON.stringify(THEME_IDS)}.indexOf(p)>=0?p:'${SITE_THEME}';
 }catch(e){document.documentElement.classList.remove('dark');}})();`;

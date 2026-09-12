@@ -8,6 +8,25 @@ import { Check, Copy } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * 递归提取 React 子树里的纯文本。
+ *
+ * ⚠️ rehype-highlight 会把代码切成一堆 <span>（语法高亮），
+ * 此时 children 是 ReactElement[] 而不是字符串。
+ * 直接 String(children) 会得到 "[object Object],[object Object]…"
+ * —— 这就是代码块显示 [object Object] 的原因。
+ */
+function nodeToText(node: React.ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") return "";
+  if (typeof node === "string") return node;
+  if (typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(nodeToText).join("");
+  if (React.isValidElement(node)) {
+    return nodeToText((node.props as { children?: React.ReactNode }).children);
+  }
+  return "";
+}
+
 interface CodeBlockProps {
   language?: string;
   code: string;
@@ -54,8 +73,13 @@ export function Markdown({ content, className }: { content: string; className?: 
         rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
         components={{
           pre: ({ children }) => <>{children}</>,
-          code({ className: codeClassName, children }) {
-            const text = String(children ?? "").replace(/\n$/, "");
+          code({ className: codeClassName, children, node }) {
+            // 优先用 AST 里的原始文本，其次递归提取，最后才退回 String()
+            const raw =
+              nodeToText(
+                (node as { children?: unknown[] } | undefined)?.children as React.ReactNode,
+              ) || nodeToText(children);
+            const text = raw.replace(/\n$/, "");
             const langMatch = /language-(\w+)/.exec(codeClassName ?? "");
             const isBlock = Boolean(langMatch) || text.includes("\n");
 
