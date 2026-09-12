@@ -36,8 +36,91 @@ export interface SiteS3Info {
   hasPresetKey: boolean;
 }
 
+/**
+ * R2 账户 ID：优先 R2_ACCOUNT_ID，回退 Cloudflare 通用变量。
+ * 这样只配了 CF_ACCOUNT_ID 的部署也能自动拼出 endpoint。
+ */
+function r2AccountId(): string {
+  return (
+    process.env.R2_ACCOUNT_ID?.trim() ||
+    process.env.CF_ACCOUNT_ID?.trim() ||
+    process.env.CLOUDFLARE_ACCOUNT_ID?.trim() ||
+    ""
+  );
+}
+
+/**
+ * 按桶名自动定位 R2 桶。
+ *
+ * 用户只填桶名就够了 —— 用 Cloudflare API 列出账户下所有桶，
+ * 找到同名桶并自动拼出 endpoint，免去手抄 32 位账户 ID 的麻烦。
+ *
+ * 需要 CLOUDFLARE_API_TOKEN（或 R2_API_TOKEN）+ 账户 ID。
+ */
+export async function discoverR2Bucket(
+  bucketName: string,
+): Promise<{ found: boolean; endpoint: string; publicBaseUrl: string; error?: string }> {
+  const bucket = bucketName.trim();
+  if (!bucket) return { found: false, endpoint: "", publicBaseUrl: "", error: "请填写桶名" };
+
+  const token = (process.env.CLOUDFLARE_API_TOKEN ?? process.env.R2_API_TOKEN ?? "").trim();
+  const account = r2AccountId();
+  if (!token || !account) {
+    return {
+      found: false,
+      endpoint: "",
+      publicBaseUrl: "",
+      error: "缺少 CLOUDFLARE_API_TOKEN 或账户 ID，无法自动查找",
+    };
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${account}/r2/buckets`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!res.ok) {
+      return {
+        found: false,
+        endpoint: "",
+        publicBaseUrl: "",
+        error: `Cloudflare API 返回 ${res.status}`,
+      };
+    }
+    const data = (await res.json()) as {
+      success?: boolean;
+      result?: { name?: string }[];
+    };
+    const names = (data.result ?? []).map((b) => b.name ?? "");
+    const hit = names.find((n) => n.toLowerCase() === bucket.toLowerCase());
+    if (!hit) {
+      return {
+        found: false,
+        endpoint: "",
+        publicBaseUrl: "",
+        error: `账户下没有名为「${bucket}」的桶，现有：${names.join("、") || "（空）"}`,
+      };
+    }
+
+    const endpoint = `https://${account}.r2.cloudflarestorage.com`;
+    return {
+      found: true,
+      endpoint,
+      // r2.dev 公开域名（需在桶设置里开启）；用户也可填自定义域覆盖
+      publicBaseUrl: `https://pub-${account}.r2.dev`,
+    };
+  } catch (err) {
+    return {
+      found: false,
+      endpoint: "",
+      publicBaseUrl: "",
+      error: err instanceof Error ? err.message : "查找失败",
+    };
+  }
+}
+
 function fromR2(): S3Config | null {
-  const account = process.env.R2_ACCOUNT_ID?.trim();
+  const account = r2AccountId();
   const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
   const bucket = process.env.R2_BUCKET?.trim();

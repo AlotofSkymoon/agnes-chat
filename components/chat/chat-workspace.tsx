@@ -265,8 +265,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                     })),
                   ],
                 };
-              }),
-            );
+              }
+            });
 
       // ---- 发送前体积预检 ----
       // Vercel Serverless 请求体硬上限 4.5MB，超出会在平台层直接被拒，

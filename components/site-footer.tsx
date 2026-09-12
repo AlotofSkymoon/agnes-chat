@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { AUTHOR_NAME, REPO_URL, SITE_NAME, UPSTREAM_URL } from "@/lib/site";
+import { AUTHOR_NAME, BY_LINE, REPO_URL, SITE_NAME, UPSTREAM_URL } from "@/lib/site";
 
 /**
  * 全站页脚。
@@ -35,9 +35,11 @@ export function SiteFooter({ className = "" }: { className?: string }) {
           本项目源码
         </Link>
       </p>
-      <p className="mt-1 text-fg-quaternary">
+      <p className="mt-1.5 text-fg-quaternary">
         代码开源（MIT），公开部署需获作者授权 · 详见 LICENSE
       </p>
+      {/* 署名标识：按 LICENSE 要求保留，不可移除 */}
+      <p className="mt-1 font-medium tracking-wide text-fg-tertiary">{BY_LINE}</p>
     </footer>
   );
 }

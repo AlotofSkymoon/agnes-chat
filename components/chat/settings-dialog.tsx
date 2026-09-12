@@ -34,7 +34,7 @@ import {
   type CustomProviderConfig,
   type ProviderId,
 } from "@/lib/config";
-import { Plus, Pencil, Check as CheckIcon, X as XIcon } from "lucide-react";
+import { Loader2, Plus, Pencil, Search, Check as CheckIcon, X as XIcon } from "lucide-react";
 import {
   ALLOW_CUSTOM_BASE_URL,
   ALLOW_CUSTOM_KEY,
@@ -89,6 +89,8 @@ export function SettingsDialog({
   const [form, setForm] = React.useState<ChatSettings>(settings);
   const [showKey, setShowKey] = React.useState<Record<string, boolean>>({});
   const [showSecret, setShowSecret] = React.useState(false);
+  const [discovering, setDiscovering] = React.useState(false);
+  const [discoverMsg, setDiscoverMsg] = React.useState("");
   const [siteInfo, setSiteInfo] = React.useState<{
     siteManaged: boolean;
     endpoint: string;
@@ -127,6 +129,46 @@ export function SettingsDialog({
    * 并已在 /admin 面板提供。
    */
   const isAdmin = user?.role === "admin";
+
+  /** 只填桶名 → 自动定位 R2 桶并填好 endpoint / 公开域名 */
+  async function discoverBucket() {
+    const name = (form.s3?.bucket ?? "").trim();
+    if (!name) {
+      setDiscoverMsg("请先填写桶名");
+      return;
+    }
+    setDiscovering(true);
+    setDiscoverMsg("");
+    try {
+      const res = await fetch("/api/upload/discover-r2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bucket: name }),
+      });
+      const data = (await res.json()) as {
+        found?: boolean;
+        endpoint?: string;
+        publicBaseUrl?: string;
+        error?: string;
+      };
+      if (data.found && data.endpoint) {
+        patchS3({
+          enabled: true,
+          endpoint: data.endpoint,
+          region: "auto",
+          bucket: name,
+          publicBaseUrl: data.publicBaseUrl ?? "",
+        });
+        setDiscoverMsg(`已找到桶「${name}」，端点已自动填入`);
+      } else {
+        setDiscoverMsg(data.error ?? "未找到该桶");
+      }
+    } catch {
+      setDiscoverMsg("查找失败，请稍后重试");
+    } finally {
+      setDiscovering(false);
+    }
+  }
 
   const s3 = form.s3 ?? DEFAULT_S3_CONFIG;
   const patchS3 = (patch: Partial<S3Config>) =>
@@ -581,12 +623,39 @@ export function SettingsDialog({
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Bucket</Label>
-                  <Input
-                    placeholder="my-bucket"
-                    value={s3.bucket}
-                    onChange={(e) => patchS3({ bucket: e.target.value })}
-                    autoComplete="off"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="只填桶名，如 agnes-chat"
+                      value={s3.bucket}
+                      onChange={(e) => patchS3({ bucket: e.target.value })}
+                      autoComplete="off"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-9 shrink-0 text-xs"
+                      disabled={discovering}
+                      onClick={() => void discoverBucket()}
+                      title="用桶名自动查找并填入 Endpoint"
+                    >
+                      {discovering ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Search className="h-3.5 w-3.5" />
+                      )}
+                      自动寻找
+                    </Button>
+                  </div>
+                  {discoverMsg ? (
+                    <p
+                      className={`text-[11px] ${
+                        discoverMsg.startsWith("已找到") ? "text-primary" : "text-destructive"
+                      }`}
+                    >
+                      {discoverMsg}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">目录前缀</Label>

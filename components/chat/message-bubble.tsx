@@ -1,10 +1,20 @@
 "use client";
 
+import * as React from "react";
 import { useState } from "react";
-import { Check, Copy, FileText, FileVideo, RotateCw, TriangleAlert } from "lucide-react";
+import {
+  Check,
+  Copy,
+  FileDown,
+  FileText,
+  FileVideo,
+  RotateCw,
+  TriangleAlert,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { AgnesIcon } from "@/components/agnes-logo";
+import { ImageLightbox } from "@/components/chat/image-lightbox";
 import { Markdown } from "@/components/chat/markdown";
 import { Button } from "@/components/ui/button";
 import { formatBytes, type ChatMessage } from "@/lib/types";
@@ -15,9 +25,68 @@ interface MessageBubbleProps {
   isStreaming?: boolean;
 }
 
+/** 语言标注 → 文件扩展名 */
+function extFromLang(lang: string): string {
+  const map: Record<string, string> = {
+    ts: "ts", typescript: "ts", tsx: "tsx",
+    js: "js", javascript: "js", jsx: "jsx", mjs: "mjs",
+    py: "py", python: "py",
+    json: "json", yaml: "yaml", yml: "yml",
+    html: "html", css: "css", scss: "scss",
+    sh: "sh", bash: "sh", sql: "sql",
+    go: "go", rs: "rs", java: "java", c: "c", cpp: "cpp", cs: "cs",
+    md: "md", markdown: "md", txt: "txt",
+  };
+  return map[lang.toLowerCase().trim()] ?? "txt";
+}
+
+/** 抽出 Markdown 里的代码块，优先取最长的那一段 */
+function extractCodeBlocks(text: string): { lang: string; code: string }[] {
+  const re = /```([\w+-]*)\n([\s\S]*?)```/g;
+  const out: { lang: string; code: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    out.push({ lang: m[1] ?? "", code: m[2] ?? "" });
+  }
+  return out.sort((a, b) => b.code.length - a.code.length);
+}
+
 export function MessageBubble({ message, onRetry, isStreaming }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
+  const [preview, setPreview] = useState<{ src: string; name: string } | null>(null);
   const isUser = message.role === "user";
+
+  /**
+   * 「AI 编辑并输出新版」的落地动作。
+   *
+   * 用户上传原文件 → 让 AI 改写 → 点「下载新版」拿到改好的文件。
+   * 优先抽取代码块（按语言标注决定扩展名），没有代码块则保存全文。
+   */
+  const codeBlocks = React.useMemo(
+    () => extractCodeBlocks(message.content),
+    [message.content],
+  );
+  const hasCodeBlock = codeBlocks.length > 0;
+
+  function downloadNewVersion() {
+    const block = codeBlocks[0];
+    const content = block?.code ?? message.content;
+    const ext = block?.lang ? extFromLang(block.lang) : "txt";
+    const base = (block?.lang ? `new-version` : "ai-output").replace(/[^\w.-]/g, "");
+    const filename = `${base}${codeBlocks.length > 1 ? `-${codeBlocks.length}` : ""}.${ext}`;
+
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // 交给浏览器完成下载后再回收
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast.success(`已保存为 ${filename}`);
+  }
 
   async function copyMessage() {
     try {
@@ -34,6 +103,7 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
   if (isUser) {
     const atts = message.attachments ?? [];
     return (
+      <>
       <div className="flex animate-fade-in flex-col items-end gap-1.5">
         {/* 附件 */}
         {atts.length > 0 ? (
@@ -44,7 +114,18 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
                 className="inline-flex max-w-[200px] items-center gap-1.5 rounded-lg border border-border/70 bg-muted/60 py-1 pl-1.5 pr-2 text-xs"
               >
                 {a.kind === "image" && a.content ? (
-                  <img src={a.content} alt={a.name} className="h-6 w-6 shrink-0 rounded object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setPreview({ src: a.content!, name: a.name })}
+                    className="shrink-0 rounded transition-opacity hover:opacity-80"
+                    title="点击查看原图"
+                  >
+                    <img
+                      src={a.content}
+                      alt={a.name}
+                      className="h-6 w-6 rounded object-cover"
+                    />
+                  </button>
                 ) : a.kind === "video" ? (
                   <FileVideo className="h-3.5 w-3.5 shrink-0 text-primary" />
                 ) : (
@@ -62,6 +143,10 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
           </div>
         ) : null}
       </div>
+      {preview ? (
+        <ImageLightbox src={preview.src} name={preview.name} onClose={() => setPreview(null)} />
+      ) : null}
+      </>
     );
   }
 
@@ -102,7 +187,7 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
           </div>
         )}
 
-        {/* 操作栏：复制 / 重新生成 */}
+        {/* 操作栏：复制 / 存为新版文件 */}
         {message.content && !message.error && !isStreaming ? (
           <div className="mt-2 flex items-center gap-1">
             <button
@@ -112,6 +197,16 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
             >
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
             </button>
+            {hasCodeBlock ? (
+              <button
+                onClick={downloadNewVersion}
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                title="把 AI 生成的内容存为新版文件"
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                下载新版
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>

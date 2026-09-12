@@ -50,6 +50,14 @@ export const AUTHOR_NAME: string =
 export const REPO_URL: string =
   process.env.NEXT_PUBLIC_REPO_URL?.trim() || "https://github.com/AlotofSkymoon/agnes-chat";
 
+/**
+ * 署名标识：默认 by-agnes-chat.vercel.app。
+ * 页面会显式展示（页脚 + 侧边栏底部），按 LICENSE 要求不可移除。
+ * 换自己的域名时改 NEXT_PUBLIC_BY_LINE 即可。
+ */
+export const BY_LINE: string =
+  process.env.NEXT_PUBLIC_BY_LINE?.trim() || "by-agnes-chat.vercel.app";
+
 /** 上游项目地址（迁移来源，页脚标注） */
 export const UPSTREAM_URL: string =
   process.env.NEXT_PUBLIC_UPSTREAM_URL?.trim() || "https://github.com/AlotofSkymoon/agnes-chat";
