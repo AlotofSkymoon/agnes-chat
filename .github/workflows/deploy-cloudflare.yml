@@ -33,7 +33,9 @@ jobs:
       - name: 准备 Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # Node 20 已被 GitHub Actions 弃用（会被强制在 Node 24 上运行并告警），
+          # 用 22 消除该告警；Next 14 在 22 上完全兼容
+          node-version: "22"
 
       - name: 安装依赖
         # 不用 npm ci：仓库没提交 lock 文件，ci 会直接失败
