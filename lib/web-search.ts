@@ -342,13 +342,16 @@ const runBocha: KeyedRunner = async (query, limit, key) => {
 
 /**
  * 按顺序尝试：第一个配了 Key 的就作为首选。
- * 顺序依据：Tavily 专为 AI 优化 > Brave 独立索引 > 博查中文友好 > Serper > Exa
+ *
+ * Serper 排第一是因为**注册不需要信用卡**，门槛最低：
+ * 免费额度 2500 次，用 Google 的索引，结果质量稳定。
+ * 其余源各有优势，配了多个时按下面的顺序取第一个可用的。
  */
 const KEYED_SOURCES: { id: SearchProvider; env: string; run: KeyedRunner; label: string }[] = [
+  { id: "serper", env: "SERPER_API_KEY", run: runSerper, label: "Serper" },
   { id: "tavily", env: "TAVILY_API_KEY", run: runTavily, label: "Tavily" },
   { id: "brave", env: "BRAVE_API_KEY", run: runBrave, label: "Brave Search" },
   { id: "bocha", env: "BOCHA_API_KEY", run: runBocha, label: "博查 AI" },
-  { id: "serper", env: "SERPER_API_KEY", run: runSerper, label: "Serper" },
   { id: "exa", env: "EXA_API_KEY", run: runExa, label: "Exa" },
 ];
 

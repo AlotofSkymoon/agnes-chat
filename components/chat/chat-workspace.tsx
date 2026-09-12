@@ -181,6 +181,32 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       /* 忽略 */
     }
     setMounted(true);
+
+    /**
+     * 云端保存的初始值 = 用户自己的选择 > 管理员设的站点默认值。
+     *
+     * ⚠️ 这里之前只读 localStorage，压根没去取管理员的 cloudSaveDefault，
+     * 所以管理员在面板里开了「默认开启」，用户刷新后还是关的。
+     *
+     * 判断依据用 localStorage 里**有没有这个键**，而不是值本身：
+     * 用户手动关掉后存的是 "false"，若按值判断就会被默认值覆盖回去。
+     */
+    fetch("/api/site-settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { settings?: { cloudSaveDefault?: boolean } } | null) => {
+        const siteDefault = Boolean(d?.settings?.cloudSaveDefault);
+        if (!siteDefault) return; // 默认关闭时无需处理
+        try {
+          if (localStorage.getItem(LS_KEYS.cloudSyncSetByUser) === "1") return;
+          if (localStorage.getItem(LS_KEYS.cloudSync) !== null) return;
+          setCloudSync(true);
+        } catch {
+          /* 忽略 */
+        }
+      })
+      .catch(() => {
+        /* 拿不到站点设置就维持本地值 */
+      });
   }, []);
 
   // 探测对象存储：站点托管 或 用户自己配置了 都算就绪
@@ -200,6 +226,20 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       alive = false;
     };
   }, [settings.s3?.enabled]);
+
+  /**
+   * 用户手动切换云端保存。
+   * 除了存值，还要打上「用户已设置」标记 ——
+   * 之后管理员的默认值就不能再覆盖这个选择了。
+   */
+  const handleCloudSyncChange = React.useCallback((next: boolean) => {
+    setCloudSync(next);
+    try {
+      localStorage.setItem(LS_KEYS.cloudSyncSetByUser, "1");
+    } catch {
+      /* 忽略 */
+    }
+  }, []);
 
   React.useEffect(() => {
     if (!mounted) return;
@@ -1108,7 +1148,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         onSave={saveSettings}
         user={user}
         cloudSync={cloudSync}
-        onCloudSyncChange={setCloudSync}
+        onCloudSyncChange={handleCloudSyncChange}
         onClearAll={clearAllData}
       />
     </div>

@@ -358,6 +358,13 @@ export const LS_KEYS = {
   conversationId: "agnes:conversationId",
   theme: "agnes:theme",
   cloudSync: "agnes:cloudSync",
+  /**
+   * 用户是否**手动**设置过云端保存。
+   *
+   * 存在这个标记时，说明用户有自己的偏好，
+   * 管理员的「默认开启」就不能再覆盖他 —— 否则用户关掉后一刷新又变回开启。
+   */
+  cloudSyncSetByUser: "agnes:cloudSyncSetByUser",
   sidebarCollapsed: "agnes:sidebarCollapsed",
   s3: "agnes:s3",
   /** 思考模式开关 */

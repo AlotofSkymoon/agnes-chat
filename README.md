@@ -224,6 +224,101 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 
 ---
 
+## 📋 环境变量速查（按平台分列）
+
+三个平台用的存储后端不同，**变量不能混着填**。
+下面按平台完整列出，照抄即可。
+
+---
+
+### 🟠 Cloudflare Workers
+
+存储用 **KV + D1 + R2**，不需要 Redis。
+
+**必须（GitHub Secrets / Workers 环境变量）**
+
+| Key | 说明 |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | API 令牌（仅 Actions 方式需要） |
+| `CLOUDFLARE_ACCOUNT_ID` | 账户 ID（Dashboard 右侧栏） |
+| `KV_NAMESPACE_ID` | KV 命名空间 ID |
+| `D1_DATABASE_ID` | D1 数据库 ID |
+| `SESSION_SECRET` | `openssl rand -base64 32` 生成 |
+| `PRESET_AGNES_API_KEY` | 站点内置 Key |
+
+**可选**
+
+| Key | 说明 |
+|---|---|
+| `R2_ACCOUNT_ID` | R2 账户 ID |
+| `R2_ACCESS_KEY_ID` | R2 令牌 Access Key |
+| `R2_SECRET_ACCESS_KEY` | R2 令牌 Secret |
+| `R2_BUCKET` | 桶名，如 `agnes-chat` |
+| `R2_PUBLIC_BASE_URL` | 公开域名，如 `https://pub-xxx.r2.dev` |
+| `JWT_SECRET` | 建表接口 `/api/d1/cshsjk/<token>` 用 |
+
+> ❌ **不要填** `UPSTASH_*` —— Cloudflare 上不读。
+> ⚠️ 密钥走 `wrangler secret put`，别写进 `wrangler.jsonc`（会提交到仓库）。
+
+---
+
+### 🔵 Vercel
+
+存储用 **Upstash Redis**，对象存储只能用 **Backblaze B2**。
+
+| Key | 说明 |
+|---|---|
+| `UPSTASH_REDIS_REST_URL` | Upstash REST URL（⚠️ 带 `REST` 字样那个） |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash REST TOKEN |
+| `SESSION_SECRET` | 任意长随机串 |
+| `PRESET_AGNES_API_KEY` | 站点内置 Key |
+| `B2_REGION` | B2 区域（可选） |
+| `B2_ACCESS_KEY_ID` | B2 Key ID（可选） |
+| `B2_SECRET_ACCESS_KEY` | B2 Secret（可选） |
+| `B2_BUCKET` | 桶名（可选） |
+
+> ❌ **不要填** `R2_*` / `CLOUDFLARE_*` —— Vercel 上不读。
+
+---
+
+### 🟢 Netlify
+
+和 Vercel **完全一样**（Node 运行时 + Upstash + B2）。
+
+| Key | 说明 |
+|---|---|
+| `UPSTASH_REDIS_REST_URL` | Upstash REST URL |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash REST TOKEN |
+| `SESSION_SECRET` | 任意长随机串 |
+| `PRESET_AGNES_API_KEY` | 站点内置 Key |
+| `B2_*` | 对象存储（可选，同 Vercel） |
+
+> ❌ **不要填** `R2_*` / `CLOUDFLARE_*`。
+
+---
+
+### ⚪ 三个平台通用（可选）
+
+这些不管部署在哪都能用。
+
+| Key | 默认值 | 说明 |
+|---|---|---|
+| `NEXT_PUBLIC_SITE_NAME` | `Agnes AI` | 站点名 |
+| `NEXT_PUBLIC_THEME` | `anthropic` | 配色：`anthropic` / `fuwari` / `violet-rose` |
+| `NEXT_PUBLIC_REQUIRE_LOGIN` | `false` | 设 `true` 则必须登录才能对话 |
+| `NEXT_PUBLIC_ALLOW_WEB_SEARCH` | `true` | 设 `false` 关闭联网开关 |
+| `NEXT_PUBLIC_ALLOW_CUSTOM_KEY` | `true` | 设 `false` 锁死只能用站长的 Key |
+| `SERPER_API_KEY` | — | 联网搜索（⭐ 推荐，注册不用信用卡） |
+| `TAVILY_API_KEY` | — | 联网搜索，专为 LLM 设计 |
+| `BRAVE_API_KEY` | — | 联网搜索，独立索引 |
+| `BOCHA_API_KEY` | — | 联网搜索，国内可用 |
+| `EXA_API_KEY` | — | 联网搜索，语义检索 |
+
+> 搜索源配了任一 Key 就优先用它；一个都不配则自动用免费的
+> Bing RSS / Sogou / DuckDuckGo，零配置也能联网。
+
+---
+
 ## 🎨 换成你自己的品牌（中转站必看）
 
 默认整套品牌是 **Agnes AI**。想挂上你自己的中转服务，改环境变量即可，**不用动代码**。
@@ -558,14 +653,18 @@ Agent、工具调用、代码执行、语音 —— 聊天之外不做多余的�
 | 免费 | **Bing RSS** | 否 | 官方 RSS 输出，结构化，默认主源 |
 | 免费 | **Sogou** | 否 | 中文结果质量好（无摘要、链接为跳转地址） |
 | 免费 | DuckDuckGo | 否 | 备用源 |
+| API | ⭐ **Serper** | 是 | **推荐**：注册不用信用卡，免费 2500 次，走 Google 索引 |
 | API | **Tavily** | 是 | 专为 LLM 设计，返回已提炼的片段 |
 | API | **Brave Search** | 是 | 独立索引，不依赖 Google/Bing |
 | API | **博查 AI** | 是 | 国内可用，中文友好 |
-| API | Serper / Exa | 是 | Google 索引 / 语义搜索 |
+| API | Exa | 是 | 语义/神经搜索 |
 
 **配了 Key 就优先用 API 源** —— 爬虫源随时可能因反爬失效，而 API 有 SLA。
-在部署平台加任一环境变量即可：`TAVILY_API_KEY` / `BRAVE_API_KEY` /
-`BOCHA_API_KEY` / `SERPER_API_KEY` / `EXA_API_KEY`。
+按上表顺序取第一个配了 Key 的。
+
+> **为什么默认推荐 Serper**：注册只要邮箱，**不需要信用卡**，
+> 免费额度 2500 次，对个人站足够。其余几个要么要卡（Brave/Tavily 部分套餐），
+> 要么国内访问不稳。
 
 > ⚠️ **关于"某引擎不可用"的判断，这里踩过坑**：
 > 开发环境有出网白名单，连 `example.com` 和 npm 官方源都会返回 403，
