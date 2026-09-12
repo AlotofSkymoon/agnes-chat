@@ -209,64 +209,59 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
           return next;
         });
 
-      // 先构造消息数组，发送前做一次体积预检
+      // 构造发送用的消息数组：只有最后一条用户消息带多模态附件，
+      // 历史消息用文字摘要，省 token 也省体积。
       const visionOkNow = visionEnabled(settings.model, settings.customProviders);
       const outboundMessages = history
         .filter((m) => !m.error)
         .map((m, idx, arr) => {
-        const atts = m.attachments ?? [];
-        // 只有最后一条用户消息带附件才需要多模态；历史消息用文字摘要，省 token
-        const isLastUser =
-          m.role === "user" && idx === arr.length - 1 && atts.length > 0;
+          const atts = m.attachments ?? [];
+          const isLastUser = m.role === "user" && idx === arr.length - 1 && atts.length > 0;
 
-        if (!isLastUser) {
-          const past =
-            atts.length > 0
-              ? `${m.content}\n（此前附带的附件：${atts
-                  .map((a) => a.name)
-                  .join("、")}）`
-              : m.content;
-          return { role: m.role, content: past };
-        }
+          if (!isLastUser) {
+            const past =
+              atts.length > 0
+                ? `${m.content}\n（此前附带的附件：${atts.map((a) => a.name).join("、")}）`
+                : m.content;
+            return { role: m.role, content: past };
+          }
 
-        const visionOk = visionOkNow;
-        const textAtts = atts.filter((a) => a.kind === "text" && a.content);
-        const imgAtts = visionOk
-          ? atts.filter((a) => a.kind === "image" && a.content)
-          : [];
-        const otherAtts = atts.filter(
-          (a) => !textAtts.includes(a) && !imgAtts.includes(a),
-                );
+          const textAtts = atts.filter((a) => a.kind === "text" && a.content);
+          const imgAtts = visionOkNow
+            ? atts.filter((a) => a.kind === "image" && a.content)
+            : [];
+          const otherAtts = atts.filter(
+            (a) => !textAtts.includes(a) && !imgAtts.includes(a),
+          );
 
-                const textBlocks = [
-                  m.content,
-                  ...textAtts.map((a) => `\n---\n【附件：${a.name}】\n${a.content}`),
-                  ...otherAtts.map((a) =>
-                    a.content && /^https?:\/\//.test(a.content)
-                      ? `\n【${a.kind === "video" ? "视频" : "附件"}：${a.name}】${a.content}`
-                      : `\n【附件：${a.name}】${a.note ?? "（内容不可用）"}`,
-                  ),
-                  ...(atts.length > 0 && !visionOk && atts.some((a) => a.kind === "image")
-                    ? ["\n（当前模型不支持识图，图片未发送）"]
-                    : []),
-                ]
-                  .filter(Boolean)
-                  .join("\n");
+          const textBlocks = [
+            m.content,
+            ...textAtts.map((a) => `\n---\n【附件：${a.name}】\n${a.content}`),
+            ...otherAtts.map((a) =>
+              a.content && /^https?:\/\//.test(a.content)
+                ? `\n【${a.kind === "video" ? "视频" : "附件"}：${a.name}】${a.content}`
+                : `\n【附件：${a.name}】${a.note ?? "（内容不可用）"}`,
+            ),
+            ...(atts.length > 0 && !visionOkNow && atts.some((a) => a.kind === "image")
+              ? ["\n（当前模型不支持识图，图片未发送）"]
+              : []),
+          ]
+            .filter(Boolean)
+            .join("\n");
 
-                if (imgAtts.length === 0) return { role: m.role, content: textBlocks };
+          if (imgAtts.length === 0) return { role: m.role, content: textBlocks };
 
-                return {
-                  role: m.role,
-                  content: [
-                    { type: "text" as const, text: textBlocks },
-                    ...imgAtts.map((a) => ({
-                      type: "image_url" as const,
-                      image_url: { url: a.content!, detail: "auto" as const },
-                    })),
-                  ],
-                };
-              }
-            });
+          return {
+            role: m.role,
+            content: [
+              { type: "text" as const, text: textBlocks },
+              ...imgAtts.map((a) => ({
+                type: "image_url" as const,
+                image_url: { url: a.content!, detail: "auto" as const },
+              })),
+            ],
+          };
+        });
 
       // ---- 发送前体积预检 ----
       // Vercel Serverless 请求体硬上限 4.5MB，超出会在平台层直接被拒，
