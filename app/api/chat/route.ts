@@ -9,6 +9,7 @@ import {
   resolveTarget,
   sanitizeCustomProviders,
 } from "@/lib/config";
+import { detectPlatform } from "@/lib/platform";
 import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
@@ -76,10 +77,33 @@ export async function POST(request: Request) {
     return errorResponse(400, "BAD_MODEL", "不支持的模型");
   }
 
-  // 单条消息体积保护（图片 base64 容易撑爆）
-  const tooBig = messages.some((m) => JSON.stringify(m.content).length > 1_500_000);
-  if (tooBig) {
-    return errorResponse(413, "TOO_LARGE", "单条消息内容过大，请减少附件后再试");
+  /**
+   * 单条消息体积保护。
+   *
+   * 阈值按平台定：Vercel Serverless 请求体硬上限 4.5MB，
+   * Cloudflare Workers 宽松得多（100MB），可以放开。
+   * 图片在前端已自动压缩，正常不会触发；触发时给出可操作的指引。
+   */
+  const MAX_MESSAGE_CHARS = detectPlatform() === "vercel" ? 3_500_000 : 20_000_000;
+
+  // 逐条检查，顺便判断是不是图片引起的，好给针对性提示
+  let oversizeIsImage = false;
+  for (const m of messages) {
+    const size = JSON.stringify(m.content).length;
+    if (size <= MAX_MESSAGE_CHARS) continue;
+
+    const hasImage =
+      Array.isArray(m.content) &&
+      m.content.some((c) => (c as { type?: string }).type === "image_url");
+    if (hasImage) oversizeIsImage = true;
+
+    return errorResponse(
+      413,
+      "TOO_LARGE",
+      oversizeIsImage
+        ? "图片内容过大。请在设置里配置对象存储（Cloudflare R2 / Backblaze B2）后重新上传，图片会以链接方式发送而非内嵌。"
+        : "单条消息内容过大，请精简文本或减少附件后再试",
+    );
   }
 
   // 解析：这个模型属于哪个供应商、该打哪个地址

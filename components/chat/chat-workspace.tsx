@@ -27,9 +27,11 @@ import {
   supportsVision,
   type CustomProviderConfig,
 } from "@/lib/config";
+import { IMAGE_TARGET_BASE64 } from "@/lib/image-compress";
 import { DEFAULT_S3_CONFIG, type S3Config } from "@/lib/s3-presets";
 import {
   createId,
+  formatBytes,
   isImageFile,
   isTextFile,
   isVideoFile,
@@ -207,37 +209,33 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
           return next;
         });
 
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            messages: history
-              .filter((m) => !m.error)
-              .map((m, idx, arr) => {
-                const atts = m.attachments ?? [];
-                // 只有最后一条用户消息带附件才需要多模态；历史消息用文字摘要，省 token
-                const isLastUser =
-                  m.role === "user" && idx === arr.length - 1 && atts.length > 0;
+      // 先构造消息数组，发送前做一次体积预检
+      const visionOkNow = visionEnabled(settings.model, settings.customProviders);
+      const outboundMessages = history
+        .filter((m) => !m.error)
+        .map((m, idx, arr) => {
+        const atts = m.attachments ?? [];
+        // 只有最后一条用户消息带附件才需要多模态；历史消息用文字摘要，省 token
+        const isLastUser =
+          m.role === "user" && idx === arr.length - 1 && atts.length > 0;
 
-                if (!isLastUser) {
-                  const past =
-                    atts.length > 0
-                      ? `${m.content}\n（此前附带的附件：${atts
-                          .map((a) => a.name)
-                          .join("、")}）`
-                      : m.content;
-                  return { role: m.role, content: past };
-                }
+        if (!isLastUser) {
+          const past =
+            atts.length > 0
+              ? `${m.content}\n（此前附带的附件：${atts
+                  .map((a) => a.name)
+                  .join("、")}）`
+              : m.content;
+          return { role: m.role, content: past };
+        }
 
-                const visionOk = visionEnabled(settings.model, settings.customProviders);
-                const textAtts = atts.filter((a) => a.kind === "text" && a.content);
-                const imgAtts = visionOk
-                  ? atts.filter((a) => a.kind === "image" && a.content)
-                  : [];
-                const otherAtts = atts.filter(
-                  (a) => !textAtts.includes(a) && !imgAtts.includes(a),
+        const visionOk = visionOkNow;
+        const textAtts = atts.filter((a) => a.kind === "text" && a.content);
+        const imgAtts = visionOk
+          ? atts.filter((a) => a.kind === "image" && a.content)
+          : [];
+        const otherAtts = atts.filter(
+          (a) => !textAtts.includes(a) && !imgAtts.includes(a),
                 );
 
                 const textBlocks = [
@@ -268,13 +266,47 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   ],
                 };
               }),
-            model: settings.model,
-            keys: settings.keys,
-            baseUrls: settings.baseUrls,
-            customProviders: settings.customProviders,
-            conversationId,
-            saveToCloud: Boolean(user) && cloudSync,
-          }),
+            );
+
+      // ---- 发送前体积预检 ----
+      // Vercel Serverless 请求体硬上限 4.5MB，超出会在平台层直接被拒，
+      // 连我们的接口都到不了。这里提前拦下并给出可操作的提示，
+      // 比发出去收到一句「单条消息过大」有用得多。
+      const bodyObj = {
+        messages: outboundMessages,
+        model: settings.model,
+        keys: settings.keys,
+        baseUrls: settings.baseUrls,
+        customProviders: settings.customProviders,
+        conversationId,
+        saveToCloud: Boolean(user) && cloudSync,
+      };
+      const bodyBytes = new TextEncoder().encode(JSON.stringify(bodyObj)).length;
+      const PLATFORM_BODY_LIMIT =
+        platformRef.current === "vercel" ? 4 * 1024 * 1024 : 20 * 1024 * 1024;
+
+      if (bodyBytes > PLATFORM_BODY_LIMIT) {
+        const hasImage = outboundMessages.some(
+          (m) =>
+            Array.isArray(m.content) &&
+            m.content.some((c: { type?: string }) => c.type === "image_url"),
+        );
+        toast.error(
+          hasImage
+            ? `内容共 ${formatBytes(bodyBytes)}，超出发送上限。图片请配置对象存储后以链接发送，或减少附件数量`
+            : `内容共 ${formatBytes(bodyBytes)}，超出发送上限。请精简文本或减少附件后重试`,
+          { duration: 6000 },
+        );
+        setStatus("idle");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify(bodyObj),
         });
 
         if (!res.ok || !res.body) {
@@ -425,6 +457,25 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     s3Ref.current = settings.s3 ?? DEFAULT_S3_CONFIG;
   }, [settings.s3]);
 
+  /** 当前部署平台，用于发送前的请求体体积预检（Vercel 上限比 Workers 小得多） */
+  const platformRef = React.useRef<"cloudflare" | "vercel" | "local">("local");
+  React.useEffect(() => {
+    let alive = true;
+    fetch("/api/upload/config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (alive && d && typeof d.platform === "string") {
+          platformRef.current = d.platform as "cloudflare" | "vercel" | "local";
+        }
+      })
+      .catch(() => {
+        /* 忽略：拿不到就按宽松处理 */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const uploadViaS3 = React.useCallback(async (file: File): Promise<Attachment> => {
     const cfg = s3Ref.current;
     const res = await fetch("/api/upload/presign", {
@@ -514,21 +565,48 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     let toastId: string | number | undefined;
     if (willUpload) toastId = toast.loading("正在上传到对象存储…");
 
+    // 本地内嵌（base64）的体积红线：超过这个就别硬塞了，必被服务端拒。
+    // 图片经压缩后一般远低于此值，触发说明图确实太大或压缩没生效。
+    const INLINE_LIMIT = IMAGE_TARGET_BASE64;
+
     const parsed = await Promise.all(
       picked.map(async (f) => {
         if (s3.enabled && needsRemote(f)) {
           try {
             return await uploadViaS3(f);
           } catch (err) {
-            toast.error(
-              `${f.name}：${err instanceof Error ? err.message : "上传失败"}`,
-            );
-            return readFileToAttachment(f);
+            // ⚠️ 不能无条件回落到 base64：大文件内嵌必然触发「单条消息过大」。
+            //    只有小文件才值得降级内嵌；大文件要如实告诉用户上传没成功。
+            if (f.size <= INLINE_LIMIT) {
+              toast.warning(`${f.name}：上传失败，已改为本地内嵌（${err instanceof Error ? err.message : ""}）`);
+              return readFileToAttachment(f);
+            }
+            return {
+              id: createId(),
+              name: f.name,
+              size: f.size,
+              mime: f.type || "application/octet-stream",
+              kind: "file" as const,
+              note: `${f.name} 上传失败：${err instanceof Error ? err.message : "未知错误"}。请检查存储桶的 CORS 与公开读设置，或在设置里重新配置对象存储`,
+            };
           }
         }
         return readFileToAttachment(f);
       }),
     );
+
+    // 未走对象存储、且内嵌体积仍然过大的：直接拦下并引导去配置存储，
+    // 免得用户点发送后才收到服务端的「单条消息过大」。
+    const oversize = parsed.filter(
+      (a) => a.kind === "image" && (a.content?.length ?? 0) > INLINE_LIMIT,
+    );
+    if (oversize.length > 0) {
+      toast.error(
+        `${oversize[0].name} 体积过大（${formatBytes(oversize[0].content?.length ?? 0)}），无法内嵌发送。请在设置里配置对象存储后重试`,
+        { duration: 6000 },
+      );
+      return;
+    }
 
     if (toastId !== undefined) {
       const okCount = parsed.filter((a) => a.content?.startsWith("http")).length;

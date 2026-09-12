@@ -109,13 +109,17 @@ export async function readFileToAttachment(file: File): Promise<Attachment> {
 
   try {
     if (isImageFile(file)) {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const fr = new FileReader();
-        fr.onload = () => resolve(String(fr.result));
-        fr.onerror = () => reject(new Error("read error"));
-        fr.readAsDataURL(file);
-      });
-      return { ...base, kind: "image", content: dataUrl };
+      // 图片 base64 会膨胀 33%，直接塞进请求很容易触发「单条消息过大」。
+      // 这里先自动压缩（降采样 + JPEG），模型识图不需要原图分辨率。
+      // 动态 import：压缩依赖 canvas / Image，只应在浏览器加载
+      const { compressImageToDataUrl } = await import("@/lib/image-compress");
+      const { dataUrl, compressed } = await compressImageToDataUrl(file);
+      return {
+        ...base,
+        kind: "image",
+        content: dataUrl,
+        note: compressed ? `已压缩至 ${formatBytes(dataUrl.length)} 以便发送` : undefined,
+      };
     }
 
     if (isTextFile(file)) {
