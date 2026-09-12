@@ -69,7 +69,7 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
   return (
     <div className="flex animate-fade-in gap-3">
       {/* 头像 */}
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4D6BFE] to-[#7B8CFF] p-1.5 text-white">
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4D6BFE] p-1.5 text-white">
         <AgnesIcon />
       </div>
 

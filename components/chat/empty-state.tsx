@@ -1,7 +1,5 @@
 "use client";
 
-import { AgnesIcon } from "@/components/agnes-logo";
-
 const SUGGESTIONS = [
   { title: "帮我写一段自我介绍", sub: "简洁、有记忆点" },
   { title: "用通俗的话解释向量数据库", sub: "并举一个例子" },
@@ -15,8 +13,15 @@ export function EmptyState({ onPick }: { onPick: (text: string) => void }) {
     <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-5">
       {/* 主标题区 */}
       <div className="mt-4 flex flex-col items-center text-center">
-        <span className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#4D6BFE] to-[#7B8CFF] p-3 text-white shadow-lg shadow-[#4D6BFE]/25">
-          <AgnesIcon />
+        {/* 空状态：小蓝海豚游动 */}
+        <span className="mb-4 inline-flex h-[76px] w-[130px] items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/dolphin-swim.gif"
+            alt="小蓝海豚游动"
+            className="h-[76px] w-[130px] object-contain"
+            draggable={false}
+          />
         </span>
         <h1 className="text-[26px] font-semibold tracking-tight sm:text-[30px]">
           我是 Agnes，很高兴见到你！

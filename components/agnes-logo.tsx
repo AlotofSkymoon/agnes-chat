@@ -23,7 +23,7 @@ export function AgnesLogo({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-center rounded-full bg-gradient-to-br from-[#4D6BFE] to-[#7B8CFF] p-[0.18em] text-white shadow-lg shadow-[#4D6BFE]/25",
+        "inline-flex items-center justify-center rounded-full bg-[#4D6BFE] p-[0.18em] text-white shadow-lg shadow-[#4D6BFE]/25",
         className,
       )}
     >

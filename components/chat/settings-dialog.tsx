@@ -25,7 +25,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { AGENT_TIP, PROVIDERS, type ProviderId } from "@/lib/config";
-import { DEFAULT_S3_CONFIG, S3_PRESETS, type S3Config } from "@/lib/s3-presets";
+import {
+  DEFAULT_S3_CONFIG,
+  presetsForPlatform,
+  type S3Config,
+} from "@/lib/s3-presets";
 
 export interface ChatSettings {
   /** 各服务商的 Key */
@@ -66,6 +70,35 @@ export function SettingsDialog({
     deepseek: false,
   });
   const [showSecret, setShowSecret] = React.useState(false);
+  const [siteInfo, setSiteInfo] = React.useState<{
+    siteManaged: boolean;
+    endpoint: string;
+    bucket: string;
+    publicBaseUrl: string;
+    platform?: "cloudflare" | "vercel" | "local";
+  } | null>(null);
+
+  // 只展示当前部署平台支持的对象存储
+  const availablePresets = React.useMemo(
+    () => presetsForPlatform(siteInfo?.platform ?? "local"),
+    [siteInfo?.platform],
+  );
+
+  React.useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    fetch("/api/upload/config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (alive && d && typeof d === "object") setSiteInfo(d);
+      })
+      .catch(() => {
+        /* 忽略 */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [open]);
 
   const s3 = form.s3 ?? DEFAULT_S3_CONFIG;
   const patchS3 = (patch: Partial<S3Config>) =>
@@ -191,6 +224,37 @@ export function SettingsDialog({
             </summary>
 
             <div className="mt-3 space-y-3">
+              {siteInfo?.siteManaged ? (
+                <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+                  <p className="text-xs font-medium text-primary">站点已配置 R2，可直接使用</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    管理员已在服务端配好存储桶。点下面的按钮即可上传，
+                    <strong> 你不需要填写任何密钥</strong>。
+                    {siteInfo.bucket ? ` 桶名：${siteInfo.bucket}` : ""}
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={form.s3?.useSiteConfig ? "default" : "outline"}
+                    className="h-7 text-xs"
+                    onClick={() =>
+                      patchS3({
+                        enabled: true,
+                        useSiteConfig: true,
+                        endpoint: siteInfo.endpoint,
+                        region: "auto",
+                        bucket: siteInfo.bucket,
+                        publicBaseUrl: siteInfo.publicBaseUrl,
+                        accessKeyId: "",
+                        secretAccessKey: "",
+                      })
+                    }
+                  >
+                    {form.s3?.useSiteConfig ? "✓ 正在使用站点配置" : "使用站点配置（推荐）"}
+                  </Button>
+                </div>
+              ) : null}
+
               <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
                 <div className="pr-3">
                   <p className="text-sm">启用对象存储</p>
@@ -207,7 +271,7 @@ export function SettingsDialog({
               <div className="space-y-1.5">
                 <Label className="text-xs">服务商预设</Label>
                 <div className="flex flex-wrap gap-1.5">
-                  {S3_PRESETS.map((preset) => (
+                  {availablePresets.map((preset) => (
                     <button
                       key={preset.id}
                       type="button"
@@ -220,8 +284,8 @@ export function SettingsDialog({
                       title={preset.note}
                       className={cn(
                         "rounded-full border px-2.5 py-1 text-[11px] transition-colors",
-                        preset.discouraged
-                          ? "border-destructive/40 text-destructive/80 hover:bg-destructive/10"
+                        preset.limited
+                          ? "border-amber-500/40 text-amber-600 hover:bg-amber-500/10"
                           : preset.recommended
                             ? "border-primary/40 text-primary hover:bg-primary/10"
                             : "border-border text-muted-foreground hover:bg-muted",
@@ -235,6 +299,13 @@ export function SettingsDialog({
                   点击预设会填入 Endpoint 与 Region 示例，把尖括号部分换成你自己的。
                 </p>
               </div>
+
+              {form.s3?.useSiteConfig ? (
+                <p className="rounded-lg border border-border/60 px-3 py-2 text-[11px] text-muted-foreground">
+                  当前使用站点托管的 R2，密钥保存在服务器，浏览器不持有。
+                  如需改用你自己的存储，关掉上面的「使用站点配置」再填写。
+                </p>
+              ) : null}
 
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="space-y-1">
@@ -325,11 +396,22 @@ export function SettingsDialog({
                 </p>
                 <p>
                   2. 存储桶 CORS 要允许你的站点域名做 <code className="rounded bg-muted px-1">PUT</code>
-                  ，否则浏览器直传会被拦。R2 在「设置 → CORS 策略」里加。
+                  ，否则浏览器直传会被拦。
                 </p>
                 <p className="mt-1">
                   凭证只存在你的浏览器，上传链接由服务端签名，文件<strong>不经过本站服务器</strong>。
                 </p>
+                {availablePresets[0]?.platform === "cloudflare" ? (
+                  <p className="mt-1">
+                    当前部署在 <strong>Cloudflare Workers</strong>，仅支持 Cloudflare R2（零出站流量费）。
+                  </p>
+                ) : null}
+                {availablePresets[0]?.platform === "vercel" ? (
+                  <p className="mt-1">
+                    当前部署在 <strong>Vercel</strong>，仅支持 Backblaze B2。B2 的 S3 兼容层只覆盖部分操作，
+                    若上传报 501 请改用其原生 API 或换到 Cloudflare 部署。
+                  </p>
+                ) : null}
               </div>
             </div>
           </details>

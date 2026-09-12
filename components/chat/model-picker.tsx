@@ -14,8 +14,8 @@ interface ModelPickerProps {
 
 const PROVIDER_ORDER: ProviderId[] = ["agnes", "deepseek"];
 
-/** 模型名全部是拉丁字符，强制走 SF Pro Display（SuperPingFangV1 的拉丁部分） */
-const SF_PRO = 'SuperPingFangV1, "SF Pro Display", -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
+/** 模型名全是拉丁字符，强制走 Montserrat */
+const MONTSERRAT = 'Montserrat, -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
 
 /** 输入框内的小模型选择框（不占全屏，点开是下拉小菜单） */
 export function ModelPicker({ value, onChange, className }: ModelPickerProps) {
@@ -48,7 +48,7 @@ export function ModelPicker({ value, onChange, className }: ModelPickerProps) {
         aria-haspopup="listbox"
         aria-expanded={open}
         title="切换模型"
-        style={{ fontFamily: SF_PRO }}
+        style={{ fontFamily: MONTSERRAT }}
         className={cn(
           "flex max-w-full items-center gap-1 rounded-full border border-border/70 bg-background px-2.5 py-1 font-sans text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground",
           open && "border-primary/50 text-foreground",
@@ -61,7 +61,7 @@ export function ModelPicker({ value, onChange, className }: ModelPickerProps) {
       {open ? (
         <div
           role="listbox"
-          style={{ fontFamily: SF_PRO }}
+          style={{ fontFamily: MONTSERRAT }}
           className="absolute bottom-full left-0 z-50 mb-2 w-60 overflow-hidden rounded-xl border border-border bg-popover p-1 font-sans shadow-xl shadow-black/10 animate-fade-in"
         >
           {PROVIDER_ORDER.map((pid) => {
