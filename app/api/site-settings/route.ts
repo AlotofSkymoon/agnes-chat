@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { REQUIRE_LOGIN } from "@/lib/site";
 import { DEFAULT_SITE_SETTINGS, type SiteSettings } from "@/lib/types";
 import { getValue, hasRedisConfig, KEYS } from "@/lib/redis";
 
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   if (!hasRedisConfig()) {
-    return NextResponse.json({ settings: DEFAULT_SITE_SETTINGS });
+    return NextResponse.json({ settings: DEFAULT_SITE_SETTINGS, requireLogin: REQUIRE_LOGIN });
   }
 
   try {
@@ -23,8 +24,8 @@ export async function GET() {
       ...DEFAULT_SITE_SETTINGS,
       ...(raw ?? {}),
     };
-    return NextResponse.json({ settings });
+    return NextResponse.json({ settings, requireLogin: REQUIRE_LOGIN });
   } catch {
-    return NextResponse.json({ settings: DEFAULT_SITE_SETTINGS });
+    return NextResponse.json({ settings: DEFAULT_SITE_SETTINGS, requireLogin: REQUIRE_LOGIN });
   }
 }

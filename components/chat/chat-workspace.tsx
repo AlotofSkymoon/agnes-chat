@@ -17,6 +17,7 @@ import { ChatInput } from "@/components/chat/chat-input";
 import { EmptyState } from "@/components/chat/empty-state";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { SettingsDialog, type ChatSettings } from "@/components/chat/settings-dialog";
+import { REQUIRE_LOGIN } from "@/lib/site";
 import { Sidebar } from "@/components/chat/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -391,6 +392,19 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       const text = raw.trim();
       if (status === "streaming") return;
       if (!text && attachments.length === 0) return;
+
+      /**
+       * 强制登录：发送前就拦住并引导去登录。
+       * 这只是体验层（服务端 /api/chat 另有校验），
+       * 免得用户打完一长段字才被告知需要登录。
+       */
+      if (REQUIRE_LOGIN && !user) {
+        toast.error("本站需要登录后才能对话", {
+          description: "右上角「登录 / 注册」即可，第一个注册的账号自动成为管理员。",
+          duration: 5000,
+        });
+        return;
+      }
 
       // 确保有当前会话
       let convId = currentId;

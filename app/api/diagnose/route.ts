@@ -18,7 +18,26 @@ export const dynamic = "force-dynamic";
  * 仅管理员可用：会用到服务端的 Key，且响应体里含有上游信息。
  */
 export async function GET() {
-  const admin = await requireAdmin();
+  /**
+   * requireAdmin 内部是 throw（不是返回 null），不接住会变成 500，
+   * 看起来跟"接口不存在"一样难排查。这里按状态码翻译成明确提示。
+   */
+  let admin: Awaited<ReturnType<typeof requireAdmin>>;
+  try {
+    admin = await requireAdmin();
+  } catch (err) {
+    const status = (err as Error & { status?: number })?.status ?? 500;
+    return NextResponse.json(
+      {
+        error:
+          status === 401
+            ? "请先登录管理员账号再访问本接口（第一个注册的账号自动成为管理员）。"
+            : "需要管理员权限。",
+        code: status === 401 ? "LOGIN_REQUIRED" : "FORBIDDEN",
+      },
+      { status },
+    );
+  }
   if (!admin) {
     return NextResponse.json({ error: "需要管理员权限" }, { status: 403 });
   }

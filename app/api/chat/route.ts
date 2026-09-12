@@ -11,6 +11,7 @@ import {
 } from "@/lib/config";
 import { detectPlatform } from "@/lib/platform";
 import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
+import { REQUIRE_LOGIN } from "@/lib/site";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,6 +74,25 @@ export async function POST(request: Request) {
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return errorResponse(400, "BAD_REQUEST", "消息不能为空");
+  }
+
+  /**
+   * 强制登录校验（服务端防线）。
+   *
+   * 站长设了 NEXT_PUBLIC_REQUIRE_LOGIN=true 时，没登录一律拒绝。
+   * 前端也会拦一道，但那只是体验；绕过前端直接打接口的人在这里被挡住。
+   */
+  if (REQUIRE_LOGIN) {
+    const u = await getCurrentUser();
+    if (!u) {
+      return NextResponse.json(
+        {
+          error: "本站已开启「必须登录才能对话」。请先登录或注册后再试。",
+          code: "LOGIN_REQUIRED",
+        },
+        { status: 401 },
+      );
+    }
   }
   const custom = sanitizeCustomProviders(customProviders);
 

@@ -206,6 +206,7 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 | `UPSTREAM_BASE_URL` | `https://apihub.agnes-ai.com/v1` | 中转地址 |
 | `UPSTREAM_MODEL` | `agnes-3.0-flash` | 默认模型 |
 | `NEXT_PUBLIC_ALLOW_CUSTOM_KEY` | `true` | 设 `false` 锁死：访客只能用站长的 Key |
+| `NEXT_PUBLIC_REQUIRE_LOGIN` | `false` | 设 `true` 则必须登录才能对话 |
 | `NEXT_PUBLIC_ALLOW_CUSTOM_BASE_URL` | `true` | 设 `false` 锁死 Base URL |
 
 > 💡 只要服务兼容 OpenAI 的 `/chat/completions` 就能直接套用。

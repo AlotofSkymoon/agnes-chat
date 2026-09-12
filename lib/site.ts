@@ -73,3 +73,19 @@ export const ALLOW_CUSTOM_KEY =
 /** 是否允许自定义 Base URL（关掉后只能用环境变量里配置的中转地址） */
 export const ALLOW_CUSTOM_BASE_URL =
   process.env.NEXT_PUBLIC_ALLOW_CUSTOM_BASE_URL?.trim() !== "false";
+
+/**
+ * 是否必须登录才能对话。
+ *
+ * 面向开发者的开关：
+ *   NEXT_PUBLIC_REQUIRE_LOGIN=true  → 访客必须注册/登录才能聊天
+ *   （默认 false，即免登录可用）
+ *
+ * 为什么做成 NEXT_PUBLIC_ 前缀：前端也需要知道这个值，好在发送前
+ * 就拦住并引导去登录，而不是等服务端返回 401 才知道。
+ *
+ * ⚠️ 前端拦只是体验优化，真正的校验在服务端 /api/chat 里，
+ *    两者都要有 —— 只靠前端拦是可以被绕过的。
+ */
+export const REQUIRE_LOGIN =
+  process.env.NEXT_PUBLIC_REQUIRE_LOGIN?.trim() === "true";

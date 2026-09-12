@@ -217,39 +217,107 @@ export function SettingsDialog({
     const [editing, setEditing] = React.useState(false);
     const [label, setLabel] = React.useState("");
     const [url, setUrl] = React.useState("");
+    const [key, setKey] = React.useState("");
     const [modelsRaw, setModelsRaw] = React.useState("");
     const [vision, setVision] = React.useState(false);
+    const [thinking, setThinking] = React.useState(false);
     const [err, setErr] = React.useState("");
+    const [probing, setProbing] = React.useState(false);
+    const [probeMsg, setProbeMsg] = React.useState("");
+    /** 探测到的候选模型，供用户勾选 */
+    const [found, setFound] = React.useState<string[]>([]);
+    const [selected, setSelected] = React.useState<Set<string>>(new Set());
 
     function reset() {
       setEditing(false);
       setLabel("");
       setUrl("");
+      setKey("");
       setModelsRaw("");
       setVision(false);
+      setThinking(false);
       setErr("");
+      setProbeMsg("");
+      setFound([]);
+      setSelected(new Set());
+    }
+
+    /** 自动发现：问上游 /models 上有哪些模型 */
+    async function probe() {
+      const base = url.trim().replace(/\/+$/, "");
+      if (!base) return setErr("请先填写 Base URL");
+
+      setProbing(true);
+      setProbeMsg("");
+      setErr("");
+      try {
+        const res = await fetch("/api/probe-models", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ baseUrl: base, apiKey: key.trim() }),
+        });
+        const data = (await res.json()) as {
+          ok?: boolean;
+          models?: string[];
+          total?: number;
+          error?: string;
+        };
+
+        if (data.ok && data.models?.length) {
+          setFound(data.models);
+          // 默认全选：一般中转站也就十几个模型，全勾上最省事
+          setSelected(new Set(data.models));
+          setProbeMsg(`发现 ${data.total ?? data.models.length} 个模型，可取消勾选不需要的`);
+        } else {
+          setFound([]);
+          setProbeMsg(data.error ?? "没探测到模型，请手动填写模型 id");
+        }
+      } catch {
+        setProbeMsg("探测失败，请手动填写模型 id");
+      } finally {
+        setProbing(false);
+      }
+    }
+
+    /** 最终采用的模型列表：勾选优先，其次手填 */
+    function resolveModels(): string[] {
+      if (selected.size > 0) return Array.from(selected);
+      return modelsRaw
+        .split(/[\n,]/)
+        .map((m) => m.trim())
+        .filter(Boolean);
+    }
+
+    function toggleModel(id: string) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
     }
 
     function add() {
       const name = label.trim();
       const base = url.trim().replace(/\/+$/, "");
-      const models = modelsRaw
-        .split(/[\n,]/)
-        .map((m) => m.trim())
-        .filter(Boolean);
+      const models = resolveModels();
 
       if (!name) return setErr("请填写名称");
       if (!base) return setErr("请填写 Base URL");
       if (!/^https?:\/\//i.test(base)) return setErr("Base URL 必须以 http:// 或 https:// 开头");
       if (isBlockedBaseUrl(base)) return setErr("不允许填写内网 / 本机地址");
-      if (models.length === 0) return setErr("至少填写一个模型 id");
+      if (models.length === 0) return setErr("至少选择一个或手填一个模型 id");
 
       const id = `${CUSTOM_PROVIDER_PREFIX}${name.toLowerCase().replace(/[^a-z0-9_-]/g, "") || Date.now()}`;
       if (form.customProviders.some((c) => c.id === id)) return setErr("已存在同名供应商");
 
       setForm((f) => ({
         ...f,
-        customProviders: [...f.customProviders, { id, label: name, baseUrl: base, models, vision }],
+        customProviders: [
+          ...f.customProviders,
+          { id, label: name, baseUrl: base, models, vision, thinking },
+        ],
+        keys: { ...f.keys, [id]: key.trim() },
         // 默认选中第一个模型，省得再手动切
         model: models[0],
       }));
@@ -270,44 +338,129 @@ export function SettingsDialog({
     }
 
     return (
-      <div className="space-y-2 rounded-xl border border-border/70 bg-card/40 p-3">
+      <div className="space-y-2.5 rounded-xl border border-border/70 bg-card/40 p-3">
         <Label className="flex items-center gap-2 text-sm font-medium">
           <Pencil className="h-4 w-4" />
           自定义供应商
         </Label>
-        <Input
-          placeholder="名称，例如：我的中转站"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          autoComplete="off"
-        />
-        <Input
-          placeholder="Base URL，例如：https://api.example.com/v1"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          autoComplete="off"
-        />
+
         <div className="space-y-1">
+          <Label className="text-[11px] text-fg-tertiary">名称</Label>
           <Input
-            placeholder="模型 id，多个用逗号或换行分隔"
+            placeholder="例如：我的中转站"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-fg-tertiary">Base URL</Label>
+          <Input
+            placeholder="例如：https://api.example.com/v1"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-fg-tertiary">
+            API Key（选填，部分服务的 /models 需要）
+          </Label>
+          <Input
+            type="password"
+            placeholder="sk-...（留空也可探测）"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="w-full text-xs"
+          disabled={probing}
+          onClick={() => void probe()}
+        >
+          {probing ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Search className="h-3.5 w-3.5" />
+          )}
+          {probing ? "正在探测…" : "自动发现可用模型"}
+        </Button>
+
+        {probeMsg ? (
+          <p
+            className={`text-[11px] ${
+              found.length > 0 ? "text-primary" : "text-amber-600 dark:text-amber-500"
+            }`}
+          >
+            {probeMsg}
+          </p>
+        ) : null}
+
+        {/* 探测结果：可勾选 */}
+        {found.length > 0 ? (
+          <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border/60 bg-muted/20 p-2">
+            {found.map((m) => (
+              <label
+                key={m}
+                className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-[11px] hover:bg-muted/60"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(m)}
+                  onChange={() => toggleModel(m)}
+                  className="h-3 w-3 rounded border-border"
+                />
+                <span className="truncate font-mono">{m}</span>
+              </label>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="space-y-1">
+          <Label className="text-[11px] text-fg-tertiary">
+            模型 id（自动发现失败时手填，逗号或换行分隔）
+          </Label>
+          <Input
+            placeholder="例如：gpt-5.6-terra"
             value={modelsRaw}
             onChange={(e) => setModelsRaw(e.target.value)}
             autoComplete="off"
           />
           <p className="text-[11px] text-muted-foreground">
-            例如：gpt-4o, claude-3-5-sonnet。填的名字要和上游一致。
+            探测不到也别卡住 —— 直接把上游给你的模型名填进来就行，比如 gpt-5.6-terra。
           </p>
         </div>
-        <label className="flex items-center gap-2 text-xs text-fg-secondary">
-          <input
-            type="checkbox"
-            checked={vision}
-            onChange={(e) => setVision(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-border"
-          />
-          这些模型支持识图（vision）
-        </label>
+
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+          <label className="flex items-center gap-2 text-xs text-fg-secondary">
+            <input
+              type="checkbox"
+              checked={vision}
+              onChange={(e) => setVision(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-border"
+            />
+            支持识图
+          </label>
+          <label className="flex items-center gap-2 text-xs text-fg-secondary">
+            <input
+              type="checkbox"
+              checked={thinking}
+              onChange={(e) => setThinking(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-border"
+            />
+            支持思考模式
+          </label>
+        </div>
+
         {err ? <p className="text-[11px] text-destructive">{err}</p> : null}
+
         <div className="flex gap-2">
           <Button type="button" size="sm" onClick={add}>
             <CheckIcon className="h-4 w-4" />
