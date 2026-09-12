@@ -111,7 +111,12 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       if (rawKeys) {
         try {
           const parsed = JSON.parse(rawKeys) as Record<string, string>;
-          keys = { agnes: parsed.agnes ?? "", deepseek: parsed.deepseek ?? "" };
+          /**
+           * ⚠️ 这里必须保留所有 key，不能只挑 agnes / deepseek。
+           * 之前写死挑这两个字段，导致自定义供应商（custom:xxx）的 Key
+           * 存进去了却读不回来 —— 刷新页面就"凭空消失"。
+           */
+          keys = { agnes: "", deepseek: "", ...parsed };
         } catch {
           /* 忽略 */
         }
