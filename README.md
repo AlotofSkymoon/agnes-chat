@@ -337,6 +337,40 @@ lib/storage/
 
 ---
 
+## 🔐 依赖安全说明（构建日志里的警告要不要管）
+
+`npm install` 时你可能会看到几条黄字，逐个说明：
+
+| 警告 | 严重吗 | 处理 |
+|---|---|---|
+| `@opennextjs/cloudflare@0.4.8: CVE-2025-6087 was fixed in 1.3.0` | ⚠️ 真实漏洞，但**本站不受影响** | 见下方详解 |
+| `deprecated crypto-js / glob / uuid / rollup-plugin-inject` | 无害 | 是依赖的依赖废弃提示，不影响运行 |
+| `allow-scripts: esbuild / sharp / workerd` | 无害 | 已加 `trustedDependencies` 声明 |
+
+### 关于 CVE-2025-6087
+
+这是一个 SSRF 漏洞（CVSS 7.8）：Cloudflare 适配器的 `/_next/image` 端点
+可被用来代理任意远程地址，攻击者能借你的域名托管钓鱼内容。
+
+**为什么本站不受影响：**
+
+1. 漏洞只存在于 **Cloudflare 适配器**，Vercel 部署完全不涉及（**Cloudflare 平台侧也已自动缓解**：限制该端点只返回图片）
+2. 本站**根本没有用 `next/image`**，也不加载任何外部图片（图标全是内联 SVG）
+3. 已在 `next.config.mjs` 设置 `images.remotePatterns: []` + `unoptimized: true`，
+   即官方推荐的白名单缓解方案
+
+**为什么没升级到 1.3.0：**
+
+修复版 1.3.0 起强制要求 `next >= 15.5` 与 `wrangler ^4`，
+本项目停在 **Next 14.2.35**，升级会连带破坏大量代码
+（Next 15 把 `cookies()` / `headers()` 改成异步 API）。
+权衡之下，用配置缓解比强行升 Next 更稳妥。
+
+> 若你之后决定迁移到 Next 15，届时应同步把
+> `@opennextjs/cloudflare` 升到 `^1.3.0`、`wrangler` 升到 `^4`。
+
+---
+
 ## 不实现的功能
 
 Agent、工具调用、联网搜索、代码执行、语音 —— 聊天之外不做多余的事。
