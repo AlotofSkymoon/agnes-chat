@@ -17,6 +17,7 @@ import {
   Server,
   Settings2,
   Shield,
+  TriangleAlert,
   Trash2,
   User as UserIcon,
 } from "lucide-react";
@@ -294,15 +295,57 @@ function SiteSettingsCard() {
   });
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
+  /**
+   * 读取结果的提示。
+   * fatal=true  → 拿不到配置，展示错误态 + 重试
+   * fatal=false → 只是警告（如后端没配存储），表单仍可填
+   */
+  const [loadError, setLoadError] = React.useState<{ msg: string; fatal: boolean } | null>(
+    null,
+  );
 
   const load = React.useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const res = await fetch("/api/admin/settings");
-      const data = (await res.json()) as { settings?: SiteSettings };
+      /**
+       * 必须带超时。之前没有，服务端一旦挂起（Upstash 慢、KV 卡住），
+       * 这张卡片就会永远停在「读取中…」，而其他卡片都正常 ——
+       * 看起来像整个页面坏了，实际只是这一个请求没回来。
+       */
+      const res = await fetch("/api/admin/settings", {
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      // 403 / 500 也带 JSON，尽量读出服务端给的中文原因
+      const data = (await res.json().catch(() => ({}))) as {
+        settings?: SiteSettings;
+        error?: string;
+        storage?: boolean;
+      };
+
+      if (!res.ok) {
+        setLoadError({ msg: data.error ?? `读取失败（HTTP ${res.status}）`, fatal: true });
+        return;
+      }
+
       if (data.settings) setForm(data.settings);
-    } catch {
-      toast.error("读取站点配置失败");
+      // storage:false 表示后端没配存储，配置能读但保存会失败，提前告知
+      if (data.storage === false) {
+        setLoadError({
+          msg: "未配置存储后端，当前显示的是默认值，保存也不会生效",
+          fatal: false,
+        });
+      }
+    } catch (err) {
+      const name = err instanceof Error ? err.name : "";
+      setLoadError({
+        msg:
+          name === "TimeoutError" || name === "AbortError"
+            ? "读取超时（10 秒），请检查服务端存储是否正常"
+            : "读取站点配置失败，请检查网络",
+        fatal: true,
+      });
     } finally {
       setLoading(false);
     }
@@ -319,15 +362,22 @@ function SiteSettingsCard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
+        signal: AbortSignal.timeout(15_000),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        toast.error(data.error ?? "保存失败");
+        // 服务端会给出中文原因（如"需要管理员权限""未配置存储"），优先展示
+        toast.error(data.error ?? `保存失败（HTTP ${res.status}）`);
         return;
       }
       toast.success("站点配置已保存，全站生效");
-    } catch {
-      toast.error("保存失败");
+      // 保存后重新拉一次，确认真的写进去了
+      await load();
+    } catch (err) {
+      const name = err instanceof Error ? err.name : "";
+      toast.error(
+        name === "TimeoutError" || name === "AbortError" ? "保存超时，请重试" : "保存失败",
+      );
     } finally {
       setSaving(false);
     }
@@ -351,9 +401,39 @@ function SiteSettingsCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         {loading ? (
-          <p className="text-sm text-muted-foreground">读取中…</p>
+          /* 骨架屏：保留大致布局，避免内容到达时高度突变 */
+          <div className="space-y-4" aria-busy>
+            <div className="space-y-2">
+              <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+              <div className="h-9 w-full animate-pulse rounded-md bg-muted" />
+            </div>
+            <div className="space-y-2">
+              <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+              <div className="h-9 w-full animate-pulse rounded-md bg-muted" />
+            </div>
+            <div className="h-10 w-full animate-pulse rounded-md bg-muted" />
+          </div>
+        ) : loadError?.fatal ? (
+          /* 出错时给出原因和重试入口，而不是让用户对着空白猜 */
+          <div className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-3">
+            <p className="flex items-start gap-2 text-sm text-destructive">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+              {loadError.msg}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => void load()}>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              重试
+            </Button>
+          </div>
         ) : (
           <>
+            {/* 非致命警告：表单照常可用，只是提前告知保存会失败 */}
+            {loadError ? (
+              <p className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-sm text-amber-700 dark:text-amber-400">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                {loadError.msg}
+              </p>
+            ) : null}
             <div className="space-y-1.5">
               <Label htmlFor="ss-base" className="flex items-center gap-2">
                 <Server className="h-4 w-4" />
