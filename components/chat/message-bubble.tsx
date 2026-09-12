@@ -91,14 +91,14 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
           <>
             <Markdown content={message.content} />
             {isStreaming ? (
-              <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-foreground align-middle" />
+              <span className="ml-0.5 inline-block h-4 w-[2px] animate-caret bg-foreground align-middle" />
             ) : null}
           </>
         ) : (
           <div className="flex items-center gap-1.5 py-2" aria-label="正在生成">
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.3s]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.15s]" />
-            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
+            <span className="h-1.5 w-1.5 animate-dot rounded-full bg-primary [animation-delay:-0.6s]" />
+            <span className="h-1.5 w-1.5 animate-dot rounded-full bg-primary [animation-delay:-0.3s]" />
+            <span className="h-1.5 w-1.5 animate-dot rounded-full bg-primary" />
           </div>
         )}
 

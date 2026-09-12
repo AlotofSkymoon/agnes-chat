@@ -101,19 +101,35 @@ const config: Config = {
           to: { height: "0" },
         },
         "fade-in": {
-          from: { opacity: "0", transform: "translateY(6px)" },
+          from: { opacity: "0", transform: "translateY(10px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
         "gradient-pan": {
           "0%,100%": { backgroundPosition: "0% 50%" },
           "50%": { backgroundPosition: "100% 50%" },
         },
+        /** 打字光标：比 pulse 更从容，像真实光标呼吸 */
+        "caret": {
+          "0%, 45%": { opacity: "1" },
+          "55%, 100%": { opacity: "0.15" },
+        },
+        /** 加载三点：幅度收小、节奏放慢，不再弹跳 */
+        "dot": {
+          "0%, 60%, 100%": { transform: "translateY(0)", opacity: "0.45" },
+          "30%": { transform: "translateY(-4px)", opacity: "1" },
+        },
+      },
+      transitionTimingFunction: {
+        /** 优雅缓出：起步轻快、尾部柔和停靠 */
+        elegant: "cubic-bezier(0.16, 1, 0.3, 1)",
       },
       animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in": "fade-in 0.25s ease-out",
-        "gradient-pan": "gradient-pan 8s ease infinite",
+        "accordion-down": "accordion-down 0.32s cubic-bezier(0.16, 1, 0.3, 1)",
+        "accordion-up": "accordion-up 0.32s cubic-bezier(0.16, 1, 0.3, 1)",
+        "fade-in": "fade-in 0.55s cubic-bezier(0.16, 1, 0.3, 1)",
+        "gradient-pan": "gradient-pan 14s ease-in-out infinite",
+        "caret": "caret 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "dot": "dot 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite",
       },
     },
   },
