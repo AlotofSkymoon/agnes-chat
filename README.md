@@ -337,6 +337,36 @@ lib/storage/
 
 ---
 
+## 🩺 部署自检：/api/health
+
+部署完访问 `https://你的域名/api/health`，会返回一份**不含任何密钥**的诊断：
+
+```jsonc
+{
+  "ok": true,
+  "platform": "cloudflare",        // 或 vercel / local
+  "storage": {
+    "backend": "cloudflare",       // cloudflare(KV+D1) | upstash | none
+    "reachable": true              // 是否真的读写成功，不只是"配置了"
+  },
+  "objectStorage": { "kind": "r2", "siteManaged": true },
+  "problems": []                   // 有内容就按提示逐条修
+}
+```
+
+常见报错对照：
+
+| `problems` 内容 | 原因 | 怎么办 |
+|---|---|---|
+| 未检测到 KV / D1 binding | `wrangler.jsonc` 的 ID 没填对，或 Actions 的 `KV_NAMESPACE_ID` / `D1_DATABASE_ID` 写错 | 核对 Actions Secrets；本地 `npx wrangler kv namespace list` 复查 |
+| 存储读写失败 | D1 表没建 | `npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote` |
+| 未设置 PRESET_AGNES_API_KEY | 密钥没写进 Workers | `npx wrangler secret put PRESET_AGNES_API_KEY` |
+| backend 是 upstash | 部署到了 Vercel 却填了 Redis | 正常，符合预期 |
+
+> 注册第一个账号前先打一发这个接口，能省掉大半排查时间。
+
+---
+
 ## 🔐 依赖安全说明（构建日志里的警告要不要管）
 
 `npm install` 时你可能会看到几条黄字，逐个说明：

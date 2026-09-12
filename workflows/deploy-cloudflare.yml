@@ -95,5 +95,21 @@ jobs:
           put R2_BUCKET           "${{ secrets.R2_BUCKET }}"
           put R2_PUBLIC_BASE_URL  "${{ secrets.R2_PUBLIC_BASE_URL }}"
 
+      - name: 自检（确认 binding 与密钥都生效）
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -e
+          echo "--- 已配置的密钥（只列名称）:"
+          npx wrangler secret list || true
+
       - name: 完成
-        run: echo "部署完成，访问 Cloudflare Dashboard 查看 Workers 域名"
+        run: |
+          echo "=============================================="
+          echo "部署完成！"
+          echo ""
+          echo "下一步：打开你的 Workers 域名，访问 /api/health"
+          echo "  - ok: true        → 一切正常，去注册第一个账号（自动成为管理员）"
+          echo "  - problems 有内容 → 按提示逐条修"
+          echo "=============================================="

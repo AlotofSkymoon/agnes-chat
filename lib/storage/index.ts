@@ -25,24 +25,53 @@ export function setCloudflareEnv(env: CloudflareEnv | null): void {
  * 从全局探测 Cloudflare bindings。
  * 不同运行时注入位置不同，这里按常见位置依次尝试，全部失败返回 null。
  */
+/** 判断某个对象是否像 Cloudflare bindings（含 KV 或 D1） */
+function looksLikeBindings(value: unknown): CloudflareEnv | null {
+  if (!value || typeof value !== "object") return null;
+  const obj = value as Record<string, unknown>;
+  // OpenNext 的 context 形如 { env: {...}, ctx, cf }，先剥一层
+  const inner = (obj.env ?? obj) as Record<string, unknown>;
+  if (!inner || typeof inner !== "object") return null;
+  if (inner.KV || inner.DB) return inner as unknown as CloudflareEnv;
+  return null;
+}
+
 export function probeCloudflareEnv(): CloudflareEnv | null {
   const g = globalThis as unknown as Record<string, unknown>;
-  const candidates: unknown[] = [
+
+  // 1) 先试已知命名（OpenNext 各版本注入位置不统一）
+  const known: unknown[] = [
     g.__env__,
     g.__cloudflare_env__,
     g.__cloudflareContext__,
     g.__cf_env__,
+    g.__NEXT_DATA__,
   ];
-
-  for (const c of candidates) {
-    if (!c || typeof c !== "object") continue;
-    const candidate = c as Record<string, unknown>;
-    // OpenNext 的 context 形如 { env: {...}, ctx, cf }
-    const inner = (candidate.env ?? candidate) as Record<string, unknown>;
-    if (inner && typeof inner === "object" && (inner.KV || inner.DB)) {
-      return inner as CloudflareEnv;
-    }
+  for (const c of known) {
+    const hit = looksLikeBindings(c);
+    if (hit) return hit;
   }
+
+  // 2) 兜底：扫 globalThis 上所有属性，找含 KV / DB 的对象。
+  //    不同版本 OpenNext / workerd 注入的全局名可能变化，
+  //    与其猜名字，不如按"是否含我们要的 binding"来认。
+  //    只扫一层、跳过常见巨型对象，开销可忽略。
+  try {
+    for (const key of Object.getOwnPropertyNames(g)) {
+      if (key === "globalThis" || key === "global" || key === "window" || key === "self") continue;
+      let value: unknown;
+      try {
+        value = (g as Record<string, unknown>)[key];
+      } catch {
+        continue; // 某些 getter 会抛
+      }
+      const hit = looksLikeBindings(value);
+      if (hit) return hit;
+    }
+  } catch {
+    /* 忽略 */
+  }
+
   return null;
 }
 
