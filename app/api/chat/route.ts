@@ -157,22 +157,45 @@ export async function POST(request: Request) {
 
   const upstreamUrl = `${targetBase}/chat/completions`;
 
+  const buildUpstreamRequest = (): RequestInit => ({
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${finalKey}`,
+      Accept: "text/event-stream",
+    },
+    body: JSON.stringify({
+      model,
+      messages: outbound.map((m) => ({ role: m.role, content: m.content })),
+      stream: true,
+    }),
+    signal: request.signal,
+  });
+
+  /** 读取上游建议的等待秒数，没有就给个保守值 */
+  function retryAfterSeconds(res: Response): number {
+    const raw = res.headers.get("retry-after");
+    if (raw) {
+      const n = Number(raw);
+      if (Number.isFinite(n) && n >= 0) return Math.min(10, Math.ceil(n));
+    }
+    return 2;
+  }
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
   let upstream: Response;
   try {
-    upstream = await fetch(upstreamUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${finalKey}`,
-        Accept: "text/event-stream",
-      },
-      body: JSON.stringify({
-        model,
-        messages: outbound.map((m) => ({ role: m.role, content: m.content })),
-        stream: true,
-      }),
-      signal: request.signal,
-    });
+    upstream = await fetch(upstreamUrl, buildUpstreamRequest());
+
+    // 瞬时 429 自动重试一次：免费额度常按「每分钟 N 次」计，
+    // 这一秒超了、下一秒往往就空出来了，重试能救回大部分情况。
+    if (upstream.status === 429) {
+      const wait = retryAfterSeconds(upstream);
+      await upstream.body?.cancel().catch(() => {});
+      await sleep(wait * 1000);
+      upstream = await fetch(upstreamUrl, buildUpstreamRequest());
+    }
   } catch {
     return errorResponse(502, "NETWORK_ERROR", `无法连接 ${target.label} 服务，请检查网络与 Base URL 后重试`);
   }
@@ -186,7 +209,20 @@ export async function POST(request: Request) {
       );
     }
     if (upstream.status === 429) {
-      return errorResponse(429, "RATE_LIMIT", "请求过快，请稍后再试");
+      /**
+       * 重试一次仍然是 429，说明不是偶发。
+       * 这里必须说清楚「是谁限流、等多久」，否则用户只能干等。
+       * 常见原因：免费额度按分钟计数被打满；或多个站点共用同一个 Key 互相抢占。
+       */
+      const wait = retryAfterSeconds(upstream);
+      return NextResponse.json(
+        {
+          error: `${target.label} 提示请求过快（429）。免费额度通常按「每分钟次数」计算，已自动重试一次仍被限流。请等待约 ${wait} 秒后再试。若多个站点共用了同一个 API Key，它们会互相抢占额度，建议各站用各自的 Key。`,
+          code: "RATE_LIMIT",
+          retryAfter: wait,
+        },
+        { status: 429, headers: { "Retry-After": String(wait) } },
+      );
     }
     const text = await upstream.text().catch(() => "");
     console.error("[chat] 上游返回错误", upstream.status);

@@ -306,16 +306,21 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
 
         if (!res.ok || !res.body) {
           let message = "请求失败，请稍后重试";
-          if (res.status === 401) message = "Agnes API Key 无效，请在设置中检查你的 Key";
-          else if (res.status === 429) message = "请求过快，请稍后再试";
-          else if (res.status >= 500) message = "服务暂时不可用，请稍后重试";
-          else {
-            try {
-              const data = (await res.json()) as { error?: string };
-              message = data.error || message;
-            } catch {
-              /* 忽略 */
+          // 优先用服务端给的文案（429 时会带上「等几秒」和排查方向）
+          let fromServer = false;
+          try {
+            const data = (await res.json()) as { error?: string };
+            if (data?.error) {
+              message = data.error;
+              fromServer = true;
             }
+          } catch {
+            /* 非 JSON 响应，走下面的兜底 */
+          }
+          if (!fromServer) {
+            if (res.status === 401) message = "API Key 无效，请在设置中检查你的 Key";
+            else if (res.status === 429) message = "请求过快（429），请稍等几秒后再试";
+            else if (res.status >= 500) message = "服务暂时不可用，请稍后重试";
           }
           patchAssistant({ error: message });
           return;
