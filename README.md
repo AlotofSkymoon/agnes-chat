@@ -160,8 +160,8 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 
 ### 方式三：Vercel（不推荐，但仍可用）
 
-1. [Upstash](https://console.upstash.com/redis) 创建 Redis，复制 **REST URL** 和 **REST TOKEN**
-   （⚠️ 一定是带 `REST` 字样的两个值）
+1. [Upstash](https://console.upstash.com/redis) 创建 Redis —— **注册信息、登录态都存这里**，
+   复制 **REST URL** 和 **REST TOKEN**（⚠️ 一定是带 `REST` 字样的两个值）
 2. Vercel → Add New → Project → Import 本仓库（框架自动识别 Next.js）
 3. 填环境变量：
 
@@ -299,14 +299,45 @@ lib/storage/
 
 ### Vercel（Upstash Redis）数据结构
 
-| Key | 说明 |
-|---|---|
-| `users:count` | 自增计数器 |
-| `user:{userId}` | Hash：用户信息 |
-| `user:email:{email}` | 邮箱 → userId |
-| `session:{sessionId}` | sessionId → userId，TTL 7 天 |
-| `chat:{userId}:{conversationId}` | 云端聊天记录 |
-| `ratelimit:login:{ip}` | 登录限流 |
+**登录信息全部存在 Upstash Redis 里**，站点自身不保存任何账号数据到文件或数据库。
+
+| Key | 类型 | 说明 |
+|---|---|---|
+| `users:count` | String | 自增计数器，判断是否第一位用户（决定管理员） |
+| `user:{userId}` | Hash | 账号主体：`id, email, passwordHash, role, createdAt` |
+| `user:email:{email}` | String | 邮箱 → userId，登录时反查 |
+| `session:{sessionId}` | String | **登录态**：sessionId → userId，TTL 7 天 |
+| `user:sessions:{userId}` | Set | 该用户所有 session，便于整体踢下线 |
+| `chat:{userId}:{conversationId}` | String | 云端聊天记录（需用户开启开关） |
+| `chat:index:{userId}` | Set | 会话索引 |
+| `ratelimit:login:{ip}` | String | 登录限流，1 分钟 10 次 |
+| `ratelimit:upload:{ip}` | String | 上传限流 |
+
+**一次登录发生了什么：**
+
+```
+1. POST /api/auth/login
+2. 用 user:email:{email} 反查 userId
+3. 取 user:{userId} 的 passwordHash，bcrypt.compare 校验
+4. 生成 32 字节随机 sessionId
+5. SET session:{sessionId} = userId，EX 604800（7 天）
+6. SADD user:sessions:{userId} sessionId
+7. 通过 httpOnly Cookie 把 sessionId 下发给浏览器
+```
+
+浏览器只拿到一个**无意义的随机串**，拿不到 userId、更拿不到密码哈希。
+后续每个请求用 `getCurrentUser()` 读 Cookie → 查 `session:{sessionId}` → 查 `user:{userId}`。
+
+> ⚠️ **Upstash token 绝不下发浏览器**，所有读写都在服务端 API Route 内完成。
+> 免费版额度为每天 1 万条命令，个人站足够；超出需升级。
+
+### 登录信息存放在哪（按平台）
+
+| 部署平台 | 账号数据 | 登录态（session） |
+|---|---|---|
+| **Vercel** | Upstash Redis `user:{id}` | Upstash Redis `session:{sid}` |
+| **Cloudflare Workers** | D1 `users` 表 | KV `session:{sid}` |
+| 本地（未配置） | 无 | 无 —— 只能聊天，不能注册登录 |
 
 ---
 
@@ -331,7 +362,11 @@ lib/storage/
 - **密码**：Node/Vercel 用 bcrypt（cost 10）；Workers 用 **PBKDF2-SHA256 210000 次**
   （Web Crypto 原生，比纯 JS bcrypt 快得多，不浪费 CPU 配额）。
   验证时按哈希前缀自动识别算法，**跨平台迁移后老密码仍能登录**。
-- **Session**：32 字节随机数，Cookie `httpOnly + secure + sameSite=lax`，TTL 7 天。
+- **Session**：32 字节随机数，只存服务端（Vercel 在 Upstash Redis、Workers 在 KV），
+  Cookie `httpOnly + secure + sameSite=lax`，TTL 7 天。浏览器拿到的只是随机串。
+- **登录信息去向**：邮箱 + bcrypt/PBKDF2 哈希 + 角色写在服务端存储里，
+  **从不写入日志、不落盘到站点服务器、不下发给任何前端**。
+  普通用户请求 `/api/admin/*` 一律 403。
 - **管理员权限**：服务端 `requireAdmin()` 校验，前端隐藏按钮不算权限控制。
 - **预设 API Key**：只在服务端环境变量，非管理员请求返回 403。
 - **登录失败**统一提示「邮箱或密码错误」，不区分邮箱是否存在。
