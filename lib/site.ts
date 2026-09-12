@@ -75,6 +75,18 @@ export const ALLOW_CUSTOM_BASE_URL =
   process.env.NEXT_PUBLIC_ALLOW_CUSTOM_BASE_URL?.trim() !== "false";
 
 /**
+ * 是否开放联网搜索。
+ *
+ * 默认开放（true）：访客都能用，不需要任何 API Key，
+ * 因为走的是 DuckDuckGo 公开端点。
+ *
+ * 想关掉就设 NEXT_PUBLIC_ALLOW_WEB_SEARCH=false ——
+ * 比如你担心额度、或部署环境不允许出站请求。
+ */
+export const ALLOW_WEB_SEARCH =
+  process.env.NEXT_PUBLIC_ALLOW_WEB_SEARCH?.trim() !== "false";
+
+/**
  * 是否必须登录才能对话。
  *
  * 面向开发者的开关：

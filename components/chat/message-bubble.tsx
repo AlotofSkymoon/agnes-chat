@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   Brain,
   Check,
+  Globe,
   ChevronDown,
   Copy,
   FileDown,
@@ -218,6 +219,30 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
             reasoning={message.reasoning}
             streaming={Boolean(isStreaming) && !message.reasoningDone}
           />
+        ) : null}
+
+        {/* 联网搜索来源 */}
+        {message.sources?.length ? (
+          <div className="mb-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+            <p className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-fg-tertiary">
+              <Globe className="h-3 w-3" />
+              联网搜索来源（{message.sources.length}）
+            </p>
+            <ol className="space-y-0.5">
+              {message.sources.map((src, i) => (
+                <li key={src.url} className="text-[11px] leading-relaxed">
+                  <a
+                    href={src.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-primary hover:underline"
+                  >
+                    [{i + 1}] {src.title || src.url}
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </div>
         ) : null}
         {message.error ? (
           <div className="space-y-3 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3">

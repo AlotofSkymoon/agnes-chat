@@ -6,6 +6,7 @@ import {
   LogIn,
   MessageSquare,
   PanelLeftClose,
+  Pencil,
   Plus,
   Settings2,
   Shield,
@@ -26,6 +27,7 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  onRename: (id: string, title: string) => void;
   onClearAll: () => void;
   onOpenSettings: () => void;
   open: boolean;
@@ -42,6 +44,7 @@ export function Sidebar({
   onSelect,
   onNew,
   onDelete,
+  onRename,
   onClearAll,
   onOpenSettings,
   open,
@@ -50,6 +53,36 @@ export function Sidebar({
   collapsed = false,
   onToggleCollapse,
 }: SidebarProps) {
+  /** 正在重命名的会话 id；null 表示没在编辑 */
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [draft, setDraft] = React.useState("");
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // 进入编辑后自动聚焦并全选，直接打字覆盖最顺手
+  React.useEffect(() => {
+    if (!editingId) return;
+    const t = setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 0);
+    return () => clearTimeout(t);
+  }, [editingId]);
+
+  function startRename(id: string, current: string) {
+    setEditingId(id);
+    setDraft(current === "新对话" ? "" : current);
+  }
+
+  function commitRename() {
+    if (!editingId) return;
+    onRename(editingId, draft);
+    setEditingId(null);
+  }
+
+  function cancelRename() {
+    setEditingId(null);
+  }
+
   return (
     <>
       {/* 移动端遮罩 */}
@@ -135,19 +168,47 @@ export function Sidebar({
                           : "text-[hsl(var(--sidebar-foreground))] hover:bg-muted",
                       )}
                     >
+                      {editingId === c.id ? (
+                        <input
+                          ref={inputRef}
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                          onBlur={commitRename}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              commitRename();
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              cancelRename();
+                            }
+                          }}
+                          placeholder="留空则自动命名"
+                          className="min-w-0 flex-1 rounded border border-primary/40 bg-background px-1.5 py-0.5 text-sm outline-none"
+                        />
+                      ) : (
+                        <button
+                          onClick={() => {
+                            onSelect(c.id);
+                            onClose();
+                          }}
+                          onDoubleClick={() => startRename(c.id, c.title)}
+                          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                          <span className="truncate">{c.title}</span>
+                        </button>
+                      )}
                       <button
-                        onClick={() => {
-                          onSelect(c.id);
-                          onClose();
-                        }}
-                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                        onClick={() => startRename(c.id, c.title)}
+                        className="shrink-0 rounded p-1 opacity-0 transition-opacity hover:bg-background group-hover:opacity-100"
+                        title="重命名对话"
                       >
-                        <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                        <span className="truncate">{c.title}</span>
+                        <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={() => onDelete(c.id)}
-                        className="shrink-0 rounded p-1 opacity-0 transition-opacity hover:bg-background group-hover:opacity-100"
+                        className="shrink-0 rounded p-1 opacity-0 transition-opacity hover:bg-background hover:text-destructive group-hover:opacity-100"
                         title="删除对话"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

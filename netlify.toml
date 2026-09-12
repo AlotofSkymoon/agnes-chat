@@ -1,0 +1,29 @@
+# Netlify 部署配置
+#
+# 用法（最省事的一条路）：
+#   1. 在 GitHub 仓库页下载 main.zip 并解压
+#   2. 打开 https://app.netlify.com/drop
+#   3. 把解压出来的整个文件夹拖进去
+#   4. 部署完成后去 Site configuration → Environment variables 填环境变量
+#   5. 手动触发一次重新部署（改环境变量后必须重新部署才生效）
+#
+# 说明：Next.js 在 Netlify 上需要官方插件做 SSR / API 路由适配，
+# 所以这里声明了 @netlify/plugin-nextjs —— 它已在 devDependencies 里。
+
+[build]
+  command = "npm run build"
+  # 插件会处理产物位置，但 Netlify 要求 publish 目录必须存在
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Node 版本：Next 14 需要 18+
+[build.environment]
+  NODE_VERSION = "20"
+
+# 单页应用的兜底重写，交给插件处理即可，这里只保留静态资源缓存头
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

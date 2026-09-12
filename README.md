@@ -23,8 +23,16 @@
 默认品牌是 **Agnes AI**（`apihub.agnes-ai.com/v1`），
 改环境变量就能换成任意 OpenAI 兼容服务 —— DeepSeek、Kimi、智谱、自建 One API / New API 都行。
 
-**功能范围**：纯文本聊天 + 图片/视频识别（需 vision 模型）+ 多对话管理 + 用户系统 + 导航站。
-不做 Agent、工具调用、联网搜索、代码执行。
+**功能范围**：
+
+- 纯文本聊天 + 图片/视频识别（需 vision 模型）
+- **多对话管理**：可新建、切换、删除，也能**手动重命名**（双击侧边栏条目或点铅笔图标）
+- **思考模式**：支持思考的模型会先输出推理过程，再给答案（可折叠）
+- **联网搜索**：输入框「联网」开关，先搜再答并在回答下方列出来源
+- 用户系统（注册/登录/管理员面板）+ 导航站
+- 文件上传（需先配置对象存储，见下）
+
+不做 Agent、工具调用、代码执行。
 
 ---
 
@@ -46,17 +54,20 @@
 
 ## 🚀 部署（不会代码也能做）
 
-两种方式二选一。存储与对象存储后端会**按部署平台自动识别**：
-在 Cloudflare 上走 KV + D1 + R2，在 Vercel 上走 Upstash + B2。
+存储与对象存储后端会**按部署平台自动识别**：
+在 Cloudflare 上走 KV + D1 + R2，在 Vercel / Netlify 上走 Upstash + B2。
 
-| | ⭐ Cloudflare Workers（推荐） | Vercel（不推荐） |
-|---|---|---|
-| 数据库 | KV + D1，**自带免费额度，不用额外注册** | 需另注册 Upstash Redis |
-| 对象存储 | R2，**零出站流量费**（图片视频外链不花钱） | 只能 Backblaze B2，S3 兼容层不完整 |
-| 费用 | 免费额度充裕 | 免费额度较紧，流量超额即计费 |
-| 部署 | GitHub Actions 推送即部署 | 同样支持，但不推荐 |
+| | ⭐ Cloudflare Workers（推荐） | Netlify（拖 ZIP） | Vercel（不推荐） |
+|---|---|---|---|
+| 数据库 | KV + D1，**自带免费额度，不用额外注册** | 需另注册 Upstash Redis | 需另注册 Upstash Redis |
+| 对象存储 | R2，**零出站流量费**（图片视频外链不花钱） | 只能 Backblaze B2 | 只能 Backblaze B2 |
+| 上手难度 | 中（要配三件套） | **低**（拖文件夹即可） | 低 |
+| 连 Git 仓库 | 需要 | 可选（拖 zip 则无需） | 需要 |
+| 费用 | 免费额度充裕 | 免费额度够用 | 免费额度较紧 |
 
-> Vercel 仍能正常部署，只是要额外配 Redis，且对象存储只能用 B2。
+> 想最省事：**Netlify 拖 ZIP**。
+> 想长期稳定、额度大：**Cloudflare Workers**。
+> Vercel 也能跑，只是要额外配 Redis，且对象存储只能用 B2。
 
 ---
 
@@ -179,6 +190,37 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 
 ---
 
+### 方式四：Netlify（拖 ZIP，最省事）
+
+和 Vercel 一样走 Node.js 运行时 + Upstash Redis，但**不用连 Git 仓库**，
+把源码拖上去就行。
+
+1. 准备 Upstash Redis（同方式三第 1 步）
+2. 在 GitHub 仓库页下载源码：`Code` → `Download ZIP`，解压得到文件夹
+3. 打开 https://app.netlify.com/drop ，**把整个文件夹拖进去**
+4. 部署完成后：Site configuration → **Environment variables**，填：
+
+| Key | Value |
+|---|---|
+| `UPSTASH_REDIS_REST_URL` | Upstash REST URL |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash REST TOKEN |
+| `SESSION_SECRET` | 任意长随机串 |
+| `PRESET_AGNES_API_KEY` | 站点内置 Key |
+
+5. **再触发一次部署**（改环境变量后必须重新构建才生效）：
+   Deploys → `Trigger deploy` → `Deploy site`
+
+> Netlify 上不填 `R2_*` / `CLOUDFLARE_*`，不会被读取。
+> 需要对象存储就用 `B2_*` 那组（Backblaze B2）。
+>
+> 首次部署可能会失败一次并显示「No Cache Detected」——
+> 那是 Next.js 提示没配构建缓存，不影响成败，忽略即可。
+
+> ⚠️ 拖拽部署不会随仓库更新自动同步。
+> 想持续更新，改成在 Netlify 里 `Import from Git` 连仓库即可。
+
+---
+
 ## 🎨 换成你自己的品牌（中转站必看）
 
 默认整套品牌是 **Agnes AI**。想挂上你自己的中转服务，改环境变量即可，**不用动代码**。
@@ -207,6 +249,7 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 | `UPSTREAM_MODEL` | `agnes-3.0-flash` | 默认模型 |
 | `NEXT_PUBLIC_ALLOW_CUSTOM_KEY` | `true` | 设 `false` 锁死：访客只能用站长的 Key |
 | `NEXT_PUBLIC_REQUIRE_LOGIN` | `false` | 设 `true` 则必须登录才能对话 |
+| `NEXT_PUBLIC_ALLOW_WEB_SEARCH` | `true` | 设 `false` 关闭联网搜索功能 |
 | `JWT_SECRET` | 无 | D1 初始化接口的签名密钥，界面部署时用它生成建表令牌 |
 | `CLOUDFLARE_API_TOKEN` | 无 | 选填，配了就能自动寻找 R2 桶（`agnes-chat` / `agnes-chat-r2`） |
 | `NEXT_PUBLIC_ALLOW_CUSTOM_BASE_URL` | `true` | 设 `false` 锁死 Base URL |
@@ -462,5 +505,8 @@ lib/storage/
 
 ## 不实现的功能
 
-Agent、工具调用、联网搜索、代码执行、语音 —— 聊天之外不做多余的事。
+Agent、工具调用、代码执行、语音 —— 聊天之外不做多余的事。
 需要 Agent 功能请去 **AgentScope** 添加 Agnes API Key。
+
+> 联网搜索是唯一例外：它只是"检索结果拼进上下文"，
+> 不涉及工具调用循环，所以做进来了。

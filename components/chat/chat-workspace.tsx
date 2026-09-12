@@ -17,7 +17,7 @@ import { ChatInput } from "@/components/chat/chat-input";
 import { EmptyState } from "@/components/chat/empty-state";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { SettingsDialog, type ChatSettings } from "@/components/chat/settings-dialog";
-import { REQUIRE_LOGIN } from "@/lib/site";
+import { ALLOW_WEB_SEARCH, REQUIRE_LOGIN } from "@/lib/site";
 import { Sidebar } from "@/components/chat/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -75,6 +75,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     newConversation,
     selectConversation,
     deleteConversation,
+    renameConversation,
     clearAllConversations,
     ensureConversation,
   } = useConversations();
@@ -171,6 +172,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         thinking: localStorage.getItem(LS_KEYS.thinking) === "true",
       };
       setSettings(saved);
+      setWebSearch(localStorage.getItem(LS_KEYS.webSearch) === "true");
       setCloudSync(localStorage.getItem(LS_KEYS.cloudSync) === "true");
       setSidebarCollapsed(localStorage.getItem(LS_KEYS.sidebarCollapsed) === "1");
     } catch {
@@ -178,6 +180,24 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     }
     setMounted(true);
   }, []);
+
+  // 探测对象存储：站点托管 或 用户自己配置了 都算就绪
+  React.useEffect(() => {
+    let alive = true;
+    fetch("/api/upload/config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { siteManaged?: boolean } | null) => {
+        if (!alive) return;
+        setStorageReady(Boolean(d?.siteManaged) || Boolean(settings.s3?.enabled));
+      })
+      .catch(() => {
+        /* 探测失败就按本地配置判断 */
+        if (alive) setStorageReady(Boolean(settings.s3?.enabled));
+      });
+    return () => {
+      alive = false;
+    };
+  }, [settings.s3?.enabled]);
 
   React.useEffect(() => {
     if (!mounted) return;
@@ -271,12 +291,92 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
           };
         });
 
+      /**
+       * 联网搜索：开启时先搜一次，把结果作为上下文拼进最后一条用户消息。
+       *
+       * 搜不到不阻断 —— 提示一句后照常让模型用自己的知识回答，
+       * 免得整句话卡在搜索上。
+       */
+      let searchNote = "";
+      let searchSources: { title: string; url: string }[] = [];
+      if (webSearchRef.current) {
+        try {
+          const lastUser = [...outboundMessages]
+            .reverse()
+            .find((m) => m.role === "user");
+          const queryText =
+            typeof lastUser?.content === "string"
+              ? lastUser.content
+              : Array.isArray(lastUser?.content)
+                ? lastUser.content
+                    .map((c) => (c as { text?: string }).text ?? "")
+                    .join(" ")
+                : "";
+          const q = queryText.trim().slice(0, 200);
+
+          if (q) {
+            const sr = await fetch("/api/web-search", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query: q, limit: 5 }),
+              signal: abortRef.current?.signal,
+            });
+            const sd = (await sr.json()) as {
+              ok?: boolean;
+              context?: string;
+              error?: string;
+              results?: { title: string; url: string }[];
+            };
+            if (sd.ok && sd.context) {
+              searchNote = sd.context;
+              searchSources = sd.results ?? [];
+              // 来源先挂上，这样即使后面流式失败也能看到引用
+              if (searchSources.length) patchAssistant({ sources: searchSources });
+            } else if (sd.error) {
+              toast.info(`联网搜索未成功：${sd.error}。将按常规方式回答。`);
+            }
+          }
+        } catch (err) {
+          if ((err as Error)?.name !== "AbortError") {
+            toast.info("联网搜索失败，将按常规方式回答。");
+          }
+        }
+      }
+
+      /** 把搜索上下文附到最后一条用户消息上 */
+      const finalMessages = searchNote
+        ? outboundMessages.map((m, idx) => {
+            const isLastUser =
+              m.role === "user" &&
+              idx ===
+                outboundMessages.reduce(
+                  (acc, mm, i) => (mm.role === "user" ? i : acc),
+                  -1,
+                );
+            if (!isLastUser) return m;
+
+            if (typeof m.content === "string") {
+              return { ...m, content: `${m.content}\n\n${searchNote}` };
+            }
+            if (Array.isArray(m.content)) {
+              return {
+                ...m,
+                content: [
+                  ...m.content,
+                  { type: "text" as const, text: searchNote },
+                ],
+              };
+            }
+            return m;
+          })
+        : outboundMessages;
+
       // ---- 发送前体积预检 ----
       // Vercel Serverless 请求体硬上限 4.5MB，超出会在平台层直接被拒，
       // 连我们的接口都到不了。这里提前拦下并给出可操作的提示，
       // 比发出去收到一句「单条消息过大」有用得多。
       const bodyObj = {
-        messages: outboundMessages,
+        messages: finalMessages,
         model: settings.model,
         keys: settings.keys,
         baseUrls: settings.baseUrls,
@@ -507,6 +607,20 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     thinkingRef.current = settings.thinking === true;
   }, [settings.thinking]);
 
+  /**
+   * 对象存储是否已就绪。
+   * 未配置时隐藏上传入口 —— 否则用户传了文件才发现发不出去，体验很差。
+   */
+  const [storageReady, setStorageReady] = React.useState(false);
+
+  /** 联网搜索开关（同样用 ref，理由同上：避免重建 useCallback） */
+  const webSearchRef = React.useRef(false);
+  const [webSearch, setWebSearch] = React.useState(false);
+
+  React.useEffect(() => {
+    webSearchRef.current = webSearch;
+  }, [webSearch]);
+
   /** 当前部署平台，用于发送前的请求体体积预检（Vercel 上限比 Workers 小得多） */
   const platformRef = React.useRef<"cloudflare" | "vercel" | "local">("local");
   React.useEffect(() => {
@@ -674,12 +788,17 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
   }, []);
 
   /* 真实 HTML5 拖拽：只在整页范围内生效，用深度计数避免子元素抖动 */
-  const onDragEnter = React.useCallback((e: React.DragEvent) => {
-    if (!Array.from(e.dataTransfer.types).includes("Files")) return;
-    e.preventDefault();
-    dragDepth.current += 1;
-    setDragging(true);
-  }, []);
+  const onDragEnter = React.useCallback(
+    (e: React.DragEvent) => {
+      // 对象存储没配好时不接管拖拽，免得给了提示却又收不下文件
+      if (!storageReady) return;
+      if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+      e.preventDefault();
+      dragDepth.current += 1;
+      setDragging(true);
+    },
+    [storageReady],
+  );
 
   const onDragOver = React.useCallback((e: React.DragEvent) => {
     if (!Array.from(e.dataTransfer.types).includes("Files")) return;
@@ -695,13 +814,14 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
 
   const onDrop = React.useCallback(
     (e: React.DragEvent) => {
+      if (!storageReady) return;
       e.preventDefault();
       dragDepth.current = 0;
       setDragging(false);
       const files = e.dataTransfer?.files;
       if (files?.length) void addFiles(files);
     },
-    [addFiles],
+    [addFiles, storageReady],
   );
 
   /** 在输入框里直接切模型 */
@@ -729,6 +849,17 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       }
       return next;
     });
+  }
+
+  /** 切换联网搜索（输入框里的快捷开关） */
+  function toggleWebSearch(on: boolean) {
+    setWebSearch(on);
+    webSearchRef.current = on;
+    try {
+      localStorage.setItem(LS_KEYS.webSearch, on ? "true" : "false");
+    } catch {
+      /* 忽略 */
+    }
   }
 
   function saveSettings(next: ChatSettings) {
@@ -765,6 +896,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         onSelect={selectConversation}
         onNew={handleNew}
         onDelete={deleteConversation}
+        onRename={renameConversation}
         onClearAll={clearAllData}
         onOpenSettings={() => setSettingsOpen(true)}
         open={sidebarOpen}
@@ -868,11 +1000,14 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   customProviders={settings.customProviders}
                   placeholder="给 Agnes 发送消息，可拖拽文件到此处"
                   attachments={attachments}
-                  onPickFiles={addFiles}
+                  onPickFiles={storageReady ? addFiles : undefined}
                   onRemoveAttachment={removeAttachment}
                   thinkingSupported={supportsThinking(mounted ? settings.model : DEFAULT_MODEL)}
                   thinking={settings.thinking === true}
                   onThinkingChange={toggleThinking}
+                  webSearchSupported={ALLOW_WEB_SEARCH}
+                  webSearch={webSearch}
+                  onWebSearchChange={toggleWebSearch}
                 />
                 <p className="mt-3 text-center text-xs text-fg-quaternary">
                   内容由 AI 生成，仅供参考 · 仅聊天，无 Agent / 联网 / 文件上传
@@ -891,11 +1026,14 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   customProviders={settings.customProviders}
                   placeholder="给 Agnes 发送消息，可拖拽文件到此处"
                   attachments={attachments}
-                  onPickFiles={addFiles}
+                  onPickFiles={storageReady ? addFiles : undefined}
                   onRemoveAttachment={removeAttachment}
                   thinkingSupported={supportsThinking(mounted ? settings.model : DEFAULT_MODEL)}
                   thinking={settings.thinking === true}
                   onThinkingChange={toggleThinking}
+                  webSearchSupported={ALLOW_WEB_SEARCH}
+                  webSearch={webSearch}
+                  onWebSearchChange={toggleWebSearch}
                 />
                 <p className="mt-2 text-center text-xs text-fg-quaternary">
                   内容由 AI 生成，仅供参考

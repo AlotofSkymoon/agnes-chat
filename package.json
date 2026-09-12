@@ -12,7 +12,7 @@
     "cf:dev": "opennextjs-cloudflare && wrangler dev",
     "cf:deploy": "opennextjs-cloudflare && wrangler deploy",
     "cf:d1:init": "wrangler d1 execute agnes-chat-db --file=./schema.sql --remote",
-  "cf:d1:token": "node scripts/gen-d1-token.mjs",
+    "cf:d1:token": "node scripts/gen-d1-token.mjs",
     "cf:secret": "wrangler secret bulk .dev.vars"
   },
   "dependencies": {
@@ -39,6 +39,9 @@
     "tailwindcss-animate": "1.0.7"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250901.0",
+    "@netlify/plugin-nextjs": "^5.0.0",
+    "@opennextjs/cloudflare": "^0.4.4",
     "@types/bcryptjs": "2.4.6",
     "@types/node": "20.16.11",
     "@types/react": "18.3.11",
@@ -47,9 +50,7 @@
     "postcss": "8.4.47",
     "tailwindcss": "3.4.14",
     "typescript": "5.6.3",
-    "@opennextjs/cloudflare": "^0.4.4",
-    "wrangler": "^3.80.0",
-    "@cloudflare/workers-types": "^4.20250901.0"
+    "wrangler": "^3.80.0"
   },
   "trustedDependencies": [
     "esbuild",

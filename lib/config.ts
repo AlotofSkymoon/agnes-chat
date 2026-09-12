@@ -362,4 +362,6 @@ export const LS_KEYS = {
   s3: "agnes:s3",
   /** 思考模式开关 */
   thinking: "agnes:thinking",
+  /** 联网搜索开关 */
+  webSearch: "agnes:webSearch",
 } as const;

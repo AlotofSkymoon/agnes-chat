@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   ArrowUp,
   Brain,
+  Globe,
   FileText,
   FileVideo,
   Paperclip,
@@ -37,6 +38,11 @@ interface ChatInputProps {
   thinkingSupported?: boolean;
   thinking?: boolean;
   onThinkingChange?: (on: boolean) => void;
+  /* ---- 联网搜索 ---- */
+  /** 站点是否开放联网搜索（站长可关） */
+  webSearchSupported?: boolean;
+  webSearch?: boolean;
+  onWebSearchChange?: (on: boolean) => void;
 }
 
 export function ChatInput({
@@ -56,6 +62,9 @@ export function ChatInput({
   thinkingSupported = false,
   thinking = false,
   onThinkingChange,
+  webSearchSupported = false,
+  webSearch = false,
+  onWebSearchChange,
 }: ChatInputProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
@@ -176,6 +185,26 @@ export function ChatInput({
             >
               <Brain className="h-3.5 w-3.5" />
               思考
+            </button>
+          ) : null}
+          {webSearchSupported && onWebSearchChange ? (
+            <button
+              type="button"
+              onClick={() => onWebSearchChange(!webSearch)}
+              title={
+                webSearch
+                  ? "联网已开启：会先搜索再作答，回答会标注来源"
+                  : "开启联网：先搜再答，回答会标注来源"
+              }
+              aria-pressed={webSearch}
+              className={
+                webSearch
+                  ? "flex h-7 shrink-0 items-center gap-1 rounded-full border border-primary/40 bg-primary/12 px-2.5 text-[11px] font-medium text-primary transition-colors"
+                  : "flex h-7 shrink-0 items-center gap-1 rounded-full border border-border px-2.5 text-[11px] text-fg-tertiary transition-colors hover:bg-muted hover:text-foreground"
+              }
+            >
+              <Globe className="h-3.5 w-3.5" />
+              联网
             </button>
           ) : null}
           {onPickFiles ? (

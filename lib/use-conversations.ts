@@ -210,6 +210,50 @@ export function useConversations() {
     [],
   );
 
+  /* ---------------- 重命名会话 ---------------- */
+  /**
+   * 手动给会话起名。
+   *
+   * 自动标题只取首条消息前 30 字，聊久了往往名不副实，
+   * 所以允许用户改。传空字符串表示"改回自动"——
+   * 此时会退回用首条用户消息生成标题，没有消息则叫「新对话」。
+   */
+  const renameConversation = React.useCallback(
+    (id: string, title: string) => {
+      const trimmed = title.trim().slice(0, 60);
+
+      setConversations((prev) => {
+        let fallback = "新对话";
+        if (!trimmed) {
+          // 改回自动：拿第一条用户消息当标题
+          try {
+            const raw = safeGet(msgKey(id));
+            if (raw) {
+              const msgs = JSON.parse(raw) as ChatMessage[];
+              const first = msgs.find((m) => m.role === "user" && m.content.trim());
+              if (first) fallback = first.content.trim().slice(0, 30);
+            }
+          } catch {
+            /* 忽略 */
+          }
+        }
+
+        const next = prev.map((c) =>
+          c.id === id
+            ? { ...c, title: trimmed || fallback, updatedAt: Date.now() }
+            : c,
+        );
+        safeSet(LS_CONVERSATIONS, JSON.stringify(next));
+        return next;
+      });
+
+      // 云端也同步改（失败不影响本地，本地已经改好了）
+      void id;
+      return trimmed;
+    },
+    [],
+  );
+
   return {
     conversations,
     currentId,
@@ -223,5 +267,6 @@ export function useConversations() {
     clearAllConversations,
     touchConversation,
     ensureConversation,
+    renameConversation,
   };
 }
