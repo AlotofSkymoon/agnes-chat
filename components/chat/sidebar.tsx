@@ -97,7 +97,7 @@ export function Sidebar({
       {/* 外层控制宽度（可收起），内层保持固定 260px，收起时内容被裁切而非挤压变形 */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 shrink-0 overflow-hidden border-r border-border bg-[hsl(var(--sidebar))] transition-[width,transform] duration-[420ms] ease-elegant md:relative md:w-[260px] md:translate-x-0",
+          "liquid-glass fixed inset-y-0 left-0 z-50 shrink-0 overflow-hidden border-r border-[hsl(var(--lg-edge)/var(--lg-edge-a))] transition-[width,transform] duration-[420ms] ease-elegant md:relative md:w-[260px] md:translate-x-0",
           open ? "w-[260px] translate-x-0" : "w-0 -translate-x-full",
           collapsed && "md:w-0 md:border-r-0",
         )}
@@ -161,11 +161,12 @@ export function Sidebar({
                   {conversations.map((c) => (
                     <div
                       key={c.id}
+                      data-active={c.id === currentId}
                       className={cn(
-                        "group flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors",
+                        "liquid-item group flex items-center gap-2 px-2.5 py-2 text-sm",
                         c.id === currentId
-                          ? "bg-primary/10 text-primary"
-                          : "text-[hsl(var(--sidebar-foreground))] hover:bg-muted",
+                          ? "text-primary"
+                          : "text-[hsl(var(--sidebar-foreground))]",
                       )}
                     >
                       {editingId === c.id ? (
@@ -224,7 +225,7 @@ export function Sidebar({
           <div className="space-y-0.5 border-t border-border px-3 py-2">
             <button
               onClick={onOpenSettings}
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))] transition-colors hover:bg-muted"
+              className="liquid-item flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]"
             >
               <Settings2 className="h-4 w-4" />
               设置
@@ -234,7 +235,7 @@ export function Sidebar({
                 {user.role === "admin" ? (
                   <Link
                     href="/admin"
-                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))] transition-colors hover:bg-muted"
+                    className="liquid-item flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]"
                   >
                     <Shield className="h-4 w-4" />
                     管理员面板
@@ -242,7 +243,7 @@ export function Sidebar({
                 ) : null}
                 <Link
                   href="/account"
-                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))] transition-colors hover:bg-muted"
+                  className="liquid-item flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]"
                 >
                   <UserIcon className="h-4 w-4" />
                   <span className="truncate">{user.email}</span>
@@ -251,7 +252,7 @@ export function Sidebar({
             ) : (
               <Link
                 href="/login"
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))] transition-colors hover:bg-muted"
+                className="liquid-item flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]"
               >
                 <LogIn className="h-4 w-4" />
                 登录 / 注册

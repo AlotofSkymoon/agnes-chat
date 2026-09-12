@@ -105,7 +105,32 @@
        ========================================================================== */
     --radius-ios: 1.125rem;   /* 18px  控件：按钮、输入框 */
     --radius-ios-lg: 1.5rem;  /* 24px  卡片：消息气泡、设置块 */
-    --radius-ios-xl: 2rem;    /* 32px  大容器：弹窗、面板 */
+    --radius-ios-xl: 2.25rem; /* 36px  大容器：弹窗、面板 */
+
+    /* ==========================================================================
+       Liquid Glass（iPadOS / iOS 26 视觉语言）
+
+       不是"半透明+模糊"就够了，真实观感来自四层叠加：
+         1. 底部渐变：玻璃本身有厚薄，左上受光、右下略暗
+         2. 镜面高光（specular）：上沿一道亮弧，是玻璃的辨识特征
+         3. 折射描边：1px 亮边勾出轮廓，模拟光线在边缘弯折
+         4. 外部投影：柔和扩散，让元素"浮"在内容之上
+       下面 --lg-* 系列就是这四层的可调参数。
+       ========================================================================== */
+    --lg-blur: 30px;
+    --lg-saturate: 190%;
+    /* 玻璃底色：浅色模式偏白，深色模式偏灰 */
+    --lg-tint: 0 0% 100%;
+    --lg-tint-a1: 0.58;   /* 受光面不透明度 */
+    --lg-tint-a2: 0.34;   /* 背光面不透明度 */
+    /* 折射描边 */
+    --lg-edge: 0 0% 100%;
+    --lg-edge-a: 0.55;
+    /* 镜面高光 */
+    --lg-spec: 0 0% 100%;
+    --lg-spec-a: 0.70;
+    /* 底边暗线，模拟玻璃厚度 */
+    --lg-thick-a: 0.06;
 
     /* 侧边栏 */
     --sidebar: 228 33% 98%;
@@ -199,6 +224,14 @@
     --background: 0 0% 11%;
     --card: 0 0% 14%;
     --popover: 0 0% 15%;
+
+    /* 深色模式玻璃：底色转灰、高光减弱，否则会像一块发白的塑料 */
+    --lg-tint: 220 10% 26%;
+    --lg-tint-a1: 0.50;
+    --lg-tint-a2: 0.28;
+    --lg-edge-a: 0.20;
+    --lg-spec-a: 0.16;
+    --lg-thick-a: 0.16;
 
     /* ---- 文字层级（深色）：避免纯白，降低眩光 ---- */
     /* 一级：正文/标题   ≈ #E8EAED，对 #1C1C1C 底 14.6:1 */
@@ -359,6 +392,131 @@
     transition:
       background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1),
       transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* ==========================================================================
+     Liquid Glass 基础材质
+     ========================================================================== */
+  .liquid-glass {
+    position: relative;
+    /* 1) 底部渐变：左上受光、右下略暗，玻璃才有厚度感 */
+    background-image: linear-gradient(
+      145deg,
+      hsl(var(--lg-tint) / var(--lg-tint-a1)) 0%,
+      hsl(var(--lg-tint) / var(--lg-tint-a2)) 100%
+    );
+    -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+    backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
+    /* 3) 折射描边 */
+    border: 1px solid hsl(var(--lg-edge) / var(--lg-edge-a));
+    /* 4) 外部投影 + 底边暗线 */
+    box-shadow:
+      inset 0 -1px 0 0 hsl(0 0% 0% / var(--lg-thick-a)),
+      0 10px 34px -10px hsl(230 30% 10% / 0.22),
+      0 2px 8px -3px hsl(230 30% 10% / 0.12);
+    transition:
+      background-image 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /**
+   * 2) 镜面高光：上沿一道亮弧。
+   * 用伪元素而非 box-shadow，因为需要"弧形"而不只是直线，
+   * 这是玻璃和"半透明圆角矩形"的分界线。
+   */
+  .liquid-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      hsl(var(--lg-spec) / var(--lg-spec-a)) 0%,
+      hsl(var(--lg-spec) / 0) 42%
+    );
+    /* 顶部收窄成弧：中间厚、两侧薄 */
+    -webkit-mask-image: radial-gradient(
+      130% 100% at 50% 0%,
+      #000 0%,
+      #000 42%,
+      transparent 78%
+    );
+    mask-image: radial-gradient(130% 100% at 50% 0%, #000 0%, #000 42%, transparent 78%);
+  }
+
+  .liquid-glass:hover {
+    box-shadow:
+      inset 0 -1px 0 0 hsl(0 0% 0% / calc(var(--lg-thick-a) * 1.2)),
+      0 14px 40px -12px hsl(230 30% 10% / 0.26),
+      0 2px 8px -3px hsl(230 30% 10% / 0.14);
+  }
+
+  /* 浮动的顶部/底部栏：不贴边，四角大圆，像 iPadOS 的悬浮工具栏 */
+  .liquid-bar {
+    border-radius: var(--radius-ios-lg);
+  }
+
+  /* 大容器（弹窗、面板） */
+  .liquid-panel {
+    border-radius: var(--radius-ios-xl);
+  }
+
+  /**
+   * 侧边栏条目。
+   * iPadOS 26 设置里选中项是"实心填充 + 圆角"，不是一条细高亮，
+   * 这里保持一致；hover 只给很淡的底色。
+   */
+  .liquid-item {
+    border-radius: 14px;
+    transition:
+      background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+      color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .liquid-item:hover {
+    background-color: hsl(var(--foreground) / 0.06);
+  }
+  .liquid-item[data-active="true"] {
+    background-color: hsl(var(--primary) / 0.16);
+    color: hsl(var(--primary));
+    font-weight: 500;
+  }
+
+  /* 圆形玻璃图标按钮：iPadOS 的工具栏按钮 */
+  .liquid-icon-btn {
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-image: linear-gradient(
+      145deg,
+      hsl(var(--lg-tint) / calc(var(--lg-tint-a1) * 0.75)),
+      hsl(var(--lg-tint) / calc(var(--lg-tint-a2) * 0.75))
+    );
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    backdrop-filter: blur(18px) saturate(180%);
+    border: 1px solid hsl(var(--lg-edge) / calc(var(--lg-edge-a) * 0.8));
+    box-shadow:
+      inset 0 1px 0 0 hsl(var(--lg-spec) / calc(var(--lg-spec-a) * 0.6)),
+      0 2px 8px -2px hsl(230 30% 10% / 0.16);
+    transition:
+      transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+      background-image 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .liquid-icon-btn:hover {
+    transform: scale(1.06);
+  }
+  .liquid-icon-btn:active {
+    transform: scale(0.94);
+  }
+
+  /* iOS 26 大标题：设置页那种超大号粗体 */
+  .ios-large-title {
+    font-size: clamp(1.75rem, 4.5vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
   }
 
   /* 尊重系统的"减少动态效果"设置 */

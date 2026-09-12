@@ -23,7 +23,7 @@ export function EmptyState({ onPick }: { onPick: (text: string) => void }) {
             draggable={false}
           />
         </span>
-        <h1 className="text-[26px] font-semibold tracking-tight sm:text-[30px]">
+        <h1 className="ios-large-title">
           我是 Agnes，很高兴见到你！
         </h1>
         <p className="mt-2.5 text-[15px] text-fg-secondary">有什么可以帮到你？</p>

@@ -320,7 +320,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
             const sr = await fetch("/api/web-search", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ query: q, limit: 5 }),
+              body: JSON.stringify({ query: q, limit: 30 }),
               signal: abortRef.current?.signal,
             });
             const sd = (await sr.json()) as {
@@ -946,7 +946,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       {/* 主区域 */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* 顶栏：常驻显示，液态玻璃 */}
-        <header className="glass-bar sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between px-3">
+        <header className="liquid-glass liquid-bar sticky top-0 z-30 mx-2 mt-2 flex h-14 shrink-0 items-center justify-between px-3">
           <div className="flex min-w-0 items-center gap-2">
             <Button
               variant="ghost"

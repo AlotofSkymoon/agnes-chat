@@ -99,8 +99,8 @@ export function ChatInput({
     <div
       className={
         isHero
-          ? "w-full rounded-2xl border border-border bg-card px-4 pb-3 pt-3.5 shadow-sm transition-colors focus-within:border-primary/60"
-          : "w-full rounded-2xl border border-border bg-card px-3 pb-2.5 pt-3 shadow-sm transition-colors focus-within:border-primary/60"
+          ? "liquid-glass w-full !rounded-[28px] px-4 pb-3 pt-3.5 focus-within:!border-[hsl(var(--primary)/0.5)]"
+          : "liquid-glass w-full !rounded-[26px] px-3 pb-2.5 pt-3 focus-within:!border-[hsl(var(--primary)/0.5)]"
       }
     >
       {/* 附件预览 */}

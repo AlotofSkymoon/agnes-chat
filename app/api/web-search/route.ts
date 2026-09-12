@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { formatSearchContext, webSearch } from "@/lib/web-search";
+import { MAX_SEARCH_RESULTS, formatSearchContext, webSearch } from "@/lib/web-search";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,8 +26,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "缺少搜索词" }, { status: 400 });
   }
 
-  // 条数夹在 1~8，防止有人一次拉一堆撑爆上下文
-  const limit = Math.min(8, Math.max(1, Number(body.limit) || 5));
+  // 条数放宽到 1~100（摘要会自动压缩，不必担心撑爆上下文）
+  const limit = Math.min(MAX_SEARCH_RESULTS, Math.max(1, Number(body.limit) || 30));
 
   const outcome = await webSearch(query, limit);
 

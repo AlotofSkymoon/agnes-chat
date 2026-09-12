@@ -29,6 +29,55 @@ interface MessageBubbleProps {
 }
 
 /**
+ * 联网搜索来源列表。
+ *
+ * 结果可能几十条，全铺开会把回答挤到看不见，
+ * 所以默认只显示前 6 条，其余折叠，点一下展开。
+ */
+function SearchSources({ sources }: { sources: { title: string; url: string }[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const PREVIEW = 6;
+
+  const shown = expanded ? sources : sources.slice(0, PREVIEW);
+  const hidden = sources.length - shown.length;
+
+  return (
+    <div className="mb-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+      <p className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-fg-tertiary">
+        <Globe className="h-3 w-3" />
+        联网搜索来源（{sources.length}）
+      </p>
+
+      <ol className="space-y-0.5">
+        {shown.map((src, i) => (
+          <li key={src.url} className="truncate text-[11px] leading-relaxed">
+            <a
+              href={src.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-primary hover:underline"
+              title={src.title || src.url}
+            >
+              [{i + 1}] {src.title || src.url}
+            </a>
+          </li>
+        ))}
+      </ol>
+
+      {hidden > 0 || expanded ? (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1.5 flex items-center gap-1 text-[11px] text-fg-tertiary transition-colors hover:text-primary"
+        >
+          <ChevronDown className={expanded ? "h-3 w-3 rotate-180 transition-transform" : "h-3 w-3 transition-transform"} />
+          {expanded ? "收起" : `展开其余 ${hidden} 条`}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * 思考过程展示块。
  *
  * 流式输出时默认展开（让用户看到模型正在推理），并带呼吸感的「思考中」提示；
@@ -221,28 +270,9 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
           />
         ) : null}
 
-        {/* 联网搜索来源 */}
+        {/* 联网搜索来源：条数可能很多，默认折叠只显示前几条 */}
         {message.sources?.length ? (
-          <div className="mb-2 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
-            <p className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-fg-tertiary">
-              <Globe className="h-3 w-3" />
-              联网搜索来源（{message.sources.length}）
-            </p>
-            <ol className="space-y-0.5">
-              {message.sources.map((src, i) => (
-                <li key={src.url} className="text-[11px] leading-relaxed">
-                  <a
-                    href={src.url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="text-primary hover:underline"
-                  >
-                    [{i + 1}] {src.title || src.url}
-                  </a>
-                </li>
-              ))}
-            </ol>
-          </div>
+          <SearchSources sources={message.sources} />
         ) : null}
         {message.error ? (
           <div className="space-y-3 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3">

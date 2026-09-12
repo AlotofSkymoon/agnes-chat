@@ -158,7 +158,10 @@ export interface SearchOutcome {
 }
 
 /** 执行搜索：先 Bing，失败再 DuckDuckGo */
-export async function webSearch(query: string, limit = 5): Promise<SearchOutcome> {
+/** 搜索结果上限放宽：想要多少给多少，靠压缩显示而非砍条数 */
+export const MAX_SEARCH_RESULTS = 100;
+
+export async function webSearch(query: string, limit = 30): Promise<SearchOutcome> {
   const q = query.trim();
   if (!q) return { ok: false, results: [], error: "搜索词为空" };
   if (q.length > 200) return { ok: false, results: [], error: "搜索词过长" };
@@ -192,17 +195,39 @@ export async function webSearch(query: string, limit = 5): Promise<SearchOutcome
  * 明确标注来源，让模型能给出引用；同时提醒它区分"检索到的"
  * 和"自己知道的"，减少把搜索结果说成事实的倾向。
  */
+/**
+ * 摘要压缩上限（字符）。
+ *
+ * 条数放宽后，全量摘要会撑爆上下文。但摘要的价值主要在开头几句，
+ * 所以按条数自适应截断：结果越多，每条摘要越短。
+ */
+function snippetLimit(total: number): number {
+  if (total <= 8) return 260;
+  if (total <= 20) return 140;
+  if (total <= 40) return 90;
+  return 60;
+}
+
+function compress(s: string, max: number): string {
+  const t = s.trim();
+  return t.length <= max ? t : t.slice(0, max) + "…";
+}
+
 export function formatSearchContext(query: string, results: SearchResult[]): string {
+  const cap = snippetLimit(results.length);
+
   const lines = results.map(
-    (r, i) => `[${i + 1}] ${r.title}\n来源：${r.url}\n摘要：${r.snippet || "（无摘要）"}`,
+    (r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${compress(r.snippet || "（无摘要）", cap)}`,
   );
 
   return [
-    `以下是联网搜索「${query}」得到的结果（共 ${results.length} 条）：`,
+    `以下是联网搜索「${query}」得到的结果（共 ${results.length} 条，摘要已压缩）：`,
     "",
     ...lines,
     "",
-    "请基于以上检索结果回答，并在提及相关信息时标注来源编号。",
-    "如果检索结果不足以回答，就明说，不要编造。",
+    "要求：",
+    "1. 基于以上检索结果回答，提及相关信息时标注来源编号，如 [3]。",
+    "2. 结果较多时优先采信相关度高的，不要逐条罗列。",
+    "3. 检索结果不足以回答就明说，不要编造。",
   ].join("\n");
 }
