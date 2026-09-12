@@ -1,0 +1,367 @@
+import type { Pipeline, SetOptions, Store, UserRecord } from "@/lib/storage/types";
+
+/**
+ * Cloudflare 后端：KV + D1。
+ *
+ * 数据分布：
+ * - D1 users 表：用户（需要按 email 反查、需要列全部用户，关系型更合适）
+ * - D1 meta 表：users:count 自增计数器（保证"第一个用户是管理员"的原子性）
+ * - KV：session、限流计数、会话记录、导航数据、缓存 —— 都是纯 KV 场景
+ */
+
+/** KVNamespace 最小类型（避免依赖 @cloudflare/workers-types 造成构建耦合） */
+export interface KVLike {
+  get(key: string, options?: unknown): Promise<unknown>;
+  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<unknown>;
+  delete(key: string): Promise<unknown>;
+  list(options?: { prefix?: string; limit?: number; cursor?: string }): Promise<{
+    keys: { name: string; expiration?: number }[];
+    list_complete: boolean;
+    cursor?: string;
+  }>;
+}
+
+/** D1 最小类型 */
+export interface D1Like {
+  prepare(query: string): {
+    bind(...values: unknown[]): {
+      run(): Promise<{ success: boolean; error?: string }>;
+      first<T = unknown>(col?: string): Promise<T | null>;
+      all<T = unknown>(): Promise<{ results: T[]; success: boolean }>;
+    };
+    run(): Promise<{ success: boolean }>;
+    first<T = unknown>(): Promise<T | null>;
+    all<T = unknown>(): Promise<{ results: T[] }>;
+  };
+  batch(statements: unknown[]): Promise<unknown[]>;
+}
+
+export interface CloudflareEnv {
+  KV?: KVLike;
+  DB?: D1Like;
+}
+
+/* --------------------------- key 路由判断 --------------------------- */
+
+const P_USER_EMAIL = "user:email:";
+const P_USER_SESSIONS = "user:sessions:";
+const P_USER = "user:";
+const P_SESSION = "session:";
+const P_RATELIMIT = "ratelimit:";
+const KEY_USERS_COUNT = "users:count";
+
+/** 是否为 user:{id}（排除 user:email: / user:sessions:） */
+function isUserKey(key: string): boolean {
+  return (
+    key.startsWith(P_USER) && !key.startsWith(P_USER_EMAIL) && !key.startsWith(P_USER_SESSIONS)
+  );
+}
+
+function isUserEmailKey(key: string): boolean {
+  return key.startsWith(P_USER_EMAIL);
+}
+
+/* ------------------------------ 实现 ------------------------------ */
+
+export class CloudflareStore implements Store {
+  constructor(private env: CloudflareEnv) {}
+
+  private get kv(): KVLike {
+    if (!this.env.KV) throw new Error("Cloudflare 部署缺少 KV 绑定（binding 名应为 KV）");
+    return this.env.KV;
+  }
+
+  private get db(): D1Like {
+    if (!this.env.DB) throw new Error("Cloudflare 部署缺少 D1 绑定（binding 名应为 DB）");
+    return this.env.DB;
+  }
+
+  /* ------------------------------ get ------------------------------ */
+  async get<T = unknown>(key: string): Promise<T | null> {
+    // 邮箱反查：直接查 users 表（email 已经是 UNIQUE 索引）
+    if (isUserEmailKey(key)) {
+      const email = key.slice(P_USER_EMAIL.length);
+      const row = await this.db
+        .prepare("SELECT id FROM users WHERE email = ?")
+        .bind(email)
+        .first<{ id: string }>();
+      return (row?.id as unknown as T) ?? null;
+    }
+    const raw = await this.kv.get(key, "json");
+    return (raw as T) ?? null;
+  }
+
+  /* ------------------------------ set ------------------------------ */
+  async set(key: string, value: unknown, opts?: SetOptions): Promise<void> {
+    // user:email: 不需要单独存 —— users 表里的 email 列就是索引
+    if (isUserEmailKey(key)) return;
+
+    if (isUserKey(key)) {
+      // hset 已经负责写 D1；这里若传的是完整用户对象也兼容
+      const rec = value as Partial<UserRecord> | null;
+      if (rec && typeof rec === "object" && rec.id && rec.email) {
+        await this.hset(key, rec as Record<string, unknown>);
+      }
+      return;
+    }
+
+    await this.kv.put(key, JSON.stringify(value), opts?.ex ? { expirationTtl: opts.ex } : undefined);
+  }
+
+  /* ------------------------------ del ------------------------------ */
+  async del(...keys: string[]): Promise<number> {
+    let count = 0;
+    for (const key of keys) {
+      if (isUserKey(key)) {
+        const id = key.slice(P_USER.length);
+        const res = await this.db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
+        if (res.success) count += 1;
+        continue;
+      }
+      if (isUserEmailKey(key)) {
+        const email = key.slice(P_USER_EMAIL.length);
+        const res = await this.db.prepare("DELETE FROM users WHERE email = ?").bind(email).run();
+        if (res.success) count += 1;
+        continue;
+      }
+      await this.kv.delete(key);
+      count += 1;
+    }
+    return count;
+  }
+
+  /* ----------------------------- exists ---------------------------- */
+  async exists(key: string): Promise<number> {
+    if (isUserEmailKey(key)) {
+      const email = key.slice(P_USER_EMAIL.length);
+      const row = await this.db
+        .prepare("SELECT 1 AS ok FROM users WHERE email = ?")
+        .bind(email)
+        .first<{ ok: number }>();
+      return row ? 1 : 0;
+    }
+    if (isUserKey(key)) {
+      const id = key.slice(P_USER.length);
+      const row = await this.db
+        .prepare("SELECT 1 AS ok FROM users WHERE id = ?")
+        .bind(id)
+        .first<{ ok: number }>();
+      return row ? 1 : 0;
+    }
+    const v = await this.kv.get(key);
+    return v === null || v === undefined ? 0 : 1;
+  }
+
+  /* ----------------------------- expire ---------------------------- */
+  async expire(key: string, seconds: number): Promise<number> {
+    if (isUserKey(key) || isUserEmailKey(key)) return 1; // 关系型数据不走 TTL
+    const v = await this.kv.get(key, "json");
+    if (v === null || v === undefined) return 0;
+    await this.kv.put(key, JSON.stringify(v), { expirationTtl: Math.max(60, seconds) });
+    return 1;
+  }
+
+  /* ------------------------------ incr ----------------------------- */
+  async incr(key: string): Promise<number> {
+    // users:count 必须原子 —— 用 D1 的 UPDATE ... RETURNING（SQLite 写事务串行化）
+    if (key === KEY_USERS_COUNT) {
+      await this.db
+        .prepare("INSERT INTO meta (k, v) VALUES ('users_count', 0) ON CONFLICT(k) DO NOTHING")
+        .run();
+      const row = await this.db
+        .prepare("UPDATE meta SET v = v + 1 WHERE k = 'users_count' RETURNING v")
+        .first<{ v: number }>();
+      if (!row) throw new Error("自增 users:count 失败");
+      return row.v;
+    }
+
+    // 限流计数等：KV 读改写（单 key 低频，可接受）
+    const cur = (await this.kv.get(key, "json")) as number | null;
+    const next = (typeof cur === "number" ? cur : 0) + 1;
+    await this.kv.put(key, JSON.stringify(next));
+    return next;
+  }
+
+  /* ------------------------------ hset ----------------------------- */
+  async hset(key: string, obj: Record<string, unknown>): Promise<number> {
+    if (isUserKey(key)) {
+      const id = key.slice(P_USER.length);
+      const email = String(obj.email ?? "");
+
+      // 拒绝创建「没有邮箱的用户」：会产生脏行，且多个空邮箱会撞 UNIQUE 约束。
+      // 正常注册一定会带 email；只更新密码 / 角色时用户必然已存在。
+      if (!email) {
+        const existing = await this.db
+          .prepare("SELECT id FROM users WHERE id = ?")
+          .bind(id)
+          .first<{ id: string }>();
+        if (!existing) return 0;
+      }
+      const passwordHash = String(obj.passwordHash ?? "");
+      // 关键：未提供时必须为空字符串，绝不能给默认值。
+      // 否则「改密码」时 role 默认值 "user" 会把管理员降级成普通用户。
+      const role = obj.role === undefined || obj.role === null ? "" : String(obj.role);
+      const createdAt =
+        typeof obj.createdAt === "number"
+          ? obj.createdAt
+          : Number(obj.createdAt ?? Date.now()) || Date.now();
+
+      // 局部更新要保留未提供的字段：
+      // 「改密码」只传 passwordHash，不能把 email / role 冲成空字符串
+      await this.db
+        .prepare(
+          `INSERT INTO users (id, email, password_hash, role, created_at)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             email         = CASE WHEN excluded.email <> ''         THEN excluded.email         ELSE users.email END,
+             password_hash = CASE WHEN excluded.password_hash <> '' THEN excluded.password_hash ELSE users.password_hash END,
+             role          = CASE WHEN excluded.role <> ''          THEN excluded.role          ELSE users.role END,
+             created_at    = CASE WHEN excluded.created_at > 0      THEN users.created_at       ELSE users.created_at END`,
+        )
+        .bind(id, email, passwordHash, role, createdAt)
+        .run();
+      return 1;
+    }
+
+    // 非用户 hash：整体存 JSON
+    await this.kv.put(key, JSON.stringify(obj));
+    return 1;
+  }
+
+  /* ---------------------------- hgetall ---------------------------- */
+  async hgetall<T = Record<string, unknown>>(key: string): Promise<T | null> {
+    if (isUserKey(key)) {
+      const id = key.slice(P_USER.length);
+      const row = await this.db
+        .prepare("SELECT id, email, password_hash, role, created_at FROM users WHERE id = ?")
+        .bind(id)
+        .first<{
+          id: string;
+          email: string;
+          password_hash: string;
+          role: string;
+          created_at: number;
+        }>();
+      if (!row) return null;
+      return {
+        id: row.id,
+        email: row.email,
+        passwordHash: row.password_hash,
+        role: row.role,
+        createdAt: row.created_at,
+      } as unknown as T;
+    }
+    const raw = await this.kv.get(key, "json");
+    return (raw as T) ?? null;
+  }
+
+  /* ------------------------------ keys ----------------------------- */
+  async keys(pattern: string): Promise<string[]> {
+    // user:* → 直接查 D1 全表
+    if (pattern.startsWith(P_USER) && !pattern.startsWith(P_USER_EMAIL)) {
+      const { results } = await this.db.prepare("SELECT id FROM users").all<{ id: string }>();
+      return (results ?? []).map((r) => `${P_USER}${r.id}`);
+    }
+    if (pattern.startsWith(P_USER_EMAIL)) {
+      const { results } = await this.db.prepare("SELECT email FROM users").all<{ email: string }>();
+      return (results ?? []).map((r) => `${P_USER_EMAIL}${r.email}`);
+    }
+
+    // KV：只支持前缀列举，取 "user:*" 的 * 之前部分
+    const prefix = pattern.replace(/\*+$/, "");
+    const out: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await this.kv.list({ prefix, cursor, limit: 1000 });
+      for (const k of page.keys ?? []) out.push(k.name);
+      cursor = page.list_complete ? undefined : page.cursor;
+    } while (cursor);
+    return out;
+  }
+
+  /* ------------------------------ sadd ----------------------------- */
+  async sadd(key: string, ...members: string[]): Promise<number> {
+    const cur = (await this.kv.get(key, "json")) as string[] | null;
+    const set = new Set(Array.isArray(cur) ? cur : []);
+    let added = 0;
+    for (const m of members) {
+      if (!set.has(m)) {
+        set.add(m);
+        added += 1;
+      }
+    }
+    await this.kv.put(key, JSON.stringify(Array.from(set)));
+    return added;
+  }
+
+  async smembers(key: string): Promise<string[]> {
+    const cur = (await this.kv.get(key, "json")) as string[] | null;
+    return Array.isArray(cur) ? cur : [];
+  }
+
+  /* ------------------------------ srem ----------------------------- */
+  async srem(key: string, ...members: string[]): Promise<number> {
+    const cur = (await this.kv.get(key, "json")) as string[] | null;
+    const set = new Set(Array.isArray(cur) ? cur : []);
+    let removed = 0;
+    for (const m of members) {
+      if (set.delete(m)) removed += 1;
+    }
+    if (removed > 0) await this.kv.put(key, JSON.stringify(Array.from(set)));
+    return removed;
+  }
+
+  /* ---------------------------- pipeline --------------------------- */
+  pipeline(): Pipeline {
+    const tasks: (() => Promise<unknown>)[] = [];
+    const self = this;
+    const pipe: Pipeline = {
+      set(key: string, value: unknown, opts?: SetOptions) {
+        tasks.push(() => self.set(key, value, opts));
+        return pipe;
+      },
+      del(...keys: string[]) {
+        tasks.push(() => self.del(...keys));
+        return pipe;
+      },
+      sadd(key: string, ...members: string[]) {
+        tasks.push(() => self.sadd(key, ...members));
+        return pipe;
+      },
+      srem(key: string, ...members: string[]) {
+        tasks.push(() => self.srem(key, ...members));
+        return pipe;
+      },
+      hset(key: string, obj: Record<string, unknown>) {
+        tasks.push(() => self.hset(key, obj));
+        return pipe;
+      },
+      async exec() {
+        const out: unknown[] = [];
+        // 顺序执行（D1 batch 需要预编译语句，这里简单顺序执行更易维护）
+        for (const t of tasks) out.push(await t());
+        return out;
+      },
+    };
+    return pipe;
+  }
+}
+
+/* --------------------------- D1 建表语句 --------------------------- */
+
+export const D1_SCHEMA = `
+CREATE TABLE IF NOT EXISTS users (
+  id            TEXT PRIMARY KEY,
+  email         TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role          TEXT NOT NULL DEFAULT 'user',
+  created_at    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role  ON users(role);
+
+CREATE TABLE IF NOT EXISTS meta (
+  k TEXT PRIMARY KEY,
+  v INTEGER NOT NULL
+);
+`;

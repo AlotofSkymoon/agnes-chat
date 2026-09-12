@@ -1,94 +1,76 @@
-import { Redis } from "@upstash/redis";
-
 /**
- * Upstash Redis 客户端（惰性单例）。
+ * 兼容层：历史上这里直接连 Upstash Redis。
  *
- * 注意：
- * 1. 本文件只允许在 Server Component / API Route / Server Action 中导入，
- *    绝对不能被 "use client" 的组件引用 —— 否则 TOKEN 会被打进浏览器包。
- * 2. 惰性创建，保证 `next build` 时即使环境变量缺失也不会直接崩。
+ * 现在存储已抽象成 @/lib/storage，会根据部署平台自动选择后端：
+ *   - Cloudflare Workers → KV + D1（无需 Redis）
+ *   - Vercel / 本地      → Upstash Redis
+ *
+ * 本文件保留原导出名，让上层业务代码无需改动即可双平台工作。
+ * 新代码请直接使用 @/lib/storage。
  */
 
-let client: Redis | null = null;
-
-export function hasRedisConfig(): boolean {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
-}
-
-export function getRedis(): Redis {
-  if (client) return client;
-
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-
-  if (!url || !token) {
-    throw new Error(
-      "缺少 Upstash Redis 配置：请在 .env.local 中设置 UPSTASH_REDIS_REST_URL 与 UPSTASH_REDIS_REST_TOKEN",
-    );
-  }
-
-  client = new Redis({ url, token, automaticDeserialization: true });
-  return client;
-}
-
-/* -------------------------------------------------------------------------- */
-/*                                  Key 规范                                   */
-/* -------------------------------------------------------------------------- */
+import {
+  backendKind,
+  getStore,
+  hasStore as hasStoreBackend,
+} from "@/lib/storage";
+import type { Store, UserRecord } from "@/lib/storage/types";
 
 export const KEYS = {
   usersCount: "users:count",
   user: (userId: string) => `user:${userId}`,
   userEmail: (email: string) => `user:email:${email.toLowerCase()}`,
   session: (sessionId: string) => `session:${sessionId}`,
-  /** 某用户当前所有 sessionId，便于删除用户 / 清空登录态 */
   userSessions: (userId: string) => `user:sessions:${userId}`,
-  /** 云端聊天记录：chat:{userId}:{conversationId} */
   chat: (userId: string, conversationId: string) => `chat:${userId}:${conversationId}`,
-  /** 某用户的会话索引（Set，存 conversationId） */
   chatIndex: (userId: string) => `chat:index:${userId}`,
-  /** 登录限流 */
   loginRateLimit: (ip: string) => `ratelimit:login:${ip}`,
   ratelimitUpload: (ip: string) => `ratelimit:upload:${ip}`,
-  /** 导航站自定义数据（管理员维护） */
   navData: "nav:data",
-  /** 域名后缀缓存 */
   tlds: "tlds:list",
-  /** 站点公告 */
   announcement: "site:announcement",
-  /** 站点统计：累计对话数 */
   statMessages: "stat:messages",
 } as const;
 
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 天
 
+/** 是否配置了任意可用的存储后端 */
+export function hasRedisConfig(): boolean {
+  return hasStoreBackend();
+}
+
+/** 当前生效的后端名称，用于 /admin 展示与排障 */
+export function storageBackend(): string {
+  return backendKind();
+}
+
 /**
- * hgetall 的宽松封装。
- * Upstash 的 hgetall<TData extends Record<string, unknown>> 要求 TData 带索引签名，
- * 而我们的 interface（如 UserRecord）没有，直接传泛型会编译报错。这里统一处理。
+ * 获取存储实例。
+ * 命名保留 getRedis 以兼容既有调用点，实际可能是 KV/D1 实现。
  */
+export function getRedis(): Store {
+  return getStore();
+}
+
+/** Hash 全量读取（封装泛型，避免各后端签名差异） */
 export async function hgetAll<T>(key: string): Promise<T | null> {
-  const redis = getRedis();
-  const raw = await redis.hgetall<Record<string, unknown>>(key);
-  return (raw as unknown as T | null) ?? null;
+  return getStore().hgetall<T>(key);
 }
 
-/** get 的类型安全封装 */
+/** 读取字符串/JSON 值 */
 export async function getValue<T = string>(key: string): Promise<T | null> {
-  const redis = getRedis();
-  const raw = await redis.get<unknown>(key);
-  return (raw as T | null) ?? null;
+  return getStore().get<T>(key);
 }
 
-/** smembers 的类型安全封装（Upstash 的 smembers<TData extends unknown[]> 约束会导致 string 报错） */
+/** 读取 Set 成员 */
 export async function setMembers(key: string): Promise<string[]> {
-  const redis = getRedis();
-  const raw = await redis.smembers<unknown[]>(key);
-  return ((raw ?? []) as unknown as string[]) ?? [];
+  return getStore().smembers(key);
 }
 
-/** keys 的类型安全封装 */
+/** 按 pattern 列 key */
 export async function listKeys(pattern: string): Promise<string[]> {
-  const redis = getRedis();
-  const raw = await redis.keys(pattern);
-  return ((raw ?? []) as unknown as string[]) ?? [];
+  return getStore().keys(pattern);
 }
+
+export { hasUpstashConfig } from "@/lib/storage";
+export type { Store, UserRecord };

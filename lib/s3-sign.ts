@@ -45,6 +45,31 @@ function encodeS3Path(path: string): string {
     .join("/");
 }
 
+/** 安全解码，失败时原样返回 */
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+/**
+ * 路径归一化：把可能已经被编码过的 pathname 还原成原始字符，再统一编码。
+ * 保证幂等 —— 调用方传编码或未编码的路径都能得到同一个 canonical URI，
+ * 否则会出现双重编码（%20 → %2520）导致签名不匹配。
+ */
+export function normalizeS3Path(path: string): string {
+  let current = path;
+  // 最多解 3 层，防止病态输入
+  for (let i = 0; i < 3; i += 1) {
+    const decoded = safeDecode(current);
+    if (decoded === current) break;
+    current = decoded;
+  }
+  return current;
+}
+
 /** RFC 3986 编码（比 encodeURIComponent 更严格，额外编码 !'()*） */
 function encodeRfc3986(str: string): string {
   return encodeURIComponent(str).replace(
@@ -81,7 +106,8 @@ export async function presignS3Put(params: S3PresignParams): Promise<string> {
   } = params;
 
   const base = endpoint.replace(/\/+$/, "");
-  const pathEncoded = encodeS3Path(`/${bucket}/${key.replace(/^\/+/, "")}`);
+  const pathEncoded =
+    encodeS3Path(`/${bucket}/${normalizeS3Path(key).replace(/^\/+/, "")}`) || "/";
   const parsed = new URL(base + pathEncoded);
   const host = parsed.host;
 
@@ -174,7 +200,11 @@ export async function signS3Request(params: S3SignParams): Promise<S3SignedReque
 
   const parsed = new URL(url);
   const host = parsed.host;
-  const canonicalUri = encodeS3Path(parsed.pathname) || "/";
+  // 先归一化（幂等解码），再按 S3 规则编码，避免双重编码。
+  // 必须用编码后的路径重建 URL：签名用的 canonical URI 必须与最终发出的
+  // 请求行完全一致，否则服务端按原文校验会判签名不匹配。
+  const canonicalUri = encodeS3Path(normalizeS3Path(parsed.pathname)) || "/";
+  const target = new URL(parsed.origin + canonicalUri + (parsed.search || ""));
 
   const amzDateStr = amzDate.toISOString().replace(/[:-]|\.\d{3}/g, "");
   const dateStamp = amzDateStr.slice(0, 8);
@@ -229,7 +259,7 @@ export async function signS3Request(params: S3SignParams): Promise<S3SignedReque
     `SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
   return {
-    url: parsed.toString(),
+    url: target.toString(),
     headers: {
       ...outHeaders,
       ...(contentType ? { "content-type": contentType } : {}),

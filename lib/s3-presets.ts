@@ -1,6 +1,13 @@
 /**
- * S3 兼容对象存储预设。
- * 图片 / 视频等大文件不再走 base64 塞进消息，而是上传到对象存储，只回传一个 URL。
+ * 对象存储：按部署平台锁定唯一方案，避免选错导致上传失败。
+ *
+ * - Cloudflare Workers → 只能用 Cloudflare R2
+ *     零出站流量费、10GB 免费存储、S3 完全兼容、自带 r2.dev 公开域名
+ * - Vercel             → 只能用 Backblaze B2
+ *     Vercel Serverless 不在 Cloudflare 网络内，R2 的出站优势无从发挥，
+ *     且 B2 提供 10GB 免费存储；注意其 S3 兼容层只覆盖部分操作
+ *
+ * 两个方案都走标准 AWS SigV4 预签名，签名逻辑共用 lib/s3-sign.ts。
  */
 
 export interface S3Preset {
@@ -8,112 +15,45 @@ export interface S3Preset {
   label: string;
   /** 端点示例（用户需替换尖括号部分） */
   endpointHint: string;
-  /** 常见 region；S3 协议必填，即使存储商不使用也要给个值 */
   regionHint: string;
-  /** 一句话点评 */
   note: string;
-  /** 文档 / 控制台地址 */
   docs: string;
-  /** 是否推荐 */
   recommended?: boolean;
-  /** 是否不推荐（如 Backblaze B2 的 S3 兼容层有坑） */
-  discouraged?: boolean;
+  /** 该预设只在哪个平台出现 */
+  platform?: "cloudflare" | "vercel";
+  /** S3 兼容性有限，UI 会提示 */
+  limited?: boolean;
 }
 
 export const S3_PRESETS: S3Preset[] = [
   {
     id: "r2",
-    label: "Cloudflare R2（推荐）",
+    label: "Cloudflare R2",
     endpointHint: "https://<accountid>.r2.cloudflarestorage.com",
     regionHint: "auto",
-    note: "零出站流量费，10GB 免费额度，S3 完全兼容，个人站首选",
+    note: "零出站流量费，10GB 免费存储，S3 完全兼容",
     docs: "https://dash.cloudflare.com/",
     recommended: true,
-  },
-  {
-    id: "minio",
-    label: "MinIO（自建，推荐）",
-    endpointHint: "https://s3.example.com",
-    regionHint: "us-east-1",
-    note: "自己服务器跑，完全免费可控，适合已有 VPS 的人",
-    docs: "https://min.io/docs/minio/linux/index.html",
-    recommended: true,
-  },
-  {
-    id: "cos",
-    label: "腾讯云 COS",
-    endpointHint: "https://cos.<region>.myqcloud.com",
-    regionHint: "ap-guangzhou",
-    note: "国内访问快，新用户长期免费额度，需实名",
-    docs: "https://cloud.tencent.com/product/cos",
-    recommended: true,
-  },
-  {
-    id: "oss",
-    label: "阿里云 OSS",
-    endpointHint: "https://oss-<region>.aliyuncs.com",
-    regionHint: "oss-cn-hangzhou",
-    note: "节点覆盖广，新用户免费额度，稳定",
-    docs: "https://www.aliyun.com/product/oss",
-  },
-  {
-    id: "s3",
-    label: "AWS S3",
-    endpointHint: "https://s3.<region>.amazonaws.com",
-    regionHint: "us-east-1",
-    note: "行业标准，功能最全，但出站流量贵",
-    docs: "https://s3.console.aws.amazon.com/",
-  },
-  {
-    id: "qiniu",
-    label: "七牛云 Kodo",
-    endpointHint: "https://s3-<region>.qiniucs.com",
-    regionHint: "cn-east-1",
-    note: "10GB 免费空间，支持图片处理",
-    docs: "https://www.qiniu.com/products/kodo",
-  },
-  {
-    id: "upyun",
-    label: "又拍云 USS",
-    endpointHint: "https://s3.api.upyun.com",
-    regionHint: "cn-east-1",
-    note: "国内老牌，有免费联盟额度",
-    docs: "https://www.upyun.com/products/uss",
-  },
-  {
-    id: "tos",
-    label: "火山引擎 TOS",
-    endpointHint: "https://tos-s3-<region>.volces.com",
-    regionHint: "cn-beijing",
-    note: "字节系，新用户免费额度",
-    docs: "https://www.volcengine.com/product/tos",
-  },
-  {
-    id: "do",
-    label: "DigitalOcean Spaces",
-    endpointHint: "https://<region>.digitaloceanspaces.com",
-    regionHint: "nyc3",
-    note: "价格固定，含 CDN，适合海外站",
-    docs: "https://cloud.digitalocean.com/spaces",
-  },
-  {
-    id: "wasabi",
-    label: "Wasabi",
-    endpointHint: "https://s3.<region>.wasabisys.com",
-    regionHint: "us-east-1",
-    note: "无出站费，但有最小存储期计费",
-    docs: "https://wasabi.com/",
+    platform: "cloudflare",
   },
   {
     id: "b2",
-    label: "Backblaze B2（不推荐）",
+    label: "Backblaze B2",
     endpointHint: "https://s3.<region>.backblazeb2.com",
     regionHint: "us-west-004",
-    note: "S3 兼容层不完整，部分操作不支持，容易踩坑",
+    note: "10GB 免费存储，出站前 1GB/天免费；S3 兼容层仅覆盖部分操作",
     docs: "https://www.backblaze.com/b2/",
-    discouraged: true,
+    recommended: true,
+    platform: "vercel",
+    limited: true,
   },
 ];
+
+/** 按平台筛选可用预设；本地开发返回全部以便调试 */
+export function presetsForPlatform(platform: "cloudflare" | "vercel" | "local"): S3Preset[] {
+  if (platform === "local") return S3_PRESETS;
+  return S3_PRESETS.filter((p) => p.platform === platform);
+}
 
 /** S3 配置（保存在浏览器本地，随上传请求一起发到服务端代理） */
 export interface S3Config {
@@ -123,10 +63,15 @@ export interface S3Config {
   bucket: string;
   accessKeyId: string;
   secretAccessKey: string;
-  /** 自定义公开访问域名，留空则用 endpoint/bucket/key 拼 */
+  /** 自定义公开访问域名，留空则用 r2.dev 或 endpoint 拼 */
   publicBaseUrl?: string;
   /** 存储中的目录前缀 */
   prefix?: string;
+  /**
+   * 使用站点托管的 R2（管理员已在服务端配好凭证）。
+   * 为 true 时 accessKeyId / secretAccessKey 留空，由服务端补全，密钥不下发浏览器。
+   */
+  useSiteConfig?: boolean;
 }
 
 export const DEFAULT_S3_CONFIG: S3Config = {
@@ -146,3 +91,11 @@ export const UPLOAD_LIMITS = {
   video: 100 * 1024 * 1024, // 100 MB
   other: 20 * 1024 * 1024, // 20 MB
 } as const;
+
+/** 允许的文件扩展名（白名单，防止把存储桶当网盘） */
+export const ALLOWED_UPLOAD_EXT = [
+  // 图片
+  "png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "svg", "ico", "heic",
+  // 视频
+  "mp4", "webm", "mov", "m4v", "avi", "mkv", "ogv",
+] as const;
