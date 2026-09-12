@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
 
+import { DynamicTitle } from "@/components/dynamic-title";
 import { ThemeProvider, themeInitScript } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -33,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* 拉丁字形是首屏必需的（SF Pro），优先预加载；中日韩部分按需加载 */}
         <link
           rel="preload"
-          href="/fonts/SuperPingFangV1-latin.woff2"
+          href="/fonts/Montserrat-400.woff2"
           as="font"
           type="font/woff2"
           crossOrigin="anonymous"
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="font-sans">
         <ThemeProvider>
+          <DynamicTitle />
           {children}
           <Toaster
             position="top-center"

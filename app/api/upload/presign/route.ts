@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { presignS3Put } from "@/lib/s3-sign";
 import { UPLOAD_LIMITS, type S3Config } from "@/lib/s3-presets";
+import { getSiteS3Config } from "@/lib/s3-server";
+import { detectPlatform, platformLabel } from "@/lib/platform";
 import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
 
 export const runtime = "nodejs";
@@ -55,18 +57,48 @@ export async function POST(request: Request) {
 
   const { filename = "", contentType = "application/octet-stream", size = 0, config } = body;
 
-  if (!config?.enabled) return bad("未启用对象存储");
-  if (!config.endpoint?.trim()) return bad("缺少 Endpoint");
-  if (!config.bucket?.trim()) return bad("缺少 Bucket");
-  if (!config.accessKeyId?.trim()) return bad("缺少 Access Key ID");
-  if (!config.secretAccessKey?.trim()) return bad("缺少 Secret Access Key");
-  if (!config.region?.trim()) return bad("缺少 Region");
+  /**
+   * 站点托管模式：管理员已在服务端配好 R2，
+   * 前端只需传 { enabled: true, useSiteConfig: true }，密钥不会离开服务器。
+   */
+  const siteCfg = getSiteS3Config();
+  const useSite = Boolean(config?.enabled && (config as { useSiteConfig?: boolean }).useSiteConfig);
+
+  let effective: S3Config | undefined = config;
+
+  if (useSite) {
+    if (!siteCfg) return bad("站点未配置对象存储，请联系管理员", 503);
+    // 目录前缀沿用站点配置，其余用服务端凭证
+    effective = { ...siteCfg, prefix: config?.prefix?.trim() || siteCfg.prefix };
+  }
+
+  if (!effective?.enabled) return bad("未启用对象存储");
+  if (!effective.endpoint?.trim()) return bad("缺少 Endpoint");
+  if (!effective.bucket?.trim()) return bad("缺少 Bucket");
+  if (!effective.accessKeyId?.trim()) return bad("缺少 Access Key ID");
+  if (!effective.secretAccessKey?.trim()) return bad("缺少 Secret Access Key");
+  if (!effective.region?.trim()) return bad("缺少 Region");
+
+  const cfg = effective;
 
   // endpoint 必须是 https，防止凭证泄露到明文通道
-  let endpoint = config.endpoint.trim().replace(/\/+$/, "");
+  let endpoint = cfg.endpoint.trim().replace(/\/+$/, "");
   if (!/^https?:\/\//.test(endpoint)) endpoint = `https://${endpoint}`;
   if (!endpoint.startsWith("https://") && !endpoint.includes("localhost")) {
     return bad("Endpoint 必须使用 HTTPS");
+  }
+
+  // 平台锁定：Workers 只能用 R2，Vercel 只能用 B2。
+  // 服务端强制校验，避免绕过前端用错存储导致上传失败。
+  const platform = detectPlatform();
+  if (platform !== "local") {
+    const host = new URL(endpoint).host.toLowerCase();
+    if (platform === "cloudflare" && !host.includes("r2.cloudflarestorage.com")) {
+      return bad("当前部署在 Cloudflare Workers，对象存储只能用 Cloudflare R2");
+    }
+    if (platform === "vercel" && !host.includes("backblazeb2.com")) {
+      return bad(`当前部署在 ${platformLabel(platform)}，对象存储只能用 Backblaze B2`);
+    }
   }
 
   const kind = classify(contentType, filename);
@@ -98,24 +130,24 @@ export async function POST(request: Request) {
   const yyyy = now.getUTCFullYear();
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
   const ext = extOf(filename) || (kind === "video" ? "mp4" : kind === "image" ? "png" : "bin");
-  const prefix = (config.prefix?.trim() || "agnes-chat").replace(/^\/+|\/+$/g, "");
+  const prefix = (cfg.prefix?.trim() || "agnes-chat").replace(/^\/+|\/+$/g, "");
   const key = `${prefix}/${yyyy}/${mm}/${crypto.randomUUID()}.${ext}`;
 
   try {
     const uploadUrl = await presignS3Put({
       endpoint,
-      bucket: config.bucket.trim(),
+      bucket: cfg.bucket.trim(),
       key,
-      region: config.region.trim(),
-      accessKeyId: config.accessKeyId.trim(),
-      secretAccessKey: config.secretAccessKey.trim(),
+      region: cfg.region.trim(),
+      accessKeyId: cfg.accessKeyId.trim(),
+      secretAccessKey: cfg.secretAccessKey.trim(),
       expiresIn: 900,
     });
 
-    const publicBase = config.publicBaseUrl?.trim().replace(/\/+$/, "");
+    const publicBase = cfg.publicBaseUrl?.trim().replace(/\/+$/, "");
     const publicUrl = publicBase
       ? `${publicBase}/${key}`
-      : `${endpoint}/${config.bucket.trim()}/${key}`;
+      : `${endpoint}/${cfg.bucket.trim()}/${key}`;
 
     return NextResponse.json({
       uploadUrl,

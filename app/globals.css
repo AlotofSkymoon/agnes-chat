@@ -3,34 +3,54 @@
 @tailwind utilities;
 
 /* ==========================================================================
-   字体：SuperPingFangV1（SF Pro Display + 苹方）/ SuperSFMonoV1（SF Mono + 苹方）
-   按 unicode-range 拆包，浏览器只下载真正需要的那一份
+   字体：Montserrat（英文/数字）+ 昭源環方 Chiron GoRound TC（中文）
+   + SuperSFMonoV1（代码等宽）
+   中文按 unicode-range 单独分包，英文用户界面不会白下载中文字形
    ========================================================================== */
 
-/* --- SuperPingFangV1 · 拉丁（SF Pro Display）--- */
+/* --- Montserrat · 英文 UI --- */
 @font-face {
-  font-family: "SuperPingFangV1";
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Montserrat-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/Montserrat-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/Montserrat-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Montserrat";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/Montserrat-700.woff2") format("woff2");
+}
+
+/* --- 昭源環方 Chiron GoRound TC · 中文 ---
+   OFL 授权免费开源；子集含 GB2312 一级字 3755 个 + 界面实际用字 */
+@font-face {
+  font-family: "Chiron GoRound TC";
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
-  src: url("/fonts/SuperPingFangV1-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20A0-20BF, U+2074, U+20AC,
-    U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  src: url("/fonts/ChironGoRoundTC-400.woff2") format("woff2");
+  unicode-range: U+2E80-2EFF, U+3000-303F, U+3100-312F, U+3200-32FF,
+    U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE10-FE4F, U+FF00-FFEF;
 }
 
-/* --- SuperPingFangV1 · 中日韩（苹方）--- */
-@font-face {
-  font-family: "SuperPingFangV1";
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-  src: url("/fonts/SuperPingFangV1-cjk.woff2") format("woff2");
-  unicode-range: U+2E80-2EFF, U+3000-303F, U+3200-32FF, U+3400-4DBF,
-    U+4E00-9FFF, U+F900-FAFF, U+FE10-FE4F, U+FF00-FFEF;
-}
-
-/* --- SuperSFMonoV1 · 代码（SF Mono）--- */
+/* --- SuperSFMonoV1 · 代码（SF Mono + 苹方）--- */
 @font-face {
   font-family: "SuperSFMonoV1";
   font-style: normal;
