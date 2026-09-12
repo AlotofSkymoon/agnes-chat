@@ -7,6 +7,15 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Agnes AI 免费聊天",
   description: "极简、免费的 Agnes AI 网页聊天 —— 仅聊天，无 Agent 功能。",
+  applicationName: "Agnes AI",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180" }],
+    shortcut: [{ url: "/favicon.ico" }],
+  },
 };
 
 export const viewport: Viewport = {
