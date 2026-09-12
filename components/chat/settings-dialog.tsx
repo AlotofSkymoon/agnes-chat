@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
+  supportsThinking,
   AGENT_TIP,
   CUSTOM_PROVIDER_PREFIX,
   DEFAULT_MODEL,
@@ -61,6 +62,8 @@ export interface ChatSettings {
   model: string;
   /** 对象存储配置（图片 / 视频上传） */
   s3?: S3Config;
+  /** 思考模式：让模型先输出推理过程 */
+  thinking?: boolean;
 }
 
 interface SettingsDialogProps {
@@ -738,6 +741,22 @@ export function SettingsDialog({
             </div>
           </details>
           )}
+
+          {/* 思考模式 */}
+          {supportsThinking(form.model) ? (
+            <div className="flex items-center justify-between rounded-xl border border-border/70 bg-card/40 px-3 py-3">
+              <div className="pr-3">
+                <p className="text-sm font-medium">思考模式</p>
+                <p className="text-xs text-muted-foreground">
+                  开启后模型会先输出推理过程再作答；也可以在输入框左下角的「思考」按钮快速切换
+                </p>
+              </div>
+              <Switch
+                checked={form.thinking === true}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, thinking: v }))}
+              />
+            </div>
+          ) : null}
 
           {/* 云端保存 —— 仅管理员可见（站点级配置已移到 /admin） */}
           {!isAdmin ? null : user ? (

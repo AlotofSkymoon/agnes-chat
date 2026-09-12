@@ -36,6 +36,14 @@ export interface ModelOption {
   provider: ProviderId;
   /** 是否支持图片输入（vision-language） */
   vision: boolean;
+  /**
+   * 是否支持「思考模式」（输出链式推理过程）。
+   * Agnes 通过扩展字段 chat_template_kwargs.enable_thinking 开启；
+   * deepseek-reasoner 是原生推理模型，始终思考、无需开关。
+   */
+  thinking?: boolean;
+  /** 原生推理模型：思考不可关闭（如 deepseek-reasoner） */
+  alwaysThinking?: boolean;
 }
 
 /** 可选模型（纯聊天，不含 Agent / 工具调用） */
@@ -49,6 +57,7 @@ export const CHAT_MODELS: ModelOption[] = [
     desc: "最新一代 · Agent 执行强，支持识图",
     provider: "agnes",
     vision: true,
+    thinking: true,
   },
   {
     id: "agnes-2.5-flash",
@@ -56,6 +65,7 @@ export const CHAT_MODELS: ModelOption[] = [
     desc: "编码 / 推理见长，支持识图",
     provider: "agnes",
     vision: true,
+    thinking: true,
   },
   {
     id: "agnes-2.0-flash",
@@ -63,6 +73,7 @@ export const CHAT_MODELS: ModelOption[] = [
     desc: "稳定版，支持识图",
     provider: "agnes",
     vision: true,
+    thinking: true,
   },
   {
     id: "deepseek-chat",
@@ -74,9 +85,11 @@ export const CHAT_MODELS: ModelOption[] = [
   {
     id: "deepseek-reasoner",
     label: "deepseek-reasoner",
-    desc: "DeepSeek R1 · 深度推理",
+    desc: "DeepSeek R1 · 始终深度推理",
     provider: "deepseek",
     vision: false,
+    thinking: true,
+    alwaysThinking: true,
   },
 ];
 
@@ -115,6 +128,16 @@ export function supportsVision(modelId: string): boolean {
   return getModel(modelId)?.vision ?? false;
 }
 
+/** 该模型是否支持思考模式（可开关） */
+export function supportsThinking(modelId: string): boolean {
+  return getModel(modelId)?.thinking ?? false;
+}
+
+/** 该模型是否强制思考（原生推理模型，开关无效） */
+export function isAlwaysThinking(modelId: string): boolean {
+  return getModel(modelId)?.alwaysThinking ?? false;
+}
+
 /* --------------------------- 自定义供应商（用户自建） --------------------------- */
 
 /**
@@ -132,6 +155,8 @@ export interface CustomProviderConfig {
   models: string[];
   /** 这些模型是否支持识图 */
   vision?: boolean;
+  /** 这些模型是否支持思考模式（会带上 chat_template_kwargs.enable_thinking） */
+  thinking?: boolean;
 }
 
 /** 内置服务商 id 不能占用 */
@@ -188,7 +213,14 @@ export function sanitizeCustomProviders(input: unknown): CustomProviderConfig[] 
       (typeof c.label === "string" ? c.label.trim() : "") || id.replace(CUSTOM_PROVIDER_PREFIX, "");
 
     seen.add(id);
-    out.push({ id, label, baseUrl, models, vision: c.vision === true });
+    out.push({
+      id,
+      label,
+      baseUrl,
+      models,
+      vision: c.vision === true,
+      thinking: c.thinking === true,
+    });
   }
 
   // 最多 10 个自定义供应商，防止请求体被撑爆
@@ -203,6 +235,8 @@ export interface ResolvedTarget {
   label: string;
   baseUrl: string;
   vision: boolean;
+  /** 该供应商/模型是否支持思考模式 */
+  thinking: boolean;
   isCustom: boolean;
 }
 
@@ -228,6 +262,7 @@ export function resolveTarget(
       label: cfg.label,
       baseUrl: override || cfg.baseUrl,
       vision: builtin.vision,
+      thinking: builtin.thinking === true,
       isCustom: false,
     };
   }
@@ -241,6 +276,7 @@ export function resolveTarget(
       label: c.label,
       baseUrl: override || c.baseUrl,
       vision: c.vision === true,
+      thinking: c.thinking === true,
       isCustom: true,
     };
   }
@@ -324,4 +360,6 @@ export const LS_KEYS = {
   cloudSync: "agnes:cloudSync",
   sidebarCollapsed: "agnes:sidebarCollapsed",
   s3: "agnes:s3",
+  /** 思考模式开关 */
+  thinking: "agnes:thinking",
 } as const;

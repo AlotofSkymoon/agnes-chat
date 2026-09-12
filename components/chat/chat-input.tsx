@@ -1,7 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUp, FileText, FileVideo, Paperclip, Square, X } from "lucide-react";
+import {
+  ArrowUp,
+  Brain,
+  FileText,
+  FileVideo,
+  Paperclip,
+  Square,
+  X,
+} from "lucide-react";
 
 import { ModelPicker } from "@/components/chat/model-picker";
 import type { CustomProviderConfig } from "@/lib/config";
@@ -24,6 +32,11 @@ interface ChatInputProps {
   attachments?: Attachment[];
   onPickFiles?: (files: FileList | File[]) => void;
   onRemoveAttachment?: (id: string) => void;
+  /* ---- 思考模式 ---- */
+  /** 当前模型是否支持思考模式（不支持时不显示开关） */
+  thinkingSupported?: boolean;
+  thinking?: boolean;
+  onThinkingChange?: (on: boolean) => void;
 }
 
 export function ChatInput({
@@ -40,6 +53,9 @@ export function ChatInput({
   attachments = [],
   onPickFiles,
   onRemoveAttachment,
+  thinkingSupported = false,
+  thinking = false,
+  onThinkingChange,
 }: ChatInputProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
@@ -141,6 +157,26 @@ export function ChatInput({
         <div className="flex min-w-0 items-center gap-1.5">
           {model && onModelChange ? (
             <ModelPicker value={model} onChange={onModelChange} customProviders={customProviders} />
+          ) : null}
+          {thinkingSupported && onThinkingChange ? (
+            <button
+              type="button"
+              onClick={() => onThinkingChange(!thinking)}
+              title={
+                thinking
+                  ? "思考模式已开启：模型会先输出推理过程"
+                  : "开启思考模式：模型先推理再作答"
+              }
+              aria-pressed={thinking}
+              className={
+                thinking
+                  ? "flex h-7 shrink-0 items-center gap-1 rounded-full border border-primary/40 bg-primary/12 px-2.5 text-[11px] font-medium text-primary transition-colors"
+                  : "flex h-7 shrink-0 items-center gap-1 rounded-full border border-border px-2.5 text-[11px] text-fg-tertiary transition-colors hover:bg-muted hover:text-foreground"
+              }
+            >
+              <Brain className="h-3.5 w-3.5" />
+              思考
+            </button>
           ) : null}
           {onPickFiles ? (
             <>

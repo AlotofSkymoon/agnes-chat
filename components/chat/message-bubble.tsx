@@ -3,7 +3,9 @@
 import * as React from "react";
 import { useState } from "react";
 import {
+  Brain,
   Check,
+  ChevronDown,
   Copy,
   FileDown,
   FileText,
@@ -23,6 +25,57 @@ interface MessageBubbleProps {
   message: ChatMessage;
   onRetry?: () => void;
   isStreaming?: boolean;
+}
+
+/**
+ * 思考过程展示块。
+ *
+ * 流式输出时默认展开（让用户看到模型正在推理），并带呼吸感的「思考中」提示；
+ * 出完后自动收起，点标题可再展开 —— 不占正文篇幅，想看又能看到。
+ */
+function ThinkingBlock({
+  reasoning,
+  streaming,
+}: {
+  reasoning: string;
+  streaming: boolean;
+}) {
+  // 流式时跟着展开，结束后默认收起
+  const [open, setOpen] = React.useState(true);
+  React.useEffect(() => {
+    if (!streaming) setOpen(false);
+  }, [streaming]);
+
+  return (
+    <div className="mb-2 overflow-hidden rounded-xl border border-border/60 bg-muted/30">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-fg-tertiary transition-colors hover:bg-muted/50"
+        aria-expanded={open}
+      >
+        <Brain className="h-3.5 w-3.5 shrink-0 text-primary" />
+        <span className="font-medium">
+          {streaming ? "思考中…" : "已完成思考"}
+        </span>
+        {streaming ? (
+          <span className="h-1 w-1 animate-caret rounded-full bg-primary" />
+        ) : null}
+        <ChevronDown
+          className={`ml-auto h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${
+            open ? "" : "-rotate-90"
+          }`}
+        />
+      </button>
+      {open ? (
+        <div className="max-h-64 overflow-y-auto border-t border-border/50 px-3 py-2">
+          <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed text-fg-tertiary">
+            {reasoning}
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 /** 语言标注 → 文件扩展名 */
@@ -159,6 +212,13 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
       </div>
 
       <div className="min-w-0 flex-1">
+        {/* 思考过程：有内容才渲染，流式时默认展开并显示"思考中" */}
+        {message.reasoning ? (
+          <ThinkingBlock
+            reasoning={message.reasoning}
+            streaming={Boolean(isStreaming) && !message.reasoningDone}
+          />
+        ) : null}
         {message.error ? (
           <div className="space-y-3 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3">
             <div className="flex items-start gap-2 text-sm text-destructive">

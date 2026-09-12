@@ -40,6 +40,8 @@ interface ChatRequestBody {
   baseUrls?: Record<string, string>;
   /** 用户自建的 OpenAI 兼容供应商 */
   customProviders?: unknown;
+  /** 思考模式：让模型先输出推理过程，再给答案 */
+  thinking?: boolean;
   /** 云端保存开关打开时才传 */
   conversationId?: string;
   saveToCloud?: boolean;
@@ -66,6 +68,7 @@ export async function POST(request: Request) {
     customProviders,
     conversationId,
     saveToCloud,
+    thinking,
   } = body;
 
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -157,6 +160,12 @@ export async function POST(request: Request) {
 
   const upstreamUrl = `${targetBase}/chat/completions`;
 
+  /**
+   * 思考模式是否真的开启。
+   * 只有「用户开了 + 目标供应商支持」才发，避免给不支持的服务带多余字段。
+   */
+  const thinkingOn = thinking === true && target.thinking;
+
   const buildUpstreamRequest = (): RequestInit => ({
     method: "POST",
     headers: {
@@ -168,6 +177,12 @@ export async function POST(request: Request) {
       model,
       messages: outbound.map((m) => ({ role: m.role, content: m.content })),
       stream: true,
+      /**
+       * Agnes 的扩展字段：开启后在 delta 里额外回传 reasoning_content。
+       * 这是 OpenAI 生态里表示「思考内容」的事实标准字段
+       * （DeepSeek R1 也用它），所以前端按同一字段解析即可。
+       */
+      ...(thinkingOn ? { chat_template_kwargs: { enable_thinking: true } } : {}),
     }),
     signal: request.signal,
   });

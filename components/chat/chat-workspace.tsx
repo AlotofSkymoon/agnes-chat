@@ -24,6 +24,7 @@ import {
   CHAT_MODELS,
   DEFAULT_MODEL,
   LS_KEYS,
+  supportsThinking,
   supportsVision,
   type CustomProviderConfig,
 } from "@/lib/config";
@@ -161,6 +162,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         customProviders,
         model: localStorage.getItem(LS_KEYS.model) ?? DEFAULT_MODEL,
         s3,
+        thinking: localStorage.getItem(LS_KEYS.thinking) === "true",
       };
       setSettings(saved);
       setCloudSync(localStorage.getItem(LS_KEYS.cloudSync) === "true");
@@ -275,6 +277,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         customProviders: settings.customProviders,
         conversationId,
         saveToCloud: Boolean(user) && cloudSync,
+        thinking: thinkingRef.current,
       };
       const bodyBytes = new TextEncoder().encode(JSON.stringify(bodyObj)).length;
       const PLATFORM_BODY_LIMIT =
@@ -329,6 +332,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let acc = "";
+        let reasoningAcc = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -341,10 +345,19 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
             if (!data || data === "[DONE]") continue;
             try {
               const json = JSON.parse(data);
-              const delta: string = json?.choices?.[0]?.delta?.content ?? "";
+              const d = json?.choices?.[0]?.delta ?? {};
+              // 思考内容：OpenAI 生态事实标准字段（Agnes thinking / DeepSeek R1 都用它）
+              const reasoning: string = typeof d.reasoning_content === "string" ? d.reasoning_content : "";
+              const delta: string = typeof d.content === "string" ? d.content : "";
+
+              if (reasoning) {
+                reasoningAcc += reasoning;
+                patchAssistant({ reasoning: reasoningAcc });
+              }
               if (delta) {
                 acc += delta;
-                patchAssistant({ content: acc });
+                // 正文开始到达 → 思考阶段结束，用于切换 UI 状态
+                patchAssistant({ content: acc, reasoningDone: true });
               }
             } catch {
               /* SSE 分片，忽略 */
@@ -352,7 +365,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
           }
         }
 
-        if (!acc) patchAssistant({ error: "未收到模型返回内容，请重试" });
+        if (!acc && !reasoningAcc) patchAssistant({ error: "未收到模型返回内容，请重试" });
+        else patchAssistant({ reasoningDone: true });
       } catch (error) {
         const isAbort = (error as Error)?.name === "AbortError";
         patchAssistant({ error: isAbort ? "已停止生成" : "网络错误，请检查连接后重试" });
@@ -456,6 +470,16 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
   React.useEffect(() => {
     s3Ref.current = settings.s3 ?? DEFAULT_S3_CONFIG;
   }, [settings.s3]);
+
+  /**
+   * 思考模式开关。
+   * 用 ref 是因为 runCompletion 是 useCallback，
+   * 依赖里带 settings 会导致每次改设置都重建回调；ref 能读到最新值又不触发重建。
+   */
+  const thinkingRef = React.useRef(false);
+  React.useEffect(() => {
+    thinkingRef.current = settings.thinking === true;
+  }, [settings.thinking]);
 
   /** 当前部署平台，用于发送前的请求体体积预检（Vercel 上限比 Workers 小得多） */
   const platformRef = React.useRef<"cloudflare" | "vercel" | "local">("local");
@@ -667,6 +691,20 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     });
   }
 
+  /** 切换思考模式（输入框里的快捷开关） */
+  function toggleThinking(on: boolean) {
+    setSettings((prev) => {
+      const next = { ...prev, thinking: on };
+      thinkingRef.current = on;
+      try {
+        localStorage.setItem(LS_KEYS.thinking, on ? "true" : "false");
+      } catch {
+        /* 忽略 */
+      }
+      return next;
+    });
+  }
+
   function saveSettings(next: ChatSettings) {
     setSettings(next);
     try {
@@ -674,6 +712,9 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       localStorage.setItem(LS_KEYS.baseUrls, JSON.stringify(next.baseUrls));
       localStorage.setItem(LS_KEYS.customProviders, JSON.stringify(next.customProviders));
       localStorage.setItem(LS_KEYS.model, next.model);
+      if (next.thinking !== undefined) {
+        localStorage.setItem(LS_KEYS.thinking, next.thinking ? "true" : "false");
+      }
       if (next.s3) localStorage.setItem(LS_KEYS.s3, JSON.stringify(next.s3));
     } catch {
       /* 忽略 */
@@ -803,6 +844,9 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   attachments={attachments}
                   onPickFiles={addFiles}
                   onRemoveAttachment={removeAttachment}
+                  thinkingSupported={supportsThinking(mounted ? settings.model : DEFAULT_MODEL)}
+                  thinking={settings.thinking === true}
+                  onThinkingChange={toggleThinking}
                 />
                 <p className="mt-3 text-center text-xs text-fg-quaternary">
                   内容由 AI 生成，仅供参考 · 仅聊天，无 Agent / 联网 / 文件上传
@@ -823,6 +867,9 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                   attachments={attachments}
                   onPickFiles={addFiles}
                   onRemoveAttachment={removeAttachment}
+                  thinkingSupported={supportsThinking(mounted ? settings.model : DEFAULT_MODEL)}
+                  thinking={settings.thinking === true}
+                  onThinkingChange={toggleThinking}
                 />
                 <p className="mt-2 text-center text-xs text-fg-quaternary">
                   内容由 AI 生成，仅供参考
