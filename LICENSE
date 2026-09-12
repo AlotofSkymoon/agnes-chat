@@ -1,0 +1,116 @@
+AI 免費聊天站 —— 开源许可与部署授权条款
+==================================================
+
+版权所有 (c) 2026 wcvjk8tnz8
+
+本项目由 **wcvjk8tnz8** 创作，上游代码源自 AlotofSkymoon/agnes-chat（原 Agnes AI 免费聊天项目），
+经迁移、重构与功能扩展而来。
+
+
+一、代码许可（MIT）
+--------------------------------------------------
+
+**源代码部分采用 MIT 许可**，你可以自由地：
+
+- 阅读、学习、修改源代码
+- 复制、分发代码副本
+- 用于私人学习与技术交流
+- 提交 Pull Request 贡献改进
+
+前提条件：
+
+- 保留本许可声明与版权声明
+- 软件按"原样"提供，作者不承担任何责任
+
+完整的 MIT 条款见下方第三部分。
+
+
+二、部署与二次分发授权（附加条款，必须遵守）
+--------------------------------------------------
+
+⚠️ **MIT 许可仅覆盖源代码，不自动授予部署权。**
+
+在以下任一行为发生前，**必须先取得作者 wcvjk8tnz8 的书面许可**：
+
+1. **公开部署**
+   将本项目（含修改版、衍生版）部署到任何可公开访问的域名、
+   Cloudflare Workers、Vercel、Netlify 或任何其他托管平台。
+
+2. **重新分发 / 转售**
+   打包、镜像、转售，或作为模板/脚手架提供给第三方使用。
+
+3. **更换品牌对外运营**
+   修改站点名称、Logo、版权信息后，以你自己的名义对外提供服务。
+
+4. **移除或篡改版权声明**
+   删除、修改页脚的创作者署名或 upstream 来源标注。
+
+### 为什么有这条限制？
+
+本项目的定位是**中转 API 服务商的官方演示站** ——
+站长配置自己的 API Key 与 Base URL 后，访客开箱即用。
+
+若任何人都能无门槛地公开部署，会导致：
+
+- 站点内置的中转额度被恶意盗刷，成本由站长承担
+- 出现大量冒用品牌、来源不明的克隆站，损害原作者与用户利益
+- 用户无法分辨哪个是官方站，产生信任与安全问题
+
+因此部署权单独保留，这**不影响**你学习代码、本地运行、提交贡献。
+
+### 如何申请授权？
+
+在 GitHub 仓库提交 Issue，或联系作者，说明：
+
+- 你的用途（个人学习 / 中转站演示 / 企业内部 等）
+- 计划使用的域名与托管平台
+- 是否带有自己的 API 额度
+
+作者会尽快回复。自用性质的小规模部署通常会获批。
+
+
+三、MIT 许可全文（适用于源代码）
+--------------------------------------------------
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+**上述 MIT 授予的权利，在涉及本文件第二部分所述的"公开部署"与"二次分发"
+行为时，须以取得作者书面许可为前提。**
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+四、署名要求
+--------------------------------------------------
+
+任何公开部署的副本（无论是否修改）**必须**在页面可见位置保留：
+
+- 创作者：**wcvjk8tnz8**
+- 上游来源：AlotofSkymoon/agnes-chat（原项目迁移）
+
+建议直接保留默认页脚，它已包含上述信息。
+
+
+五、第三方组件
+--------------------------------------------------
+
+本项目依赖的第三方库（Next.js、Tailwind CSS、shadcn/ui、lucide-react 等）
+各自遵循其原始许可，不受本文件第二部分限制。
+
+字体资源：
+- Montserrat —— SIL Open Font License 1.1
+- 昭源環方 Chiron GoRound TC —— SIL Open Font License 1.1

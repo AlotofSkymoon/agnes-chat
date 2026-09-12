@@ -116,6 +116,75 @@
     --glass-border: 228 20% 84%;
   }
 
+  /* ==========================================================================
+     主题预设：data-theme="fuwari" | data-theme="violet-rose"
+     放在 :root 与 .dark 之后，通过更高特异性覆盖明暗基础色
+     ========================================================================== */
+
+  /* --- Fuwari：清透蓝，淡雅留白，圆角卡片 --- */
+  [data-theme="fuwari"] {
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 217 91% 60%;
+    --accent: 214 95% 96%;
+    --accent-foreground: 217 91% 42%;
+    --secondary: 214 60% 97%;
+    --muted: 214 40% 97%;
+    --sidebar: 214 33% 98%;
+    --user-bubble: 214 100% 96%;
+    --glass-bg: 0 0% 100%;
+    --glass-border: 214 20% 84%;
+  }
+
+  [data-theme="fuwari"].dark {
+    --primary: 213 94% 68%;
+    --ring: 213 94% 68%;
+    --accent: 217 40% 22%;
+    --accent-foreground: 213 20% 93%;
+    --secondary: 217 12% 18%;
+    --muted: 217 10% 17%;
+    --sidebar: 217 12% 9%;
+    --user-bubble: 217 30% 22%;
+    --glass-bg: 217 10% 20%;
+    --glass-border: 217 8% 34%;
+  }
+
+  /* --- Violet Rose：紫玫瑰，柔光渐变 --- */
+  [data-theme="violet-rose"] {
+    --primary: 292 84% 61%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 292 84% 61%;
+    --accent: 300 100% 97%;
+    --accent-foreground: 292 60% 40%;
+    --secondary: 295 60% 97%;
+    --muted: 295 40% 97%;
+    --sidebar: 295 33% 98%;
+    --user-bubble: 300 100% 97%;
+    --border: 295 20% 91%;
+    --input: 295 20% 91%;
+    --glass-bg: 0 0% 100%;
+    --glass-border: 295 20% 84%;
+  }
+
+  [data-theme="violet-rose"].dark {
+    --background: 280 12% 10%;
+    --card: 285 10% 13%;
+    --popover: 285 10% 14%;
+    --sidebar: 285 12% 8%;
+    --primary: 292 84% 72%;
+    --primary-foreground: 285 40% 12%;
+    --ring: 292 84% 72%;
+    --accent: 292 40% 22%;
+    --accent-foreground: 290 20% 93%;
+    --secondary: 290 12% 18%;
+    --muted: 290 10% 17%;
+    --user-bubble: 292 30% 24%;
+    --border: 285 8% 20%;
+    --input: 285 8% 22%;
+    --glass-bg: 285 10% 20%;
+    --glass-border: 292 10% 34%;
+  }
+
   .dark {
     --background: 0 0% 11%;
     --card: 0 0% 14%;

@@ -2,13 +2,19 @@ import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
 
 import { DynamicTitle } from "@/components/dynamic-title";
+import {
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TAGLINE,
+  SITE_TITLE,
+} from "@/lib/site";
 import { ThemeProvider, themeInitScript } from "@/components/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Agnes AI 免费聊天",
-  description: "极简、免费的 Agnes AI 网页聊天 —— 仅聊天，无 Agent 功能。",
-  applicationName: "Agnes AI",
+  title: SITE_TITLE,
+  applicationName: SITE_NAME,
+  description: SITE_DESCRIPTION,
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

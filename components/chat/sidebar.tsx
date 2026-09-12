@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { AgnesIcon } from "@/components/agnes-logo";
+import { SITE_NAME } from "@/lib/site";
 import { Button } from "@/components/ui/button";
 import type { Conversation } from "@/lib/use-conversations";
 import { cn } from "@/lib/utils";
@@ -76,7 +77,7 @@ export function Sidebar({
               <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#4D6BFE] p-1.5 text-white">
                 <AgnesIcon />
               </span>
-              <span className="text-sm font-semibold">Agnes AI</span>
+              <span className="text-sm font-semibold">{SITE_NAME}</span>
             </Link>
             <div className="flex items-center gap-0.5">
               {onToggleCollapse ? (

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { LS_KEYS } from "@/lib/config";
+import { SiteFooter } from "@/components/site-footer";
 
 interface AccountUser {
   id: string;
@@ -183,6 +184,7 @@ export function AccountClient({ user }: { user: AccountUser }) {
           </CardContent>
         </Card>
       </div>
+      <SiteFooter />
     </main>
   );
 }

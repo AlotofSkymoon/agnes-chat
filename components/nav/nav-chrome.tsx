@@ -7,6 +7,7 @@ import { Compass, LogIn, MessageSquare, Shield, User as UserIcon } from "lucide-
 import { AgnesIcon } from "@/components/agnes-logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { SITE_NAME } from "@/lib/site";
 
 interface ChromeUser {
   id: string;
@@ -37,7 +38,7 @@ export function NavChrome({ user }: { user?: ChromeUser | null }) {
     <header className="glass-bar relative z-10 flex items-center justify-between gap-2 px-3 py-2.5 sm:px-6">
       <Link href="/" className="flex items-center gap-2">
         <AgnesIcon className="h-7 w-7 text-[#4D6BFE]" />
-        <span className="text-sm font-semibold sm:text-base">Agnes AI</span>
+        <span className="text-sm font-semibold sm:text-base">{SITE_NAME}</span>
       </Link>
 
       <div className="flex items-center gap-1">

@@ -1,20 +1,55 @@
-# Agnes AI 免费聊天
+# AI 免費聊天站
 
-极简、免费的 Agnes AI 网页聊天站。仅聊天，无 Agent 功能。
+> **中转 API 的官方演示站** —— 站长把自己的 Key 和 Base URL 配进环境变量，
+> 访客打开就能直接聊，不用自己申请 Key。当然也可以自带 Key。
 
-- **技术栈**：Next.js 14（App Router）+ TypeScript + Tailwind CSS + shadcn/ui + lucide-react
-- **部署**：Cloudflare Workers（**推荐**）或 Vercel（不推荐）—— 代码自动识别平台
-- **数据**：Cloudflare 部署用 **KV + D1**；Vercel 部署用 **Upstash Redis**
-- **对象存储**：Cloudflare 用 **R2**；Vercel 用 **Backblaze B2**
-- **权限**：第一个注册的用户自动成为管理员（`D1 meta` 表 / Redis `INCR` 原子判断）
+由 **wcvjk8tnz8** 创作 · 上游迁移自 `AlotofSkymoon/agnes-chat`（原 Agnes AI 免费聊天）
 
 ---
 
-## 🚀 部署方式（推荐 Cloudflare Workers）
+## 📌 这个项目是什么？
 
-### 为什么推荐 Workers、不推荐 Vercel
+如果你在运营一个 **API 中转服务**（或者拿到某家的额度想给别人试用），
+通常需要一个"演示站"：用户打开网页就能聊天，不用去申请 Key、不用填 Base URL。
 
-| | Cloudflare Workers | Vercel |
+**本项目就是这个演示站**，开箱即用：
+
+| 角色 | 体验 |
+|---|---|
+| **访客** | 打开 → 直接聊，零配置 |
+| **想用自己的额度** | 设置里填自己的 Key / Base URL（可关掉此权限） |
+| **站长** | 环境变量配一次，全站生效，密钥不下发浏览器 |
+
+默认品牌是 **Agnes AI**（`apihub.agnes-ai.com/v1`），
+改环境变量就能换成任意 OpenAI 兼容服务 —— DeepSeek、Kimi、智谱、自建 One API / New API 都行。
+
+**功能范围**：纯文本聊天 + 图片/视频识别（需 vision 模型）+ 多对话管理 + 用户系统 + 导航站。
+不做 Agent、工具调用、联网搜索、代码执行。
+
+---
+
+## ⚖️ 许可与授权（部署前必读）
+
+| | 说明 |
+|---|---|
+| **源代码** | MIT 许可，可自由阅读、学习、修改、提交 PR |
+| **公开部署** | ⚠️ **需先取得作者 wcvjk8tnz8 书面许可** |
+| **署名** | 公开副本必须保留创作者与上游来源标注 |
+
+源码开源 ≠ 可以随便部署。原因很简单：站点内置的中转额度由站长买单，
+无门槛克隆会导致额度盗刷和品牌冒用。完整条款见 [LICENSE](./LICENSE)。
+
+**申请授权**：在仓库提 Issue，说明用途、域名、托管平台即可。
+自用性质的小规模部署通常会获批。
+
+---
+
+## 🚀 部署（不会代码也能做）
+
+两种方式二选一。存储与对象存储后端会**按部署平台自动识别**：
+在 Cloudflare 上走 KV + D1 + R2，在 Vercel 上走 Upstash + B2。
+
+| | ⭐ Cloudflare Workers（推荐） | Vercel（不推荐） |
 |---|---|---|
 | 数据库 | KV + D1，**自带免费额度，不用额外注册** | 需另注册 Upstash Redis |
 | 对象存储 | R2，**零出站流量费**（图片视频外链不花钱） | 只能 Backblaze B2，S3 兼容层不完整 |
@@ -120,6 +155,51 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 4. Deploy。Vercel 上**不要**填 `R2_*`（不会被读取）。
 
 > 改了环境变量后必须 Redeploy 才生效。
+
+---
+
+## 🎨 换成你自己的品牌（中转站必看）
+
+默认整套品牌是 **Agnes AI**。想挂上你自己的中转服务，改环境变量即可，**不用动代码**。
+
+### 基础品牌
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `NEXT_PUBLIC_SITE_NAME` | `Agnes AI` | 站点名，出现在标题栏、侧边栏、页脚 |
+| `NEXT_PUBLIC_SITE_TAGLINE` | `免费聊天` | 副标题，跟在站点名后面 |
+| `NEXT_PUBLIC_SITE_DESCRIPTION` | 自动拼接 | SEO 描述 |
+| `NEXT_PUBLIC_THEME` | `fuwari` | 配色：`fuwari`（清透蓝）/ `violet-rose`（紫玫瑰） |
+| `NEXT_PUBLIC_AUTHOR_NAME` | `wcvjk8tnz8` | 页脚创作者署名 |
+| `NEXT_PUBLIC_REPO_URL` | 本仓库 | 页脚源码链接 |
+| `NEXT_PUBLIC_UPSTREAM_URL` | 上游仓库 | 页脚上游标注 |
+
+> 两套配色访客都能在「设置 → 配色主题」里随时切换，
+> `NEXT_PUBLIC_THEME` 只决定**首次打开**用哪套。
+
+### 换成别的中转服务
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `PRESET_AGNES_API_KEY` | Agnes 内置 Key | 站长提供的 Key，访客不填时用这个 |
+| `UPSTREAM_BASE_URL` | `https://apihub.agnes-ai.com/v1` | 中转地址 |
+| `UPSTREAM_MODEL` | `agnes-2.5-flash` | 默认模型 |
+| `NEXT_PUBLIC_ALLOW_CUSTOM_KEY` | `true` | 设 `false` 锁死：访客只能用站长的 Key |
+| `NEXT_PUBLIC_ALLOW_CUSTOM_BASE_URL` | `true` | 设 `false` 锁死 Base URL |
+
+> 💡 只要服务兼容 OpenAI 的 `/chat/completions` 就能直接套用。
+> One API / New API / VoAPI 这类自建聚合站同样支持。
+
+### 演示站的两种玩法
+
+**A. 站长全包（推荐）**
+配好 `PRESET_AGNES_API_KEY` + `UPSTREAM_BASE_URL`，再把
+`NEXT_PUBLIC_ALLOW_CUSTOM_KEY` 设成 `false`。
+访客打开就能聊，看不到也改不了任何 Key 配置。
+
+**B. 自带 Key（开放）**
+用默认值即可。访客可以在设置里填自己的 Key 和 Base URL，
+不填就用站长内置的。适合小圈子共享。
 
 ---
 

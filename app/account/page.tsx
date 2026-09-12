@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import { AccountClient } from "@/components/account-client";
 import { getCurrentSafeUser } from "@/lib/auth";
 import { hasRedisConfig } from "@/lib/redis";
+import { pageTitle } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "账户设置 · Agnes AI 免费聊天" };
+export const metadata = { title: pageTitle("账户设置") };
 
 export default async function AccountPage() {
   if (!hasRedisConfig()) redirect("/");

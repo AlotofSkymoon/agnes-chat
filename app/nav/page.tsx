@@ -3,10 +3,11 @@ import { ArrowLeft, MessageSquare } from "lucide-react";
 
 import { NavBoard } from "@/components/nav/nav-board";
 import { NavChrome } from "@/components/nav/nav-chrome";
+import { pageTitle } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "导航 · Agnes AI 免费聊天",
+  title: pageTitle("导航"),
   description: "站长工具、免费资源导航与全球域名后缀速查",
 };
 

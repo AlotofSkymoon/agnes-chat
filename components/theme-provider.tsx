@@ -2,26 +2,39 @@
 
 import * as React from "react";
 
+import { SITE_THEME, type ThemePreset } from "@/lib/site";
+
 type Theme = "dark" | "light";
 
 const STORAGE_KEY = "agnes:theme";
+const PRESET_KEY = "agnes:theme-preset";
 
 interface ThemeContextValue {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+  /** 配色预设：fuwari / violet-rose */
+  preset: ThemePreset;
+  setPreset: (preset: ThemePreset) => void;
 }
 
 const ThemeContext = React.createContext<ThemeContextValue | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = React.useState<Theme>("light");
+  const [preset, setPresetState] = React.useState<ThemePreset>(SITE_THEME);
 
   React.useEffect(() => {
     const stored = (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? null;
     const initial: Theme = stored ?? "light";
     setThemeState(initial);
     document.documentElement.classList.toggle("dark", initial === "dark");
+
+    const storedPreset = localStorage.getItem(PRESET_KEY) as ThemePreset | null;
+    const initialPreset: ThemePreset =
+      storedPreset === "violet-rose" || storedPreset === "fuwari" ? storedPreset : SITE_THEME;
+    setPresetState(initialPreset);
+    document.documentElement.dataset.theme = initialPreset;
   }, []);
 
   const setTheme = React.useCallback((next: Theme) => {
@@ -34,8 +47,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setTheme(document.documentElement.classList.contains("dark") ? "light" : "dark");
   }, [setTheme]);
 
+  const setPreset = React.useCallback((next: ThemePreset) => {
+    setPresetState(next);
+    localStorage.setItem(PRESET_KEY, next);
+    document.documentElement.dataset.theme = next;
+  }, []);
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>{children}</ThemeContext.Provider>
+    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, preset, setPreset }}>
+      {children}
+    </ThemeContext.Provider>
   );
 }
 
@@ -45,5 +66,15 @@ export function useTheme() {
   return ctx;
 }
 
-/** 防止刷新时闪白：在 <head> 中同步执行 */
-export const themeInitScript = `(function(){try{var t=localStorage.getItem('${STORAGE_KEY}');var d=t?t==='dark':false;if(d)document.documentElement.classList.add('dark');else document.documentElement.classList.remove('dark');}catch(e){document.documentElement.classList.remove('dark');}})();`;
+/**
+ * 防止刷新时闪白/闪主题：在 <head> 中同步执行。
+ * 明暗用 .dark class，配色用 data-theme 属性，两者互不干扰。
+ */
+export const themeInitScript = `(function(){try{
+var t=localStorage.getItem('${STORAGE_KEY}');
+var d=t?t==='dark':false;
+var r=document.documentElement;
+if(d)r.classList.add('dark');else r.classList.remove('dark');
+var p=localStorage.getItem('${PRESET_KEY}');
+r.dataset.theme=(p==='violet-rose'||p==='fuwari')?p:'${SITE_THEME}';
+}catch(e){document.documentElement.classList.remove('dark');}})();`;

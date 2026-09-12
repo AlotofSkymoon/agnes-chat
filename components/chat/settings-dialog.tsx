@@ -7,6 +7,7 @@ import {
   EyeOff,
   ExternalLink,
   KeyRound,
+  Palette,
   Server,
   Trash2,
 } from "lucide-react";
@@ -25,6 +26,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { AGENT_TIP, PROVIDERS, type ProviderId } from "@/lib/config";
+import {
+  ALLOW_CUSTOM_BASE_URL,
+  ALLOW_CUSTOM_KEY,
+  THEME_PRESETS,
+  type ThemePreset,
+} from "@/lib/site";
+import { useTheme } from "@/components/theme-provider";
 import {
   DEFAULT_S3_CONFIG,
   presetsForPlatform,
@@ -100,6 +108,8 @@ export function SettingsDialog({
     };
   }, [open]);
 
+  const { preset, setPreset } = useTheme();
+
   const s3 = form.s3 ?? DEFAULT_S3_CONFIG;
   const patchS3 = (patch: Partial<S3Config>) =>
     setForm((f) => ({ ...f, s3: { ...(f.s3 ?? DEFAULT_S3_CONFIG), ...patch } }));
@@ -131,12 +141,51 @@ export function SettingsDialog({
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-5">
-          {/* API Keys（按服务商） */}
+          {/* 外观：配色预设 */}
+          <div className="space-y-2 rounded-xl border border-border/70 bg-card/40 p-3">
+            <Label className="flex items-center gap-2">
+              <Palette className="h-4 w-4" />
+              配色主题
+            </Label>
+            <div className="grid grid-cols-2 gap-2">
+              {THEME_PRESETS.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setPreset(t.id as ThemePreset)}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-left transition-colors",
+                    preset === t.id
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:bg-muted",
+                  )}
+                >
+                  <span className="block text-sm font-medium">{t.label}</span>
+                  <span className="mt-0.5 block text-[11px] text-fg-tertiary">{t.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* API Keys（按服务商）—— 站长可锁死为「仅用内置 Key」 */}
           <div className="space-y-4">
             <Label className="flex items-center gap-2">
               <KeyRound className="h-4 w-4" />
               API Key
+              {!ALLOW_CUSTOM_KEY ? (
+                <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] text-fg-tertiary">
+                  本站点已内置，无需填写
+                </span>
+              ) : null}
             </Label>
+
+            {!ALLOW_CUSTOM_KEY ? (
+              <p className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-[11px] text-fg-secondary">
+                本站已配置好 API Key，打开即可直接聊天。
+              </p>
+            ) : null}
+
+            <div className={ALLOW_CUSTOM_KEY ? "space-y-4" : "hidden"}>
 
             {PROVIDER_ORDER.map((pid) => {
               const p = PROVIDERS[pid];
@@ -184,6 +233,7 @@ export function SettingsDialog({
                 </div>
               );
             })}
+            </div>
           </div>
 
           {/* 模型：已移到输入框左下角的小选择框 */}
@@ -192,7 +242,8 @@ export function SettingsDialog({
             <span className="font-medium text-foreground">{form.model}</span>）。
           </div>
 
-          {/* 高级：Base URL */}
+          {/* 高级：Base URL（站长可隐藏） */}
+          {!ALLOW_CUSTOM_BASE_URL ? null : (
           <details className="rounded-xl border border-border/70 bg-card/40 px-3 py-2">
             <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
               <Server className="h-4 w-4" />
@@ -210,6 +261,7 @@ export function SettingsDialog({
               </p>
             </div>
           </details>
+          )}
 
           {/* 对象存储：图片 / 视频上传 */}
           <details className="rounded-xl border border-border/70 bg-card/40 px-3 py-2">

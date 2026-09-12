@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import { AdminClient } from "@/components/admin-client";
 import { getCurrentSafeUser } from "@/lib/auth";
 import { hasRedisConfig } from "@/lib/redis";
+import { pageTitle } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "管理员 · Agnes AI 免费聊天" };
+export const metadata = { title: pageTitle("管理员") };
 
 export default async function AdminPage() {
   if (!hasRedisConfig()) redirect("/");

@@ -73,9 +73,18 @@ export const CHAT_MODELS: ModelOption[] = [
 /** 兼容旧引用的 Agnes 模型列表 */
 export const AGNES_MODELS = CHAT_MODELS.filter((m) => m.provider === "agnes");
 
-export const DEFAULT_MODEL = "agnes-2.5-flash";
+/**
+ * 默认模型。站长可用 UPSTREAM_MODEL 换成自己中转服务的模型名，
+ * 这样连"换中转服务"都不用改代码。
+ */
+export const DEFAULT_MODEL = process.env.UPSTREAM_MODEL?.trim() || "agnes-2.5-flash";
 
-export const DEFAULT_BASE_URL = PROVIDERS.agnes.baseUrl;
+/**
+ * 默认上游地址。站长可用 UPSTREAM_BASE_URL 指向自己的中转服务
+ * （One API / New API / VoAPI 等 OpenAI 兼容聚合站都行）。
+ */
+export const DEFAULT_BASE_URL =
+  process.env.UPSTREAM_BASE_URL?.trim() || PROVIDERS.agnes.baseUrl;
 
 export const AGENT_TIP = "仅聊天模式。需要 Agent 功能请去 AgentScope 添加 Agnes API Key。";
 

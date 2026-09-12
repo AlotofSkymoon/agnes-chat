@@ -3,8 +3,10 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { AuthForm } from "@/components/auth-form";
+import { pageTitle } from "@/lib/site";
+import { SiteFooter } from "@/components/site-footer";
 
-export const metadata = { title: "注册 · Agnes AI 免费聊天" };
+export const metadata = { title: pageTitle("注册") };
 
 export default function RegisterPage() {
   return (
@@ -21,6 +23,7 @@ export default function RegisterPage() {
         <Suspense fallback={null}>
           <AuthForm mode="register" />
         </Suspense>
+        <SiteFooter className="mt-8" />
       </div>
     </main>
   );
