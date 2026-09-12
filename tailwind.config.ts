@@ -11,12 +11,12 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        // SuperPingFangV1 = SF Pro Display（拉丁）+ 苹方（中日韩）
+        // Montserrat（英文/数字）+ 昭源環方 Chiron GoRound TC（中文）
         sans: [
-          "SuperPingFangV1",
+          "Montserrat",
+          "Chiron GoRound TC",
           "-apple-system",
           "BlinkMacSystemFont",
-          "SF Pro Display",
           "system-ui",
           "PingFang SC",
           "Hiragino Sans GB",
