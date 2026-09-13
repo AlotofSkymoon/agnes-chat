@@ -78,13 +78,20 @@ export async function POST(request: Request) {
   }
 
   /**
-   * 公开 URL 的拼法：
-   * 1. 配了 S3_ACCESS_HOST / R2_PUBLIC_BASE_URL 自定义域 → 直接用
-   * 2. 否则给出相对路径，走同源的 /api/r2/[...key] 代理读取
-   *    （桶没开公开读时也能正常访问，因为读取同样走 binding）
+   * 公开 URL 的拼法 —— **必须是绝对 URL**。
+   *
+   * ⚠️ 这里曾经返回相对路径 `/api/r2/xxx`，结果 AI 完全读不到图：
+   * 前端把 content 原样塞进 `image_url.url` 发给上游，
+   * 而上游服务器不知道本站域名，相对路径对它毫无意义。
+   * 表现为"明明配了 R2、上传也成功，AI 还是看不见图"。
+   *
+   * 所以这里用请求的 origin 拼成绝对地址：
+   * 1. 配了 S3_ACCESS_HOST / R2_PUBLIC_BASE_URL 自定义域 → 用它
+   * 2. 否则走同源的 /api/r2/<key> 代理（桶不用开公开读）
    */
   const host = r2PublicHost().replace(/\/+$/, "");
-  const publicUrl = host ? `${host}/${key}` : `/api/r2/${key}`;
+  const origin = new URL(request.url).origin;
+  const publicUrl = host ? `${host}/${key}` : `${origin}/api/r2/${key}`;
 
   return NextResponse.json({
     ok: true,

@@ -6,17 +6,23 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/r2/[...key] —— 用 binding 读取 R2 对象。
+ * GET /api/r2/<...key> —— 用 binding 读取 R2 对象。
  *
- * 存在的意义：桶没开"公开读"时，外部访问不了 r2.dev 域名，
- * 但 Worker 通过 binding 照样能读到。所以让读取也走一遍 Worker ——
+ * ⚠️ 必须是 catch-all（`[...key]`）而不是单段 `[key]`：
+ * 对象 key 形如 `agnes-chat/1699999999-ab12cd-photo.jpg`，**含斜杠**。
+ * 用 `[key]` 的话 Next.js 只会匹配单段，多出来的部分直接 404 ——
+ * 于是探测失败、图片被退回 base64、base64 太长 AI 又解析不了。
+ * 症状是"明明配了 R2 却还是看不见图"，非常难查，这个坑已经踩过一次。
+ *
+ * 路由存在的意义：桶没开"公开读"时外部访问不了 r2.dev 域名，
+ * 但 Worker 通过 binding 照样能读到，所以让读取也走一遍 Worker ——
  * **不需要把桶设成公开，也不需要任何密钥**。
  *
- * 如果配了 S3_ACCESS_HOST 自定义域，前端会直接用那个域名，不走这里。
+ * 配了 S3_ACCESS_HOST 自定义域时，前端会直接用那个域名，不走这里。
  */
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ key: string }> },
+  { params }: { params: Promise<{ key: string[] }> },
 ) {
   const env = getCloudflareEnv();
   const bucket = env?.R2;
@@ -25,10 +31,11 @@ export async function GET(
     return NextResponse.json({ error: "当前环境没有 R2 绑定" }, { status: 503 });
   }
 
-  const { key } = await params;
+  const { key: segs } = await params;
+  const key = (segs ?? []).join("/");
   if (!key) return NextResponse.json({ error: "缺少对象 key" }, { status: 400 });
 
-  // 防目录穿越：key 里不允许出现 ..
+  // 防目录穿越
   if (key.includes("..")) {
     return NextResponse.json({ error: "非法路径" }, { status: 400 });
   }

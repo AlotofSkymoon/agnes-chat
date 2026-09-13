@@ -173,6 +173,32 @@ export async function POST(request: Request) {
 
   const targetBase = target.baseUrl;
 
+  /**
+   * 把图片 URL 补全成绝对地址。
+   *
+   * 前端可能送来相对路径（例如早期版本 binding 直传返回的 `/api/r2/xxx`）。
+   * 上游模型服务器不知道本站域名，相对路径它根本没法取，
+   * 结果就是"图发出去了但 AI 看不见"。
+   *
+   * 在服务端兜底最可靠 —— 因为只有这里知道自己的 origin。
+   */
+  if (visionOk) {
+    const origin = new URL(request.url).origin;
+    outbound = outbound.map((m) => {
+      if (typeof m.content === "string") return m;
+      return {
+        ...m,
+        content: m.content.map((c) => {
+          if (c.type !== "image_url") return c;
+          const url = (c as { image_url: { url: string } }).image_url.url;
+          if (!url || /^https?:\/\//i.test(url) || url.startsWith("data:")) return c;
+          // 相对路径 → 拼上本站 origin
+          return { ...c, image_url: { ...(c as { image_url: object }).image_url, url: `${origin}${url.startsWith("/") ? "" : "/"}${url}` } };
+        }),
+      };
+    });
+  }
+
   // SSRF 防护：内置地址一定安全，只校验用户可能改写的部分
   if (target.isCustom && isBlockedBaseUrl(targetBase)) {
     return errorResponse(400, "BLOCKED_URL", "该 Base URL 指向内网或受限地址，已被拒绝");

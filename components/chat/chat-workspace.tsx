@@ -18,7 +18,7 @@ import { ChatInput } from "@/components/chat/chat-input";
 import { EmptyState } from "@/components/chat/empty-state";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { SettingsDialog, type ChatSettings } from "@/components/chat/settings-dialog";
-import { fileToDataUrl, probeImageUrl } from "@/lib/image-probe";
+import { probeImageUrl } from "@/lib/image-probe";
 import { ALLOW_WEB_SEARCH, REQUIRE_LOGIN } from "@/lib/site";
 import { Sidebar } from "@/components/chat/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -31,7 +31,7 @@ import {
   supportsVision,
   type CustomProviderConfig,
 } from "@/lib/config";
-import { IMAGE_TARGET_BASE64 } from "@/lib/image-compress";
+import { IMAGE_TARGET_BASE64, compressImageToDataUrl } from "@/lib/image-compress";
 import { DEFAULT_S3_CONFIG, type S3Config } from "@/lib/s3-presets";
 import {
   createId,
@@ -841,17 +841,28 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
             ) {
               const reachable = await probeImageUrl(att.content);
               if (!reachable) {
-                const inline = await fileToDataUrl(f).catch(() => "");
+                /**
+                 * 链接不通 → 退回内嵌。
+                 *
+                 * ⚠️ 这里必须**先压缩再转 base64**：
+                 * 直接用原图转出来的 data URL 动辄好几 MB，
+                 * AI 侧解析不了（表现为图片内容为空或直接报错），
+                 * 而用户只看到"发出去了但 AI 说没看到图"。
+                 */
+                const { dataUrl: inline } = await compressImageToDataUrl(
+                  f,
+                  INLINE_LIMIT,
+                ).catch(() => ({ dataUrl: "", compressed: false }));
                 if (inline && inline.length <= INLINE_LIMIT) {
                   toast.warning(
-                    `${f.name}：存储链接无法公开访问，已自动转为内嵌发送（建议检查桶的公开读设置）`,
+                    `${f.name}：存储链接无法公开访问，已压缩后内嵌发送（建议检查桶的公开读设置）`,
                   );
                   // 用 base64 覆盖链接：AI 一定能读到内嵌内容
                   return { ...att, content: inline };
                 }
                 return {
                   ...att,
-                  note: `${f.name}：上传成功但链接无法公开访问，且图片太大无法内嵌。请在存储桶开启「公开读」，或在设置里改用自定义公开域名`,
+                  note: `${f.name}：上传成功但链接无法公开访问，且压缩后仍超出内嵌上限。请在存储桶开启「公开读」，或在设置里改用自定义公开域名`,
                 };
               }
             }
