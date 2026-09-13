@@ -3,7 +3,7 @@ import { MessageSquare } from "lucide-react";
 
 import { NavBoard } from "@/components/nav/nav-board";
 import { NavChrome } from "@/components/nav/nav-chrome";
-import { Beams, GridBackground } from "@/components/ui/aceternity";
+import { Beams, GridBackground, Meteors, Noise } from "@/components/ui/aceternity";
 import { pageTitle } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -15,10 +15,12 @@ export const metadata = {
 export default function NavPage() {
   return (
     <main className="relative min-h-[100dvh]">
-      {/* Aceternity 风格背景：极光 + 网格 + 落下的光束 */}
+      {/* Aceternity 风格背景：极光 + 网格 + 落下的光束 + 流星 */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-96 aurora" />
       <GridBackground className="h-96" />
       <Beams count={10} className="h-96" />
+      <Meteors count={12} className="h-96" />
+      <Noise className="h-96" />
       <NavChrome />
       <div className="relative">
         <NavBoard />

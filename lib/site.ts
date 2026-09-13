@@ -38,9 +38,9 @@ export const SITE_DESCRIPTION: string =
 export type ThemePreset = "fuwari" | "violet-rose" | "anthropic";
 
 export const THEME_PRESETS: { id: ThemePreset; label: string; desc: string }[] = [
-  { id: "anthropic", label: "Anthropic", desc: "暖米白 · 赤陶橙 · 克制" },
-  { id: "fuwari", label: "Fuwari", desc: "极简卡片 · 淡雅留白" },
-  { id: "violet-rose", label: "Violet Rose", desc: "紫粉渐变 · 玫瑰卡片" },
+  { id: "anthropic", label: "Anthropic", desc: "纸感排版 · 衬线思考 · Inter + Source Serif" },
+  { id: "fuwari", label: "Fuwari", desc: "极简卡片 · 大留白 · 单色相驱动" },
+  { id: "violet-rose", label: "Violet Rose", desc: "紫粉柔光 · 大圆角糖果 · 实心白卡" },
 ];
 
 export const THEME_IDS: ThemePreset[] = ["anthropic", "fuwari", "violet-rose"];

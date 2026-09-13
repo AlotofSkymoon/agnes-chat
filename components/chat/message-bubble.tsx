@@ -241,7 +241,7 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
           </div>
         ) : null}
         {message.content ? (
-          <div className="max-w-[85%] rounded-2xl rounded-br-lg bg-[hsl(var(--user-bubble))] px-4 py-2.5 text-[15px] leading-[1.75] text-[hsl(var(--user-bubble-foreground))] sm:max-w-[75%]">
+          <div className="msg-user max-w-[85%] rounded-[1.65rem] rounded-br-[0.6rem] bg-[hsl(var(--user-bubble))] px-4 py-2.5 text-[15px] leading-[1.75] text-[hsl(var(--user-bubble-foreground))] sm:max-w-[75%]">
             <p className="whitespace-pre-wrap break-words">{message.content}</p>
           </div>
         ) : null}
@@ -255,7 +255,8 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
 
   /* ---------------- 助手消息：左侧头像 + 纯文本 ---------------- */
   return (
-    <div className="flex animate-fade-in gap-3">
+    /* msg-assistant：Anthropic 主题下会换成衬线体（Claude 的标志性设计） */
+    <div className="msg-assistant flex animate-fade-in gap-3">
       {/* 头像 */}
       <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4D6BFE] p-1.5 text-white">
         <AgnesIcon />

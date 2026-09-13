@@ -224,6 +224,57 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 
 ---
 
+## 🎭 三套界面风格
+
+主题切换改的不是配色，而是**整套设计语言**：字体、圆角、阴影、间距密度、
+卡片材质、背景处理全都不同。
+
+| 风格 | 气质 | 字体 | 圆角 | 表面 |
+|---|---|---|---|---|
+| **Anthropic** | 纸感编辑排版，克制 | Inter（近似 Styrene B）+ Source Serif 4（近似 Tiempos） | 中等（控件 10px / 卡片 20px） | 几乎无阴影，发丝边框分层 |
+| **Fuwari** | 极简卡片博客，清爽 | Montserrat + 昭源環方 | 偏大（卡片 24px） | 卡片有存在感，hover 轻抬 |
+| **Violet Rose** | 紫粉柔光糖果，软 | Montserrat + 昭源環方 | 最大（卡片 28px） | 带紫色调的柔和扩散阴影 |
+
+### Anthropic 风格的两个细节
+
+**① AI 回复用衬线体**
+
+Claude 最有辨识度的设计：**用户消息用无衬线、AI 回复用衬线**。
+前者代表现代灵动的人，后者代表深沉权威的思考者。
+
+原始字体是 Anthropic 定制的 Anthropic Sans / Anthropic Serif（基于
+Commercial Type 的 Styrene B 和 Klim 的 Tiempos/Copernicus），**商业授权不能随项目分发**。
+所以用了官方 fallback 栈的第一顺位：
+
+| 用途 | Anthropic 原字体 | 本项目替代 | 授权 |
+|---|---|---|---|
+| 无衬线 | Anthropic Sans（Styrene B） | **Inter** | OFL |
+| 衬线 | Anthropic Serif（Tiempos） | **Source Serif 4** | OFL |
+| 中文 | — | 昭源環方 Chiron GoRound TC | OFL |
+
+两者都是官方 fallback 栈里排在 `system-ui` 之前的第一个，观感最接近。
+
+**② 标题统一 500 字重**
+
+Claude 从不用粗体标题，全部衬线 + 500，像同一个作者写下来的。
+
+### 圆角尺度
+
+用户要"更圆"，所以整套 Tailwind 圆角量表放大了一档：
+
+| 工具类 | 原来 | 现在 |
+|---|---|---|
+| `rounded-sm` | 0.125rem | **0.5rem** |
+| `rounded-md` | 0.375rem | **1rem** |
+| `rounded-lg` | 0.5rem | **1.25rem** |
+| `rounded-xl` | 0.75rem | **1.5rem** |
+| `rounded-2xl` | 1rem | **1.75rem** |
+| `rounded-3xl` | 1.5rem | **2rem** |
+
+改的是量表本身，所有 `rounded-*` 一次性生效，不用逐个组件改。
+
+---
+
 ## 📋 环境变量速查（按平台分列）
 
 三个平台用的存储后端不同，**变量不能混着填**。
@@ -330,7 +381,7 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 | `NEXT_PUBLIC_SITE_NAME` | `Agnes AI` | 站点名，出现在标题栏、侧边栏、页脚 |
 | `NEXT_PUBLIC_SITE_TAGLINE` | `免费聊天` | 副标题，跟在站点名后面 |
 | `NEXT_PUBLIC_SITE_DESCRIPTION` | 自动拼接 | SEO 描述 |
-| `NEXT_PUBLIC_THEME` | `fuwari` | 配色：`fuwari`（清透蓝）/ `violet-rose`（紫玫瑰） |
+| `NEXT_PUBLIC_THEME` | `anthropic` | 界面风格：`anthropic` / `fuwari` / `violet-rose` |
 | `NEXT_PUBLIC_AUTHOR_NAME` | `wcvjk8tnz8` | 页脚创作者署名 |
 | `NEXT_PUBLIC_REPO_URL` | 本仓库 | 页脚源码链接 |
 | `NEXT_PUBLIC_UPSTREAM_URL` | 上游仓库 | 页脚上游标注 |
@@ -629,8 +680,20 @@ Agent、工具调用、代码执行、语音 —— 聊天之外不做多余的�
 | `.acet-shimmer` | 斜向微光扫过 |
 | `.acet-grid` | 网格背景，中心清晰四周淡出 |
 | `.acet-beams` | 从顶部落下的细光柱 |
+| `.acet-glow` | 鼠标跟随的**边框**发光（内部保持干净） |
+| `.acet-meteors` | 斜向下落的流星带尾迹 |
+| `.acet-sparkles` | 随机闪现的星点 |
+| `.acet-moving-border` | 沿边框循环流动的流光 |
+| `.acet-tracing-beam` | 沿容器左侧向下流动的光束 |
+| `.acet-pointer` | 鼠标位置的弥散光晕（比 spotlight 更淡） |
+| `.acet-vortex` | 旋涡背景（多层 conic 反向旋转） |
+| `.acet-lamp` | 顶部落下的锥形光束 |
+| `.acet-wobble` | 鼠标靠近时轻微形变 |
+| `.acet-bento` | Bento 栅格（卡片有大有小形成节奏） |
+| `.acet-noise` | 极淡噪点，压住大面积渐变的塑料感 |
+| `.acet-text-shimmer` | 沿文字扫过的高光 |
 
-组件在 `components/ui/aceternity.tsx`。
+组件在 `components/ui/aceternity.tsx`，共 20 个。
 
 > ⚠️ 顺带修了个隐藏 bug：`.aurora` 之前被 5 个页面引用
 > （登录、注册、账户、管理、导航），但 CSS 里**从未定义**，

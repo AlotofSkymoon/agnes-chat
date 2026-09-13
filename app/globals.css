@@ -46,6 +46,56 @@
   src: url("/fonts/Montserrat-700.woff2") format("woff2");
 }
 
+/* --- Inter · Anthropic 主题的无衬线（Styrene B 的开源近似）---
+   Anthropic 官方字体 Anthropic Sans 基于 Commercial Type 的 Styrene B，
+   是商业授权字体，不能随项目分发。Inter 是官方 fallback 栈里的第一个
+   （"Anthropic Sans, Inter, IBM Plex Sans, system-ui"），
+   几何感、屏幕可读性都最接近，且完全开源。 */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Inter-latin-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/Inter-latin-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/Inter-latin-600.woff2") format("woff2");
+}
+
+/* --- Source Serif 4 · Anthropic 主题的衬线（Tiempos 的开源近似）---
+   Anthropic Serif 脱胎于 Galaxie Copernicus / Tiempos（Klim Type Foundry），
+   同样是商业字体。Source Serif 4 是官方 fallback 栈的第一个
+   （"Anthropic Serif, Source Serif 4, Charter, Georgia"）。
+
+   ⚠️ 这套衬线不只是"换个字体好看"：Claude 聊天界面里
+   **用户消息用无衬线、AI 回复用衬线** —— 前者代表现代灵动的人，
+   后者代表深沉权威的思考者。Anthropic 主题下会还原这个设计。 */
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/SourceSerif4-latin-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/SourceSerif4-latin-500.woff2") format("woff2");
+}
+
 /* --- 昭源環方 Chiron GoRound TC · 中文 ---
    OFL 授权免费开源；子集含 GB2312 一级字 3755 个 + 界面实际用字 */
 @font-face {
@@ -165,103 +215,468 @@
      ========================================================================== */
 
   /* ==========================================================================
-     Anthropic —— 暖米白 / 赤陶橙 / 克制
-     参考 Anthropic 官网的观感：不是蓝紫渐变那一套，
-     而是"纸感"的暖色底 + 一个低饱和的赤陶色作点缀。
-     圆角收小、边框变细、几乎不用阴影，靠留白和层级划分区域。
-     ========================================================================== */
-  [data-theme="anthropic"] {
-    --background: 39 23% 94%;        /* #F0EEE6 米白 */
-    --foreground: 30 8% 12%;         /* #1F1E1D 近黑棕 */
-    --card: 0 0% 100%;
-    --card-foreground: 30 8% 12%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 30 8% 12%;
+   三套「界面风格」
 
-    --primary: 16 62% 59%;           /* #D97757 赤陶橙 */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 39 18% 88%;
-    --secondary-foreground: 30 8% 20%;
-    --muted: 39 16% 90%;
-    --muted-foreground: 35 6% 42%;
-    --accent: 39 20% 88%;
-    --accent-foreground: 30 8% 20%;
-    --destructive: 6 63% 50%;
-    --destructive-foreground: 0 0% 100%;
+   ⚠️ 这里定义的不是配色，而是**整个界面的性格**：
+   字体、圆角、阴影深度、间距密度、卡片的材质感、背景处理，全都不同。
+   切换主题 = 换一整套设计语言，而不是换个主色。
 
-    --border: 38 18% 86%;            /* #E5E1D8 细边框 */
-    --input: 38 18% 86%;
-    --ring: 16 62% 59%;
+   每套风格统一通过下面这组变量表达，业务组件只读变量不写死样式，
+   所以加第四套风格只需要新增一个 [data-theme="xxx"] 块。
+   ========================================================================== */
 
-    --sidebar: 39 20% 91%;
-    --sidebar-foreground: 30 8% 16%;
-    --assistant-bubble: 0 0% 100%;
-    --user-bubble: 39 26% 88%;
-    --user-bubble-foreground: 30 8% 14%;
+/* ==========================================================================
+   风格变量默认值
 
-    /* 文字层级：暖灰，不用冷灰 */
-    --text-secondary: 32 6% 34%;
-    --text-tertiary: 34 5% 48%;
-    --text-quaternary: 34 4% 60%;
+   ⚠️ 顺序很重要：`:root` 和 `[data-theme="xxx"]` 的特异性**相同**
+   （都是 0,1,0），因此后出现的规则会覆盖先出现的。
+   默认值必须写在主题块之前，否则会把三套主题全部盖掉。
+   ========================================================================== */
+:root {
+  --font-sans: "Montserrat", "Chiron GoRound TC", -apple-system, BlinkMacSystemFont,
+    "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-serif: "Montserrat", "Chiron GoRound TC", system-ui, sans-serif;
+  --font-mono: "SuperSFMonoV1", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-    /* Anthropic 不追求玻璃感：低模糊、低饱和，几乎只做一层薄纱 */
-    --lg-tint: 39 30% 98%;
-    --lg-tint-a1: 0.66;
-    --lg-tint-a2: 0.50;
-    --lg-blur: 16px;
-    --lg-saturate: 130%;
-    --lg-edge-a: 0.55;
-    --lg-spec-a: 0.10;
-    --lg-thick-a: 0.04;
-    --glass-bg: 0 0% 100%;
-    --glass-border: 38 18% 86%;
-    /* 圆角收小：Anthropic 是克制的矩形感，不是大圆角 */
-    --radius: 0.5rem;
-    --radius-ios: 0.625rem;
-    --radius-ios-lg: 0.75rem;
-    --radius-ios-xl: 1rem;
-  }
+  --radius-ctrl: 1rem;
+  --radius-card: 1.5rem;
+  --radius-panel: 1.75rem;
+  --radius-pill: 999px;
 
-  [data-theme="anthropic"].dark {
-    --background: 60 3% 11%;         /* #1F1E1D 深棕黑 */
-    --foreground: 39 23% 90%;
-    --card: 40 4% 15%;
-    --card-foreground: 39 23% 90%;
-    --popover: 40 4% 16%;
-    --popover-foreground: 39 23% 90%;
+  --shadow-card: 0 1px 2px 0 hsl(230 20% 20% / 0.05);
+  --shadow-panel: 0 12px 32px -12px hsl(230 25% 20% / 0.15);
+  --card-border-w: 1px;
 
-    --primary: 16 62% 63%;
-    --primary-foreground: 30 20% 12%;
-    --secondary: 40 4% 20%;
-    --secondary-foreground: 39 20% 88%;
-    --muted: 40 4% 19%;
-    --muted-foreground: 38 6% 62%;
-    --accent: 40 5% 22%;
-    --accent-foreground: 39 20% 90%;
+  --density-gap: 1;
+  --leading-body: 1.55;
+}
 
-    --border: 40 5% 24%;
-    --input: 40 5% 24%;
-    --ring: 16 62% 63%;
+body {
+  font-family: var(--font-sans);
+  line-height: var(--leading-body);
+}
 
-    --sidebar: 60 3% 9%;
-    --sidebar-foreground: 39 18% 86%;
-    --assistant-bubble: 40 4% 16%;
-    --user-bubble: 40 5% 22%;
-    --user-bubble-foreground: 39 23% 90%;
+/* ==========================================================================
+   Anthropic —— 「纸感编辑排版」
 
-    --text-secondary: 38 10% 74%;
-    --text-tertiary: 38 6% 58%;
-    --text-quaternary: 38 5% 44%;
+   参考 Claude：暖米白纸面、赤陶橙点缀、**衬线体承载思考内容**。
+   特征是"克制"：几乎不用阴影，靠色阶和发丝级边框分层；
+   圆角中等（Claude 卡片 16-24px，控件 8px），不做大圆角糖果风。
+   行高放宽到 1.6，读起来像在读一本书而不是在操作仪表盘。
+   ========================================================================== */
+[data-theme="anthropic"] {
+  /* ---- 字体：Styrene B → Inter；Tiempos/Copernicus → Source Serif 4 ----
+     两者都是官方 fallback 栈的第一顺位，开源且观感最接近。 */
+  --font-sans: "Inter", "Chiron GoRound TC", -apple-system, BlinkMacSystemFont,
+    "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-serif: "Source Serif 4", "Chiron GoRound TC", Georgia, Cambria,
+    "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", "SuperSFMonoV1", ui-monospace, SFMono-Regular,
+    Menlo, monospace;
 
-    --lg-tint: 40 5% 26%;
-    --lg-tint-a1: 0.44;
-    --lg-tint-a2: 0.30;
-    --lg-edge-a: 0.14;
-    --lg-spec-a: 0.05;
-    --lg-thick-a: 0.18;
-    --glass-bg: 40 5% 24%;
-    --glass-border: 40 5% 28%;
-  }
+  /* ---- 颜色：Claude 纸感色板 ---- */
+  --background: 60 12% 97%;        /* #f8f8f6 骨色纸面 */
+  --foreground: 60 5% 7%;          /* #121212 碳墨 */
+  --card: 0 0% 100%;
+  --card-foreground: 60 5% 7%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 60 5% 7%;
+
+  --primary: 16 62% 59%;           /* #d97757 陶土橙 */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 60 8% 93%;          /* #efeeeb 软石 */
+  --secondary-foreground: 60 5% 15%;
+  --muted: 60 8% 94%;
+  --muted-foreground: 50 3% 48%;   /* #7b7974 灰烬 */
+  --accent: 60 8% 91%;
+  --accent-foreground: 60 5% 18%;
+  --destructive: 6 60% 48%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 50 5% 90%;             /* #e7e6e1 白垩，发丝级 */
+  --input: 50 5% 90%;
+  --ring: 16 62% 59%;
+
+  --sidebar: 60 10% 95%;
+  --sidebar-foreground: 60 5% 12%;
+  --assistant-bubble: 0 0% 100%;
+  --user-bubble: 60 10% 93%;
+  --user-bubble-foreground: 60 5% 10%;
+
+  --text-secondary: 60 4% 30%;
+  --text-tertiary: 50 3% 48%;
+  --text-quaternary: 50 3% 62%;
+
+  /* ---- 形状：中等圆角，克制 ---- */
+  --radius-ctrl: 0.625rem;   /* 10px 控件 */
+  --radius-card: 1.25rem;    /* 20px 卡片 */
+  --radius-panel: 1.5rem;    /* 24px 大面板 */
+  --radius-pill: 999px;
+
+  /* ---- 表面：几乎没有阴影，靠边框分层 ---- */
+  --shadow-card: 0 1px 2px 0 hsl(30 10% 20% / 0.04);
+  --shadow-panel: 0 8px 24px -8px hsl(30 10% 20% / 0.12);
+  --card-border-w: 1px;
+  --card-border: 50 5% 90%;
+
+  /* ---- 密度：宽松，行高 1.6 ---- */
+  --density-gap: 1.15;
+  --leading-body: 1.6;
+
+  /* ---- 玻璃：几乎不用，只留一层薄纱 ---- */
+  --lg-tint: 60 20% 99%;
+  --lg-tint-a1: 0.70;
+  --lg-tint-a2: 0.56;
+  --lg-blur: 12px;
+  --lg-saturate: 115%;
+  --lg-edge-a: 0.55;
+  --lg-spec-a: 0.08;
+  --lg-thick-a: 0.03;
+  --glass-bg: 0 0% 100%;
+  --glass-border: 50 5% 90%;
+
+  /* ---- 旧变量兼容 ---- */
+  --radius: 0.75rem;
+  --radius-ios: 0.625rem;
+  --radius-ios-lg: 1.25rem;
+  --radius-ios-xl: 1.5rem;
+}
+
+[data-theme="anthropic"].dark {
+  --background: 60 3% 8%;
+  --foreground: 60 12% 94%;
+  --card: 60 3% 12%;
+  --card-foreground: 60 12% 94%;
+  --popover: 60 3% 13%;
+  --popover-foreground: 60 12% 94%;
+
+  --primary: 16 62% 62%;
+  --primary-foreground: 30 20% 10%;
+  --secondary: 60 3% 17%;
+  --secondary-foreground: 60 10% 88%;
+  --muted: 60 3% 16%;
+  --muted-foreground: 50 4% 66%;
+  --accent: 60 3% 19%;
+  --accent-foreground: 60 10% 90%;
+
+  --border: 50 4% 20%;
+  --input: 50 4% 20%;
+  --ring: 16 62% 62%;
+
+  --sidebar: 60 3% 7%;
+  --sidebar-foreground: 60 10% 86%;
+  --assistant-bubble: 60 3% 13%;
+  --user-bubble: 60 4% 18%;
+  --user-bubble-foreground: 60 12% 92%;
+
+  --text-secondary: 50 6% 76%;
+  --text-tertiary: 50 4% 60%;
+  --text-quaternary: 50 4% 46%;
+
+  --shadow-card: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
+  --shadow-panel: 0 12px 32px -10px hsl(0 0% 0% / 0.5);
+  --card-border: 50 4% 20%;
+
+  --lg-tint: 60 3% 26%;
+  --lg-tint-a1: 0.50;
+  --lg-tint-a2: 0.36;
+  --lg-edge-a: 0.12;
+  --lg-spec-a: 0.04;
+  --lg-thick-a: 0.20;
+  --glass-bg: 60 3% 24%;
+  --glass-border: 50 4% 26%;
+}
+
+/**
+ * Claude 最有辨识度的一处设计：**用户消息和 AI 回复用不同字体**。
+ * 用户 = 无衬线（现代、灵动的人）；AI = 衬线（深沉、权威的思考者）。
+ * 只在 Anthropic 主题下启用，其他主题保持统一字体，避免违和。
+ */
+[data-theme="anthropic"] .msg-assistant .markdown-body,
+[data-theme="anthropic"] .msg-assistant {
+  font-family: var(--font-serif);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  letter-spacing: -0.003em;
+}
+[data-theme="anthropic"] .msg-assistant .markdown-body code,
+[data-theme="anthropic"] .msg-assistant .markdown-body pre {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+[data-theme="anthropic"] .msg-user {
+  font-family: var(--font-sans);
+}
+/* 标题统一用衬线 + 500 单一字重（Claude 从不用粗体标题） */
+[data-theme="anthropic"] h1,
+[data-theme="anthropic"] h2,
+[data-theme="anthropic"] h3 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* ==========================================================================
+   Fuwari —— 「极简卡片博客」
+
+   参考 fuwari 静态博客主题：一切内容都装在卡片里，靠留白和 hover 微动效
+   组织信息。圆角中等偏大、卡片有轻微抬起感、色相由单一 --hue 驱动。
+   整体是"清爽、有序、内容为主"的气质。
+   ========================================================================== */
+[data-theme="fuwari"] {
+  --hue: 205;
+
+  --font-sans: "Montserrat", "Chiron GoRound TC", -apple-system,
+    BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-serif: "Montserrat", "Chiron GoRound TC", system-ui, sans-serif;
+  --font-mono: "SuperSFMonoV1", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --background: var(--hue) 20% 97%;
+  --foreground: var(--hue) 15% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: var(--hue) 15% 15%;
+  --popover: 0 0% 100%;
+  --popover-foreground: var(--hue) 15% 15%;
+
+  --primary: var(--hue) 78% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: var(--hue) 30% 95%;
+  --secondary-foreground: var(--hue) 30% 28%;
+  --muted: var(--hue) 24% 96%;
+  --muted-foreground: var(--hue) 8% 45%;
+  --accent: var(--hue) 40% 94%;
+  --accent-foreground: var(--hue) 45% 32%;
+
+  --border: var(--hue) 18% 90%;
+  --input: var(--hue) 18% 90%;
+  --ring: var(--hue) 78% 52%;
+
+  --sidebar: var(--hue) 22% 98%;
+  --sidebar-foreground: var(--hue) 15% 20%;
+  --assistant-bubble: 0 0% 100%;
+  --user-bubble: var(--hue) 55% 95%;
+  --user-bubble-foreground: var(--hue) 25% 18%;
+
+  --text-secondary: var(--hue) 10% 35%;
+  --text-tertiary: var(--hue) 8% 50%;
+  --text-quaternary: var(--hue) 6% 62%;
+
+  /* ---- 形状：卡片感，圆角偏大 ---- */
+  --radius-ctrl: 0.875rem;
+  --radius-card: 1.5rem;
+  --radius-panel: 1.75rem;
+  --radius-pill: 999px;
+
+  /* ---- 表面：卡片有明确的存在感和轻微抬起 ---- */
+  --shadow-card:
+    0 1px 2px 0 hsl(var(--hue) 20% 20% / 0.04),
+    0 4px 12px -4px hsl(var(--hue) 20% 20% / 0.06);
+  --shadow-panel: 0 16px 40px -16px hsl(var(--hue) 25% 20% / 0.18);
+  --card-border-w: 1px;
+  --card-border: var(--hue) 18% 90%;
+
+  --density-gap: 1;
+  --leading-body: 1.55;
+
+  --lg-tint: 0 0% 100%;
+  --lg-tint-a1: 0.66;
+  --lg-tint-a2: 0.50;
+  --lg-blur: 14px;
+  --lg-saturate: 120%;
+  --lg-edge-a: 0.60;
+  --lg-spec-a: 0.10;
+  --lg-thick-a: 0.03;
+  --glass-bg: 0 0% 100%;
+  --glass-border: var(--hue) 18% 88%;
+
+  --radius: 1rem;
+  --radius-ios: 0.875rem;
+  --radius-ios-lg: 1.5rem;
+  --radius-ios-xl: 1.75rem;
+}
+
+[data-theme="fuwari"].dark {
+  --background: var(--hue) 12% 9%;
+  --foreground: var(--hue) 10% 92%;
+  --card: var(--hue) 10% 13%;
+  --card-foreground: var(--hue) 10% 92%;
+  --popover: var(--hue) 10% 14%;
+  --popover-foreground: var(--hue) 10% 92%;
+
+  --primary: var(--hue) 80% 66%;
+  --primary-foreground: var(--hue) 30% 12%;
+  --secondary: var(--hue) 8% 18%;
+  --secondary-foreground: var(--hue) 10% 88%;
+  --muted: var(--hue) 8% 17%;
+  --muted-foreground: var(--hue) 6% 62%;
+  --accent: var(--hue) 16% 20%;
+  --accent-foreground: var(--hue) 12% 90%;
+
+  --border: var(--hue) 8% 20%;
+  --input: var(--hue) 8% 20%;
+  --ring: var(--hue) 80% 66%;
+
+  --sidebar: var(--hue) 12% 8%;
+  --sidebar-foreground: var(--hue) 10% 86%;
+  --assistant-bubble: var(--hue) 10% 14%;
+  --user-bubble: var(--hue) 22% 20%;
+  --user-bubble-foreground: var(--hue) 10% 92%;
+
+  --text-secondary: var(--hue) 8% 76%;
+  --text-tertiary: var(--hue) 6% 60%;
+  --text-quaternary: var(--hue) 5% 46%;
+
+  --shadow-card:
+    0 1px 2px 0 hsl(0 0% 0% / 0.3),
+    0 4px 14px -4px hsl(0 0% 0% / 0.35);
+  --shadow-panel: 0 20px 48px -20px hsl(0 0% 0% / 0.55);
+  --card-border: var(--hue) 8% 20%;
+
+  --lg-tint: var(--hue) 10% 24%;
+  --lg-tint-a1: 0.46;
+  --lg-tint-a2: 0.32;
+  --lg-edge-a: 0.14;
+  --lg-spec-a: 0.05;
+  --lg-thick-a: 0.18;
+  --glass-bg: var(--hue) 10% 22%;
+  --glass-border: var(--hue) 8% 26%;
+}
+
+/* ==========================================================================
+   Violet Rose —— 「柔光糖果玻璃」
+
+   参考布吉岛登录页：紫粉柔光渐变背景 + 浮在上面的白色大圆角卡片。
+   特征是"软"：圆角最大、阴影带色彩扩散（不是中性灰）、
+   卡片是实心的（背景已经很花，再全站半透明会糊成一片）。
+   ========================================================================== */
+[data-theme="violet-rose"] {
+  --font-sans: "Montserrat", "Chiron GoRound TC", -apple-system,
+    BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-serif: "Montserrat", "Chiron GoRound TC", system-ui, sans-serif;
+  --font-mono: "SuperSFMonoV1", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --background: 295 45% 96%;
+  --foreground: 285 20% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 285 20% 16%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 285 20% 16%;
+
+  --primary: 292 72% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 300 40% 96%;
+  --secondary-foreground: 292 40% 32%;
+  --muted: 295 30% 96%;
+  --muted-foreground: 292 10% 48%;
+  --accent: 320 60% 96%;
+  --accent-foreground: 320 50% 34%;
+
+  --border: 295 22% 90%;
+  --input: 295 22% 90%;
+  --ring: 292 72% 58%;
+
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 285 20% 18%;
+  --assistant-bubble: 0 0% 100%;
+  --user-bubble: 315 55% 95%;
+  --user-bubble-foreground: 292 30% 20%;
+
+  --text-secondary: 292 12% 36%;
+  --text-tertiary: 292 10% 50%;
+  --text-quaternary: 292 8% 62%;
+
+  /* ---- 形状：最大圆角，糖果感 ---- */
+  --radius-ctrl: 1.125rem;
+  --radius-card: 1.75rem;
+  --radius-panel: 2rem;
+  --radius-pill: 999px;
+
+  /* ---- 表面：带紫色调的柔和扩散阴影 ---- */
+  --shadow-card:
+    0 2px 8px -2px hsl(295 40% 40% / 0.08),
+    0 12px 28px -12px hsl(295 45% 45% / 0.18);
+  --shadow-panel:
+    0 4px 16px -4px hsl(295 40% 40% / 0.12),
+    0 24px 56px -20px hsl(295 50% 50% / 0.28);
+  --card-border-w: 1px;
+  --card-border: 295 22% 90%;
+
+  --density-gap: 1.05;
+  --leading-body: 1.6;
+
+  --lg-tint: 0 0% 100%;
+  --lg-tint-a1: 0.74;
+  --lg-tint-a2: 0.60;
+  --lg-blur: 18px;
+  --lg-saturate: 140%;
+  --lg-edge-a: 0.65;
+  --lg-spec-a: 0.12;
+  --lg-thick-a: 0.04;
+  --glass-bg: 0 0% 100%;
+  --glass-border: 295 20% 88%;
+
+  --radius: 1.375rem;
+  --radius-ios: 1.125rem;
+  --radius-ios-lg: 1.75rem;
+  --radius-ios-xl: 2rem;
+}
+
+[data-theme="violet-rose"].dark {
+  --background: 285 18% 10%;
+  --foreground: 295 15% 92%;
+  --card: 288 14% 14%;
+  --card-foreground: 295 15% 92%;
+  --popover: 288 14% 15%;
+  --popover-foreground: 295 15% 92%;
+
+  --primary: 292 76% 70%;
+  --primary-foreground: 288 40% 12%;
+  --secondary: 290 12% 19%;
+  --secondary-foreground: 295 15% 90%;
+  --muted: 290 10% 18%;
+  --muted-foreground: 292 8% 64%;
+  --accent: 300 18% 22%;
+  --accent-foreground: 295 15% 92%;
+
+  --border: 288 10% 22%;
+  --input: 288 10% 22%;
+  --ring: 292 76% 70%;
+
+  --sidebar: 288 14% 12%;
+  --sidebar-foreground: 295 15% 88%;
+  --assistant-bubble: 288 14% 15%;
+  --user-bubble: 300 22% 22%;
+  --user-bubble-foreground: 295 15% 92%;
+
+  --text-secondary: 292 10% 76%;
+  --text-tertiary: 292 8% 60%;
+  --text-quaternary: 292 6% 46%;
+
+  --shadow-card:
+    0 2px 8px -2px hsl(0 0% 0% / 0.3),
+    0 12px 28px -12px hsl(295 30% 30% / 0.35);
+  --shadow-panel: 0 24px 56px -20px hsl(0 0% 0% / 0.55);
+  --card-border: 288 10% 22%;
+
+  --lg-tint: 290 12% 28%;
+  --lg-tint-a1: 0.48;
+  --lg-tint-a2: 0.34;
+  --lg-edge-a: 0.16;
+  --lg-spec-a: 0.06;
+  --lg-thick-a: 0.18;
+  --glass-bg: 290 12% 26%;
+  --glass-border: 288 10% 30%;
+}
+
+/* Violet Rose 的背景渐变：只在浅色下铺，深色下用纯色更耐看 */
+[data-theme="violet-rose"] body {
+  background-image:
+    radial-gradient(ellipse 80% 60% at 12% 8%, hsl(320 70% 95% / 0.9), transparent 60%),
+    radial-gradient(ellipse 70% 55% at 88% 12%, hsl(285 65% 95% / 0.9), transparent 58%),
+    radial-gradient(ellipse 90% 60% at 50% 100%, hsl(340 60% 96% / 0.7), transparent 62%);
+  background-attachment: fixed;
+}
+
 
   /* ==========================================================================
      Fuwari —— 静态博客主题的观感
@@ -906,6 +1321,414 @@
     12%  { opacity: 1; }
     88%  { opacity: 1; }
     100% { transform: translateY(320%) scaleY(1.4); opacity: 0; }
+  }
+
+  /* ==========================================================================
+     第二批 Aceternity 效果
+     ========================================================================== */
+
+  /* ------------------------- Glowing Effect ------------------------- */
+  /**
+   * 鼠标位置发光的边框（Glowing Effect）。
+   * 与 spotlight 的区别：它只在**边框**上发光，内部保持干净，
+   * 所以能叠在已有卡片上而不影响文字可读性。
+   */
+  .acet-glow {
+    position: relative;
+    border-radius: inherit;
+  }
+
+  .acet-glow::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: radial-gradient(
+      240px circle at var(--mx, 50%) var(--my, 50%),
+      hsl(var(--primary) / 0.9),
+      hsl(var(--primary) / 0.25) 40%,
+      transparent 70%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  .acet-glow:hover::before {
+    opacity: 1;
+  }
+
+  /* ----------------------------- Meteors ----------------------------- */
+  /** 斜向下落的流星，带尾迹。用作背景装饰。 */
+  .acet-meteors {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .acet-meteors i {
+    position: absolute;
+    top: -12%;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      hsl(var(--primary) / 0.7),
+      transparent
+    );
+    transform: rotate(215deg);
+    animation: acet-meteor linear infinite;
+  }
+
+  .acet-meteors i::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 3px;
+    height: 3px;
+    border-radius: 999px;
+    background: hsl(var(--primary));
+    box-shadow: 0 0 8px 1px hsl(var(--primary) / 0.8);
+  }
+
+  @keyframes acet-meteor {
+    0%   { transform: translate3d(0, 0, 0) rotate(215deg); opacity: 0; }
+    6%   { opacity: 1; }
+    85%  { opacity: 1; }
+    100% { transform: translate3d(-60vmin, 90vmin, 0) rotate(215deg); opacity: 0; }
+  }
+
+  /* ---------------------------- Sparkles ---------------------------- */
+  /** 随机闪现的小星点。用于标题、空状态点缀。 */
+  .acet-sparkles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .acet-sparkles i {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: hsl(var(--primary));
+    animation: acet-sparkle ease-in-out infinite;
+  }
+
+  @keyframes acet-sparkle {
+    0%, 100% { transform: scale(0) rotate(0deg); opacity: 0; }
+    50%      { transform: scale(1) rotate(90deg); opacity: 1; }
+  }
+
+  /* -------------------------- Moving Border -------------------------- */
+  /** 沿边框循环流动的渐变。比 glow-border 更克制，适合常驻按钮。 */
+  .acet-moving-border {
+    position: relative;
+    border-radius: inherit;
+  }
+
+  .acet-moving-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(var(--primary) / 0.15) 30%,
+      hsl(var(--primary) / 0.9) 50%,
+      hsl(var(--primary) / 0.15) 70%,
+      transparent 100%
+    );
+    background-size: 220% 100%;
+    animation: acet-move-border 3.2s linear infinite;
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  @keyframes acet-move-border {
+    0%   { background-position: 120% 0; }
+    100% { background-position: -120% 0; }
+  }
+
+  /* -------------------------- Tracing Beam -------------------------- */
+  /** 沿容器左侧向下流动的光束，常用于内容流（这里是消息列表）。 */
+  .acet-tracing-beam {
+    position: relative;
+  }
+
+  .acet-tracing-beam::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      hsl(var(--primary) / 0.55) 12%,
+      hsl(var(--primary) / 0.55) 88%,
+      transparent 100%
+    );
+    opacity: 0.5;
+  }
+
+  .acet-tracing-beam::after {
+    content: "";
+    position: absolute;
+    left: -2px;
+    top: 0;
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: hsl(var(--primary));
+    box-shadow: 0 0 12px 2px hsl(var(--primary) / 0.6);
+    animation: acet-trace 4.5s ease-in-out infinite;
+  }
+
+  @keyframes acet-trace {
+    0%   { top: 0%; opacity: 0; }
+    8%   { opacity: 1; }
+    92%  { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  /* ------------------------ Pointer Highlight ------------------------ */
+  /** 鼠标位置的高亮光晕，比 spotlight 更弥散，适合铺在文本区。 */
+  .acet-pointer {
+    position: relative;
+  }
+
+  .acet-pointer::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    background: radial-gradient(
+      520px circle at var(--mx, 50%) var(--my, 50%),
+      hsl(var(--primary) / 0.08),
+      transparent 60%
+    );
+    z-index: 0;
+  }
+
+  .acet-pointer:hover::before {
+    opacity: 1;
+  }
+
+  .acet-pointer > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ----------------------------- Vortex ----------------------------- */
+  /**
+   * 旋涡背景：多层 conic 渐变反向旋转 + 中心淡出。
+   * 比纯色渐变更有"能量感"，适合空状态/登录页。
+   */
+  .acet-vortex {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    filter: blur(28px);
+    opacity: 0.45;
+  }
+
+  .acet-vortex i {
+    position: absolute;
+    inset: -25%;
+    border-radius: 999px;
+  }
+
+  .acet-vortex i:nth-child(1) {
+    background: conic-gradient(
+      from 0deg,
+      hsl(var(--primary) / 0.55),
+      transparent 25%,
+      transparent 50%,
+      hsl(280 80% 65% / 0.45) 75%,
+      hsl(var(--primary) / 0.55)
+    );
+    animation: acet-spin-slow 14s linear infinite;
+  }
+
+  .acet-vortex i:nth-child(2) {
+    background: conic-gradient(
+      from 180deg,
+      hsl(190 85% 60% / 0.45),
+      transparent 30%,
+      hsl(330 80% 68% / 0.4) 65%,
+      transparent 85%,
+      hsl(190 85% 60% / 0.45)
+    );
+    animation: acet-spin-slow 20s linear infinite reverse;
+  }
+
+  @keyframes acet-spin-slow {
+    to { transform: rotate(360deg); }
+  }
+
+  /* ------------------------------ Lamp ------------------------------ */
+  /** 从顶部落下的锥形光束，用作区块头部的视觉锚点。 */
+  .acet-lamp {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+
+  .acet-lamp::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 2px;
+    height: 40px;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      to bottom,
+      hsl(var(--primary)),
+      hsl(var(--primary) / 0)
+    );
+  }
+
+  .acet-lamp::after {
+    content: "";
+    position: absolute;
+    top: 30px;
+    left: 50%;
+    width: 220px;
+    height: 80px;
+    transform: translateX(-50%) perspective(200px) rotateX(58deg);
+    transform-origin: top center;
+    background: radial-gradient(
+      ellipse at top center,
+      hsl(var(--primary) / 0.35),
+      transparent 70%
+    );
+  }
+
+  /* ---------------------------- Wobble Card ---------------------------- */
+  /** 鼠标靠近时轻微形变（scale + 反向位移），比 3D tilt 更柔和。 */
+  .acet-wobble {
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .acet-wobble:hover {
+    transform: scale(1.025) translateY(-3px);
+  }
+
+  /* ---------------------------- Bento Grid ---------------------------- */
+  /**
+   * Bento 栅格：不等分的卡片布局。
+   * 关键不是"格子"，而是**有大有小**带来的节奏感，
+   * 所以这里定义了跨越行列的工具类。
+   */
+  .acet-bento {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.9rem;
+  }
+
+  @media (max-width: 900px) {
+    .acet-bento {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 560px) {
+    .acet-bento {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .acet-bento > * {
+    border-radius: var(--radius-card);
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+    box-shadow: var(--shadow-card);
+    transition:
+      transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .acet-bento > *:hover {
+    box-shadow: var(--shadow-panel);
+  }
+
+  .acet-bento-wide {
+    grid-column: span 2;
+  }
+
+  .acet-bento-tall {
+    grid-row: span 2;
+  }
+
+  @media (max-width: 560px) {
+    .acet-bento-wide,
+    .acet-bento-tall {
+      grid-column: span 1;
+      grid-row: span 1;
+    }
+  }
+
+  /* ---------------------------- Noise ---------------------------- */
+  /** 极淡的噪点纹理，压住大面积渐变的"塑料感"。 */
+  .acet-noise::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ---------------------------- Text Shimmer ---------------------------- */
+  /** 沿文字扫过的高光，用于标题。 */
+  .acet-text-shimmer {
+    background: linear-gradient(
+      100deg,
+      hsl(var(--foreground)) 0%,
+      hsl(var(--foreground)) 38%,
+      hsl(var(--primary)) 50%,
+      hsl(var(--foreground)) 62%,
+      hsl(var(--foreground)) 100%
+    );
+    background-size: 260% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: acet-text-shimmer 4.5s ease-in-out infinite;
+  }
+
+  @keyframes acet-text-shimmer {
+    0%   { background-position: 130% 0; }
+    60%, 100% { background-position: -30% 0; }
   }
 
   /* 尊重系统的"减少动态效果"设置 */

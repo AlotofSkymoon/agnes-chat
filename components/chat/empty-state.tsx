@@ -1,5 +1,7 @@
 "use client";
 
+import { Sparkles, TextShimmer, Vortex } from "@/components/ui/aceternity";
+
 const SUGGESTIONS = [
   { title: "帮我写一段自我介绍", sub: "简洁、有记忆点" },
   { title: "用通俗的话解释向量数据库", sub: "并举一个例子" },
@@ -12,7 +14,11 @@ export function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col items-center px-5">
       {/* 主标题区 */}
-      <div className="mt-4 flex flex-col items-center text-center">
+      <div className="relative mt-4 flex flex-col items-center text-center">
+        {/* Aceternity：旋涡背景 + 星点，只在标题区铺，不干扰正文 */}
+        <Vortex className="-z-10 h-56 w-56 rounded-full" />
+        <Sparkles count={12} className="-z-10 h-40 w-72" />
+
         {/* 空状态：小蓝海豚游动 */}
         <span className="mb-4 inline-flex h-[76px] w-[130px] items-center justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -24,7 +30,7 @@ export function EmptyState({ onPick }: { onPick: (text: string) => void }) {
           />
         </span>
         <h1 className="ios-large-title">
-          我是 Agnes，很高兴见到你！
+          <TextShimmer>我是 Agnes，很高兴见到你！</TextShimmer>
         </h1>
         <p className="mt-2.5 text-[15px] text-fg-secondary">有什么可以帮到你？</p>
         <p className="mt-3 inline-flex items-center rounded-full border border-border bg-muted/50 px-3 py-1 text-xs text-muted-foreground">

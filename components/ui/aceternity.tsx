@@ -204,3 +204,228 @@ export function ShimmerButton({
     </button>
   );
 }
+
+/* --------------------------- Pointer Tracker --------------------------- */
+
+/**
+ * 把鼠标相对位置写成 CSS 变量（--mx / --my）。
+ *
+ * 抽出来是因为 Spotlight / Glow / Pointer 三个效果都要它，
+ * 而且必须**直接操作 style 而不走 state** ——
+ * 否则每次 mousemove 都触发一次 React 重渲染，卡片多了会明显掉帧。
+ */
+function usePointerVars<T extends HTMLElement>() {
+  const ref = React.useRef<T>(null);
+
+  const onMouseMove = React.useCallback((e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
+    el.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
+  }, []);
+
+  return { ref, onMouseMove };
+}
+
+/* ------------------------------ Glow Card ------------------------------ */
+
+/**
+ * Glowing Effect：只在边框上跟随鼠标发光，内部保持干净。
+ * 适合叠在已有卡片上（spolight 会在内部铺光，文字多时反而脏）。
+ */
+export function GlowCard({
+  children,
+  className,
+  as: Tag = "div",
+}: {
+  children: React.ReactNode;
+  className?: string;
+  as?: React.ElementType;
+}) {
+  const { ref, onMouseMove } = usePointerVars<HTMLElement>();
+
+  return (
+    <Tag
+      ref={ref as React.Ref<HTMLDivElement>}
+      onMouseMove={onMouseMove}
+      className={cn("acet-glow", className)}
+    >
+      {children}
+    </Tag>
+  );
+}
+
+/* ------------------------------- Meteors ------------------------------- */
+
+/** 斜向下落的流星带尾迹。纯装饰，用 useMemo 固定随机参数避免重渲染抖动。 */
+export function Meteors({ count = 14, className }: { count?: number; className?: string }) {
+  const meteors = React.useMemo(
+    () =>
+      Array.from({ length: count }, () => ({
+        left: `${Math.random() * 100}%`,
+        width: `${40 + Math.random() * 90}px`,
+        delay: `${Math.random() * 8}s`,
+        duration: `${5 + Math.random() * 7}s`,
+      })),
+    [count],
+  );
+
+  return (
+    <div className={cn("acet-meteors", className)} aria-hidden>
+      {meteors.map((m, i) => (
+        <i
+          key={i}
+          style={{ left: m.left, width: m.width, animationDelay: m.delay, animationDuration: m.duration }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------ Sparkles ------------------------------ */
+
+/** 随机闪现的星点。用在标题、空状态上做点缀。 */
+export function Sparkles({ count = 10, className }: { count?: number; className?: string }) {
+  const stars = React.useMemo(
+    () =>
+      Array.from({ length: count }, () => ({
+        left: `${Math.random() * 100}%`,
+        top: `${Math.random() * 100}%`,
+        delay: `${Math.random() * 3}s`,
+        duration: `${1.6 + Math.random() * 2}s`,
+      })),
+    [count],
+  );
+
+  return (
+    <div className={cn("acet-sparkles", className)} aria-hidden>
+      {stars.map((s, i) => (
+        <i
+          key={i}
+          style={{ left: s.left, top: s.top, animationDelay: s.delay, animationDuration: s.duration }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* ----------------------------- Move Border ----------------------------- */
+
+/** 沿边框循环流动的流光，适合主按钮。 */
+export function MovingBorder({
+  children,
+  className,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      {...props}
+      className={cn(
+        "acet-moving-border relative rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.03] active:scale-[0.98]",
+        className,
+      )}
+    >
+      <span className="relative z-10">{children}</span>
+    </button>
+  );
+}
+
+/* ----------------------------- Tracing Beam ----------------------------- */
+
+/** 沿左侧向下流动的光束，给内容流一点方向感。 */
+export function TracingBeam({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <div className={cn("acet-tracing-beam", className)}>{children}</div>;
+}
+
+/* --------------------------- Pointer Highlight --------------------------- */
+
+/** 鼠标位置的弥散光晕，比 spotlight 更淡，适合铺在文本/代码块上。 */
+export function PointerHighlight({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const { ref, onMouseMove } = usePointerVars<HTMLDivElement>();
+
+  return (
+    <div ref={ref} onMouseMove={onMouseMove} className={cn("acet-pointer", className)}>
+      {children}
+    </div>
+  );
+}
+
+/* -------------------------------- Vortex -------------------------------- */
+
+/** 旋涡背景（多层 conic 反向旋转 + 模糊）。适合空状态、登录页。 */
+export function Vortex({ className }: { className?: string }) {
+  return (
+    <div className={cn("acet-vortex", className)} aria-hidden>
+      <i />
+      <i />
+    </div>
+  );
+}
+
+/* --------------------------------- Lamp --------------------------------- */
+
+/** 顶部落下的锥形光束，作区块头部的视觉锚点。 */
+export function Lamp({ className }: { className?: string }) {
+  return <div className={cn("acet-lamp", className)} aria-hidden />;
+}
+
+/* ------------------------------ Bento Grid ------------------------------ */
+
+/**
+ * Bento 栅格容器。
+ * 精髓是**卡片有大有小**形成节奏，所以要配合 wide / tall 使用。
+ */
+export function BentoGrid({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <div className={cn("acet-bento", className)}>{children}</div>;
+}
+
+/** Bento 里横跨两列的卡片 */
+export function BentoWide({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn("acet-bento-wide acet-wobble p-4", className)}>{children}</div>
+  );
+}
+
+/** Bento 里纵跨两行的卡片 */
+export function BentoCard({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn("acet-wobble p-4", className)}>{children}</div>;
+}
+
+/* ------------------------------ Noise Layer ------------------------------ */
+
+/** 极淡噪点，压住大面积渐变的塑料感。 */
+export function Noise({ className }: { className?: string }) {
+  return <div className={cn("acet-noise pointer-events-none absolute inset-0", className)} aria-hidden />;
+}
+
+/* ---------------------------- Text Shimmer ---------------------------- */
+
+/** 沿文字扫过的高光，用于标题。 */
+export function TextShimmer({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return <span className={cn("acet-text-shimmer", className)}>{children}</span>;
+}

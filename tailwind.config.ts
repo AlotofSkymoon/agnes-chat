@@ -12,28 +12,10 @@ const config: Config = {
     extend: {
       fontFamily: {
         // Montserrat（英文/数字）+ 昭源環方 Chiron GoRound TC（中文）
-        sans: [
-          "Montserrat",
-          "Chiron GoRound TC",
-          "-apple-system",
-          "BlinkMacSystemFont",
-          "system-ui",
-          "PingFang SC",
-          "Hiragino Sans GB",
-          "Microsoft YaHei",
-          "sans-serif",
-        ],
+        sans: ["var(--font-sans)"],
+      serif: ["var(--font-serif)"],
         // SuperSFMonoV1 = SF Mono（拉丁）+ 苹方（中日韩）
-        mono: [
-          "SuperSFMonoV1",
-          "SF Mono",
-          "SFMono-Regular",
-          "ui-monospace",
-          "Menlo",
-          "Consolas",
-          "Liberation Mono",
-          "monospace",
-        ],
+        mono: ["var(--font-mono)"],
       },
       colors: {
         brand: {
@@ -87,13 +69,16 @@ const config: Config = {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-        // iOS 26 连续圆角层级：控件更圆，容器最圆
-        ios: "var(--radius-ios)",
-        "ios-lg": "var(--radius-ios-lg)",
-        "ios-xl": "var(--radius-ios-xl)",
+        none: "0",
+        sm: "0.5rem",
+        DEFAULT: "0.85rem",
+        md: "1rem",
+        lg: "1.25rem",
+        xl: "1.5rem",
+        "2xl": "1.75rem",
+        "3xl": "2rem",
+        "4xl": "2.5rem",
+        full: "9999px",
       },
       keyframes: {
         "accordion-down": {
