@@ -224,6 +224,27 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 
 ---
 
+## 🔁 自动部署与自动更新
+
+### 推送即部署
+
+`.github/workflows/deploy-cloudflare.yml` 在推送到 `main` 时自动触发
+（只改 `*.md` 不触发），也可以手动 Run workflow。
+
+同时启用了 Cloudflare 界面部署的话，一次推送会部署两遍、互相覆盖。
+在仓库 **Variables** 里加 `AUTO_DEPLOY=false` 即可关掉自动触发，
+保留手动运行。
+
+### 自动同步上游
+
+`.github/workflows/sync-upstream.yml` 每天检查一次上游更新，
+有则**创建 Pull Request**（不直接覆盖，避免弄丢你的改动）。
+也可以手动触发。
+
+无冲突且构建通过 → 直接合并 PR 即可。
+
+---
+
 ## 🔄 多平台数据同步
 
 **默认就是统一的**：只要配了 Upstash，无论部署到 Vercel / Netlify / Cloudflare，
@@ -438,6 +459,11 @@ R2 桶是你自己的，Worker 通过 binding 读写时，权限来自 binding �
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 的 S3 密钥 |
 | `S3_ACCESS_HOST` | 自定义访问域名，如 `https://images.example.com` |
 | `R2_ACCOUNT_ID` | 账户 ID（**一般不用填**，token 能反查） |
+
+> 💡 **KV / D1 的 ID 不用手填。** Actions 会自动完成：
+> 给了 ID 就直接用；没给就找同名的（`agnes-chat` / `agnes-chat-db`）；
+> 都没有就自动创建。R2 同理，只要桶名。
+> 省去复制 32 位十六进制串的麻烦，也不会因填错 ID 导致"部署成功但存不进去"。
 
 **仅 Cloudflare 原生存储模式需要**（设了 `STORAGE_BACKEND=cloudflare` 时）
 

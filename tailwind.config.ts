@@ -68,16 +68,27 @@ const config: Config = {
           foreground: "hsl(var(--popover-foreground))",
         },
       },
+      /*
+       * 圆角走 CSS 变量，而不是写死 rem。
+       *
+       * 之前这里是固定值，导致各主题虽然定义了 --radius-card 之类，
+       * 但组件里大量使用的 rounded-lg / rounded-xl 仍然是同一个尺寸 ——
+       * 换主题时卡片圆角纹丝不动，"换个风格还是不够圆润"。
+       *
+       * 改成变量后，每套主题可以真正定义自己的圆角语言：
+       * fuwari 圆润、anthropic 克制、violet-rose 直角。
+       * 变量在 globals.css 的 :root 与各 [data-theme] 里定义。
+       */
       borderRadius: {
         none: "0",
-        sm: "0.5rem",
-        DEFAULT: "0.85rem",
-        md: "1rem",
-        lg: "1.25rem",
-        xl: "1.5rem",
-        "2xl": "1.75rem",
-        "3xl": "2rem",
-        "4xl": "2.5rem",
+        sm: "var(--r-sm)",
+        DEFAULT: "var(--r-default)",
+        md: "var(--r-md)",
+        lg: "var(--r-lg)",
+        xl: "var(--r-xl)",
+        "2xl": "var(--r-2xl)",
+        "3xl": "var(--r-3xl)",
+        "4xl": "var(--r-4xl)",
         full: "9999px",
       },
       keyframes: {

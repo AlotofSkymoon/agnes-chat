@@ -1,0 +1,117 @@
+name: 同步上游更新
+
+# =============================================================================
+# 让 fork 自动跟进上游仓库的更新。
+#
+# 适用场景：本仓库是从 AlotofSkymoon/agnes-chat fork 出来的，
+# 上游修了 bug / 加了功能时，这里会自动把更新同步过来。
+#
+# 触发方式：
+#   1. 每天定时检查（UTC 20:00 = 北京时间凌晨 4 点）
+#   2. Actions 页面手动 Run workflow
+#
+# ⚠️ 重要：同步采用「创建 Pull Request」而不是直接强推。
+#    因为你我可能都改过同一批文件，直接覆盖会把改动弄丢。
+#    PR 可以让你先看差异、确认没问题再合并。
+# =============================================================================
+on:
+  schedule:
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # fork 仓库才需要同步；上游仓库自己跳过
+    if: github.repository != 'AlotofSkymoon/agnes-chat'
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+        with:
+          # 需要完整历史才能做三方合并
+          fetch-depth: 0
+          # 用默认 token 只能读；写 PR 需要显式给 token
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 配置 Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: 添加上游仓库
+        run: |
+          git remote add upstream https://github.com/AlotofSkymoon/agnes-chat.git || true
+          git fetch upstream --no-tags
+
+      - name: 检查是否有新提交
+        id: check
+        run: |
+          BEHIND=$(git rev-list --count HEAD..upstream/main)
+          echo "behind=$BEHIND" >> $GITHUB_OUTPUT
+          if [ "$BEHIND" -eq 0 ]; then
+            echo "✅ 已是最新，无需同步"
+          else
+            echo "📥 上游有 $BEHIND 个新提交"
+          fi
+
+      - name: 合并上游更新
+        if: steps.check.outputs.behind != '0'
+        id: merge
+        continue-on-error: true
+        run: |
+          # 加 --no-edit 避免卡在编辑器；冲突时这里的退出码非 0，交给下一步处理
+          git merge upstream/main --no-edit -m "chore: 同步上游更新（$(date -u +%Y-%m-%d)）"
+
+      - name: 处理冲突
+        if: steps.check.outputs.behind != '0' && steps.merge.outcome == 'failure'
+        run: |
+          echo "::warning::自动合并出现冲突，已中止。"
+          git merge --abort || true
+          echo ""
+          echo "=============================================="
+          echo "上游改动与你本地的改动冲突，需要手动处理："
+          echo ""
+          echo "  git fetch upstream"
+          echo "  git merge upstream/main"
+          echo "  # 解决冲突后 git add . && git commit"
+          echo "  git push"
+          echo "=============================================="
+          exit 1
+
+      - name: 创建 Pull Request
+        if: steps.check.outputs.behind != '0' && steps.merge.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="sync-upstream-$(date -u +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH"
+          git push origin "$BRANCH"
+
+          # PR 正文先写到文件里，避免大量转义把 run 块弄乱
+          cat > /tmp/pr-body.md <<'MDEOF'
+          由 sync-upstream 工作流自动生成，合并了上游仓库的新提交。
+
+          合并前请确认两件事：
+
+          1. 构建能过（Vercel / Cloudflare Actions 会自动跑一遍）
+          2. 你自定义的配置（主题、站点名、导航数据等）没有被覆盖
+
+          无冲突且构建通过即可直接合并；有冲突请看 Actions 日志里的提示。
+          MDEOF
+
+          gh pr create \
+            --title "chore: 同步上游更新" \
+            --body-file /tmp/pr-body.md \
+            --head "$BRANCH" \
+            --base main || echo "PR 可能已存在，跳过"
+
+      - name: 清理旧运行记录
+        uses: GitRML/delete-workflow-runs@main
+        continue-on-error: true
+        with:
+          retain_days: '7'
+          keep_minimum_runs: '2'

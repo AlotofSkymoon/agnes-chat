@@ -11,15 +11,24 @@ name: 部署到 Cloudflare Workers
 #         R2_BUCKET、R2_PUBLIC_BASE_URL（图片/视频上传）
 # =============================================================================
 
+# =============================================================================
+# 触发方式（参考 cloud-mail 的做法）
+#
+#   1. 推送到 main 自动部署 —— 只要改了代码或配置就自动更新线上版本
+#   2. 手动触发 —— Actions 页面点 Run workflow
+#
+# ⚠️ 如果你同时启用了「Cloudflare 界面部署（Workers Builds）」，
+#    一次推送会部署两遍、互相覆盖。二选一即可：
+#    想保留界面部署 → 在仓库 Variables 里加 AUTO_DEPLOY=false
+# =============================================================================
 on:
-  # ---------------------------------------------------------------------------
-  # 默认改为「手动触发」，避免与「方式二：Cloudflare 界面部署」重复部署。
-  #
-  # 如果你只打算用 GitHub Actions（没启用界面部署），
-  # 把下面 push 两行的注释去掉，即可恢复推送到 main 自动部署。
-  # ---------------------------------------------------------------------------
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
+    # 只改文档时不必重新部署
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
   workflow_dispatch:
 
 # 并发控制：同一分支只跑最新一次，避免多次推送互相覆盖
@@ -32,7 +41,31 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
+    # -------------------------------------------------------------------------
+    # 同时支持 Secrets 和 Variables（写法参考 cloud-mail）。
+    # 这样非敏感配置（如桶名）可以直接放 Variables，改起来不用重新加密。
+    # -------------------------------------------------------------------------
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || vars.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID }}
+      KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID || vars.KV_NAMESPACE_ID }}
+      D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID || vars.D1_DATABASE_ID }}
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET || vars.SESSION_SECRET }}
+      PRESET_AGNES_API_KEY: ${{ secrets.PRESET_AGNES_API_KEY || vars.PRESET_AGNES_API_KEY }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || vars.R2_BUCKET_NAME || 'agnes-chat' }}
+      AUTO_DEPLOY: ${{ vars.AUTO_DEPLOY || 'true' }}
+
     steps:
+      # 界面部署与 Actions 同时启用时的保险丝
+      - name: 检查是否启用自动部署
+        if: github.event_name == 'push'
+        run: |
+          if [ "${AUTO_DEPLOY}" = "false" ]; then
+            echo "::notice::AUTO_DEPLOY=false，跳过本次自动部署（你可能正在使用 Cloudflare 界面部署）。需要时请手动 Run workflow。"
+            exit 0
+          fi
+          echo "✅ 自动部署已启用"
       - name: 拉取代码
         uses: actions/checkout@v4
 
@@ -61,12 +94,11 @@ jobs:
               missing=1
             fi
           }
-          check CLOUDFLARE_API_TOKEN      "${{ secrets.CLOUDFLARE_API_TOKEN }}"
-          check CLOUDFLARE_ACCOUNT_ID     "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}"
-          check KV_NAMESPACE_ID           "${{ secrets.KV_NAMESPACE_ID }}"
-          check D1_DATABASE_ID            "${{ secrets.D1_DATABASE_ID }}"
-          check SESSION_SECRET            "${{ secrets.SESSION_SECRET }}"
-          check PRESET_AGNES_API_KEY      "${{ secrets.PRESET_AGNES_API_KEY }}"
+          # KV / D1 的 ID 不必填 —— 后面的步骤会自动查找或创建
+          check CLOUDFLARE_API_TOKEN      "${{ env.CLOUDFLARE_API_TOKEN }}"
+          check CLOUDFLARE_ACCOUNT_ID     "${{ env.CLOUDFLARE_ACCOUNT_ID }}"
+          check SESSION_SECRET            "${{ env.SESSION_SECRET }}"
+          check PRESET_AGNES_API_KEY      "${{ env.PRESET_AGNES_API_KEY }}"
           if [ "$missing" -ne 0 ]; then
             echo ""
             echo "=============================================="
@@ -80,28 +112,22 @@ jobs:
       # 把 Secrets 里的 ID 填进 wrangler.jsonc 占位符。
       # 用 python 而不是 sed：ID 里若含特殊字符也不会破坏 JSON 结构
       # ------------------------------------------------------------------
-      - name: 填入 KV / D1 ID
+      # ------------------------------------------------------------------
+      # 自动准备 KV / D1 绑定（不需要手填 ID）
+      #
+      # 参考 cloud-mail 的思路，但用 API 而不是 wrangler 子命令：
+      #   给了 ID      → 直接用
+      #   没给         → 找同名命名空间 / 数据库；没有就创建
+      # 省去复制 32 位十六进制串的麻烦，也不会因为填错 ID
+      # 导致"部署成功但数据存不进去"。
+      # ------------------------------------------------------------------
+      - name: 自动准备 KV / D1 绑定
         env:
-          KV_ID: ${{ secrets.KV_NAMESPACE_ID }}
-          D1_ID: ${{ secrets.D1_DATABASE_ID }}
-        run: |
-          set -e
-          python3 - <<'PYEOF'
-          import os, pathlib, re
-          p = pathlib.Path("wrangler.jsonc")
-          s = p.read_text()
-          # 去掉 // 注释再做替换，避免注释里的占位符被误伤
-          s = s.replace("__KV_ID__", os.environ["KV_ID"])
-          s = s.replace("__D1_ID__", os.environ["D1_ID"])
-          p.write_text(s)
-          print("已填入 KV / D1 ID")
-          for line in s.splitlines():
-              if "database_id" in line or re.match(r'^\s*"id"\s*:', line):
-                  print("   ", line.strip())
-          # 确认没有残留占位符
-          if "__KV_ID__" in s or "__D1_ID__" in s:
-              raise SystemExit("占位符未全部替换")
-          PYEOF
+          CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          KV_NAMESPACE_ID: ${{ env.KV_NAMESPACE_ID }}
+          D1_DATABASE_ID: ${{ env.D1_DATABASE_ID }}
+        run: node scripts/ensure-bindings.mjs
 
       - name: 建 D1 表（幂等，已存在不会重复建）
         env:
@@ -226,3 +252,15 @@ jobs:
           echo "  - ok: true         → 一切正常，去注册第一个账号（自动成为管理员）"
           echo "  - problems 有内容  → 按提示逐条修"
           echo "=============================================="
+
+      # ------------------------------------------------------------------
+      # 清理旧的运行记录（参考 cloud-mail）
+      # 作用：避免部署日志里长期残留 token 等敏感信息的痕迹，
+      #      也让 Actions 列表保持清爽。失败不影响部署结果。
+      # ------------------------------------------------------------------
+      - name: 删除旧运行记录
+        uses: GitRML/delete-workflow-runs@main
+        continue-on-error: true
+        with:
+          retain_days: '3'
+          keep_minimum_runs: '2'

@@ -265,10 +265,22 @@
   --font-serif: "Montserrat", "Chiron GoRound TC", system-ui, sans-serif;
   --font-mono: "SuperSFMonoV1", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --radius-ctrl: 1rem;
-  --radius-card: 1.5rem;
-  --radius-panel: 1.75rem;
+  --radius-ctrl: 1.375rem;
+  --radius-card: 2rem;
+  --radius-panel: 2.5rem;
   --radius-pill: 999px;
+
+  /* ---- Tailwind 圆角量表（rounded-lg / rounded-xl 等实际取值）----
+   * 这里给的是"圆润"档：默认主题整体偏柔和。
+   */
+  --r-sm: 0.625rem;
+  --r-default: 1.25rem;
+  --r-md: 1.25rem;
+  --r-lg: 1.625rem;
+  --r-xl: 2rem;
+  --r-2xl: 2.375rem;
+  --r-3xl: 2.75rem;
+  --r-4xl: 3.25rem;
 
   --shadow-card: 0 1px 2px 0 hsl(230 20% 20% / 0.05);
   --shadow-panel: 0 12px 32px -12px hsl(230 25% 20% / 0.15);
@@ -336,10 +348,21 @@ body {
   --text-quaternary: 50 3% 62%;
 
   /* ---- 形状：中等圆角，克制 ---- */
-  --radius-ctrl: 0.625rem;   /* 10px 控件 */
-  --radius-card: 1.25rem;    /* 20px 卡片 */
-  --radius-panel: 1.5rem;    /* 24px 大面板 */
+  --radius-ctrl: 1rem;       /* 16px 控件 */
+  --radius-card: 1.75rem;    /* 28px 卡片 */
+  --radius-panel: 2.125rem;  /* 34px 大面板 */
   --radius-pill: 999px;
+
+  /* Anthropic 风格偏"纸感编辑排版"，圆角比 fuwari 收敛一档，
+   * 但比原来的 10/20/24px 明显圆润，否则看起来像没做完。 */
+  --r-sm: 0.5rem;
+  --r-default: 1rem;
+  --r-md: 1rem;
+  --r-lg: 1.375rem;
+  --r-xl: 1.75rem;
+  --r-2xl: 2rem;
+  --r-3xl: 2.375rem;
+  --r-4xl: 2.75rem;
 
   /* ---- 表面：几乎没有阴影，靠边框分层 ---- */
   --shadow-card: 0 1px 2px 0 hsl(30 10% 20% / 0.04);
@@ -495,6 +518,16 @@ body {
   --radius-panel: 2.75rem;
   --radius-pill: 999px;
 
+  /* fuwari：最圆润的一档，卡片近乎胶囊 */
+  --r-sm: 0.75rem;
+  --r-default: 1.75rem;
+  --r-md: 1.75rem;
+  --r-lg: 2rem;
+  --r-xl: 2.25rem;
+  --r-2xl: 2.75rem;
+  --r-3xl: 3rem;
+  --r-4xl: 3.5rem;
+
   /* ---- 表面：卡片有明确的存在感和轻微抬起 ---- */
   --shadow-card:
     0 1px 2px 0 hsl(var(--hue) 20% 20% / 0.04),
@@ -523,16 +556,11 @@ body {
   --radius-ios-xl: 2.75rem;
 }
 
-/* Fuwari 下所有卡片/容器强制走大圆角，避免组件里写死的 rounded-* 破坏整体感 */
-[data-theme="fuwari"] .rounded-lg,
-[data-theme="fuwari"] .rounded-xl,
-[data-theme="fuwari"] .rounded-2xl,
-[data-theme="fuwari"] .rounded-md {
-  border-radius: 1.75rem;
-}
-[data-theme="fuwari"] .rounded-full {
-  border-radius: 999px;
-}
+/*
+ * 这里原本有一条"强制所有 rounded-* 归为 1.75rem"的规则，
+ * 现在删掉了 —— 圆角量表已经走 CSS 变量，各主题能自己定义，
+ * 那条规则反而会把 fuwari 的 rounded-2xl（2.75rem）压回 1.75rem，越改越方。
+ */
 
 [data-theme="fuwari"].dark {
   --background: var(--hue) 12% 9%;
@@ -629,6 +657,16 @@ body {
   --radius-card: 0;
   --radius-panel: 0;
   --radius-pill: 0;
+
+  /* violet-rose：完全直角，量表也一并归零 */
+  --r-sm: 0;
+  --r-default: 0;
+  --r-md: 0;
+  --r-lg: 0;
+  --r-xl: 0;
+  --r-2xl: 0;
+  --r-3xl: 0;
+  --r-4xl: 0;
 
   /* ---- 表面：带紫色调的柔和扩散阴影 ---- */
   --shadow-card:
