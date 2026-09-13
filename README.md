@@ -224,6 +224,59 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 
 ---
 
+## 🔄 多平台数据同步
+
+同一个仓库部署到 Vercel + Cloudflare 两个站，**默认是两套互不相通的数据**
+（各平台用各自的原生存储，换个域名聊天记录就没了）。
+
+要打通，加一个环境变量：
+
+```bash
+STORAGE_BACKEND=unified
+```
+
+| 取值 | 行为 |
+|---|---|
+| `auto`（默认） | Cloudflare 用 KV+D1，Vercel/Netlify 用 Upstash，**数据不互通** |
+| `unified` ⭐ | **所有平台统一走 Upstash**，账号 / 聊天记录 / 站点配置全部共享 |
+| `cloudflare` | 强制 KV + D1 |
+| `upstash` | 强制 Upstash |
+
+**为什么统一后端比双写同步好**：双写要处理冲突、重试、乱序到达、
+部分失败……是这类需求里最容易埋雷的做法。统一后端让所有平台读写同一份数据，
+天然一致，代码也简单得多。
+
+代价：Cloudflare 上要跨网络回源到 Upstash，比原生 KV 略慢。
+只部署一个平台时用 `auto` 即可。
+
+> ⚠️ 选 `unified` 时 `UPSTASH_REDIS_REST_URL` / `TOKEN` **必填**，
+> 缺了会直接启动报错（而不是悄悄退回本地存储，那样更难排查）。
+
+---
+
+## 🎬 视频播放（含 WMV / MPG）
+
+浏览器原生只支持 **mp4 / webm / ogg** 三种容器。
+`wmv`、`mpg`、`mpg2`、`avi`、`flv`、`rmvb` 这些**一律放不了**——
+不是 bug，是浏览器根本没内置对应解码器。
+
+解决办法是把 **ffmpeg 编译成 wasm 在浏览器里现场转码成 mp4**，
+即"解码器内嵌"：解码在客户端完成，服务端只存原文件，
+既不烧服务器 CPU，也不用把原片传出去。
+
+| 格式 | 播放方式 |
+|---|---|
+| mp4 / m4v / webm / ogv / ogg | **直接播** |
+| wmv / asf / avi / mpg / mpeg / mpg1 / mpg2 / m1v / m2v / ts / vob / flv / rmvb / mov / mkv / 3gp | 点「解码并播放」→ 内置解码器转 MP4 |
+
+转码参数：`libx264` + `ultrafast` + `+faststart`（可边下边播）+ `aac` 音轨。
+
+> ⚠️ ffmpeg.wasm 核心约 25~32MB，**不打包进项目** ——
+> 否则 Cloudflare Workers（免费版脚本上限 1 MiB）会直接部署失败。
+> 改成首次点播放时才从 CDN 按需加载，不用不下载。
+
+---
+
 ## 🎭 三套界面风格
 
 主题切换改的不是配色，而是**整套设计语言**：字体、圆角、阴影、间距密度、

@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { UniversalVideoPlayer } from "@/components/chat/universal-video-player";
+
 import { AgnesIcon } from "@/components/agnes-logo";
 import { ImageLightbox } from "@/components/chat/image-lightbox";
 import { Markdown } from "@/components/chat/markdown";
@@ -210,33 +212,39 @@ export function MessageBubble({ message, onRetry, isStreaming }: MessageBubblePr
       <div className="flex animate-fade-in flex-col items-end gap-1.5">
         {/* 附件 */}
         {atts.length > 0 ? (
-          <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5 sm:max-w-[75%]">
+          <div className="flex max-w-[85%] flex-col items-end gap-2 sm:max-w-[75%]">
             {atts.map((a) => (
-              <span
-                key={a.id}
-                className="inline-flex max-w-[200px] items-center gap-1.5 rounded-lg border border-border/70 bg-muted/60 py-1 pl-1.5 pr-2 text-xs"
-              >
-                {a.kind === "image" && a.content ? (
-                  <button
-                    type="button"
-                    onClick={() => setPreview({ src: a.content!, name: a.name })}
-                    className="shrink-0 rounded transition-opacity hover:opacity-80"
-                    title="点击查看原图"
-                  >
-                    <img
-                      src={a.content}
-                      alt={a.name}
-                      className="h-6 w-6 rounded object-cover"
-                    />
-                  </button>
-                ) : a.kind === "video" ? (
-                  <FileVideo className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <div key={a.id} className="flex flex-col items-end gap-1.5">
+                {a.kind === "video" && a.content ? (
+                  /* 视频：原生格式直接播，wmv/mpg 等用内置解码器转码后播 */
+                  <div className="w-[min(420px,75vw)]">
+                    <UniversalVideoPlayer src={a.content} name={a.name} />
+                  </div>
                 ) : (
-                  <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  <span className="inline-flex max-w-[200px] items-center gap-1.5 rounded-lg border border-border/70 bg-muted/60 py-1 pl-1.5 pr-2 text-xs">
+                    {a.kind === "image" && a.content ? (
+                      <button
+                        type="button"
+                        onClick={() => setPreview({ src: a.content!, name: a.name })}
+                        className="shrink-0 rounded transition-opacity hover:opacity-80"
+                        title="点击查看原图"
+                      >
+                        <img
+                          src={a.content}
+                          alt={a.name}
+                          className="h-6 w-6 rounded object-cover"
+                        />
+                      </button>
+                    ) : a.kind === "video" ? (
+                      <FileVideo className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    ) : (
+                      <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    )}
+                    <span className="truncate text-fg-secondary">{a.name}</span>
+                    <span className="shrink-0 text-[10px] text-fg-quaternary">{formatBytes(a.size)}</span>
+                  </span>
                 )}
-                <span className="truncate text-fg-secondary">{a.name}</span>
-                <span className="shrink-0 text-[10px] text-fg-quaternary">{formatBytes(a.size)}</span>
-              </span>
+              </div>
             ))}
           </div>
         ) : null}

@@ -103,8 +103,48 @@ export function getUpstash(): Redis {
   return upstashClient;
 }
 
+/**
+ * 统一后端开关。
+ *
+ * 之前是"各平台用各平台的原生存储"，结果同一个账号在
+ * Vercel 站和 Cloudflare 站是两套互不相通的数据 —— 换个域名就丢了聊天记录。
+ *
+ * 设 STORAGE_BACKEND=unified 后，**所有平台都连同一个 Upstash**，
+ * 账号 / 聊天记录 / 站点配置天然共享，不需要自己做双写同步
+ * （双写要处理冲突、重试、乱序，是这类需求里最容易埋雷的做法）。
+ *
+ * 代价：Cloudflare 上要跨网络回源到 Upstash，比原生 KV 略慢。
+ * 如果你只部署一个平台，用 auto 就好。
+ *
+ * 取值：
+ *   auto     —— 默认，平台原生优先（Cloudflare 用 KV+D1，其余用 Upstash）
+ *   unified  —— 全平台统一走 Upstash（多平台共用数据，推荐）
+ *   cloudflare —— 强制 KV + D1
+ *   upstash  —— 强制 Upstash
+ */
+export type StorageBackendMode = "auto" | "unified" | "cloudflare" | "upstash";
+
+export function storageMode(): StorageBackendMode {
+  const raw = (process.env.STORAGE_BACKEND ?? "auto").trim().toLowerCase();
+  if (raw === "unified" || raw === "shared") return "unified";
+  if (raw === "cloudflare" || raw === "cf") return "cloudflare";
+  if (raw === "upstash") return "upstash";
+  return "auto";
+}
+
 export function backendKind(): BackendKind {
-  // Cloudflare Workers：优先用平台原生的 KV + D1
+  const mode = storageMode();
+
+  // 统一模式：无视平台，一律 Upstash（这才是"多平台同步"的关键）
+  if (mode === "unified") return hasUpstashConfig() ? "upstash" : "none";
+  if (mode === "upstash") return hasUpstashConfig() ? "upstash" : "none";
+
+  if (mode === "cloudflare") {
+    const cfOnly = getCloudflareEnv();
+    return cfOnly && (cfOnly.KV || cfOnly.DB) ? "cloudflare" : "none";
+  }
+
+  // auto：Cloudflare Workers 优先用平台原生的 KV + D1
   const cf = getCloudflareEnv();
   if (cf && (cf.KV || cf.DB)) return "cloudflare";
   if (hasUpstashConfig()) return "upstash";
@@ -114,6 +154,20 @@ export function backendKind(): BackendKind {
 /** 获取存储实例（惰性单例） */
 export function getStore(): Store {
   if (storeSingleton) return storeSingleton;
+
+  const mode = storageMode();
+
+  // 统一 / 强制 Upstash：所有平台共用同一份数据
+  if (mode === "unified" || mode === "upstash") {
+    if (hasUpstashConfig()) {
+      storeSingleton = new UpstashStore(getUpstash());
+      return storeSingleton;
+    }
+    // 配了 unified 却没填 Upstash → 直接抛错，比悄悄退回本地存储好排查
+    throw new Error(
+      "STORAGE_BACKEND=unified 需要配置 UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN",
+    );
+  }
 
   // 1) Cloudflare Workers → KV + D1
   const cf = getCloudflareEnv();

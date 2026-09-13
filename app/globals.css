@@ -46,6 +46,33 @@
   src: url("/fonts/Montserrat-700.woff2") format("woff2");
 }
 
+/* --- Anthropic 官方字体（可选）---
+ *
+ * 非商业项目可以用官方字体。把两个文件放到 public/fonts/ 就会自动启用：
+ *   AnthropicSans.woff2   （Styrene B / Anthropic Sans）
+ *   AnthropicSerif.woff2  （Tiempos / Anthropic Serif）
+ *
+ * 没放也不影响 —— @font-face 加载失败会静默跳到字体栈的下一个
+ * （Inter / Source Serif 4），只是控制台会有 404，不影响显示。
+ *
+ * ⚠️ 仓库里**不预置**这两个文件：它们是商业授权字体，
+ * 不能随开源项目分发，否则会连累所有 fork 的人。
+ */
+@font-face {
+  font-family: "Anthropic Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: local("Anthropic Sans"), url("/fonts/AnthropicSans.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Anthropic Serif";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: local("Anthropic Serif"), url("/fonts/AnthropicSerif.woff2") format("woff2");
+}
+
 /* --- Inter · Anthropic 主题的无衬线（Styrene B 的开源近似）---
    Anthropic 官方字体 Anthropic Sans 基于 Commercial Type 的 Styrene B，
    是商业授权字体，不能随项目分发。Inter 是官方 fallback 栈里的第一个
@@ -267,10 +294,11 @@ body {
 [data-theme="anthropic"] {
   /* ---- 字体：Styrene B → Inter；Tiempos/Copernicus → Source Serif 4 ----
      两者都是官方 fallback 栈的第一顺位，开源且观感最接近。 */
-  --font-sans: "Inter", "Chiron GoRound TC", -apple-system, BlinkMacSystemFont,
-    "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  --font-serif: "Source Serif 4", "Chiron GoRound TC", Georgia, Cambria,
-    "Times New Roman", serif;
+  /* 官方字体（若已放置）优先，否则落到开源近似字体 */
+  --font-sans: "Anthropic Sans", "Inter", "Chiron GoRound TC", -apple-system,
+    BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-serif: "Anthropic Serif", "Source Serif 4", "Chiron GoRound TC", Georgia,
+    Cambria, "Times New Roman", serif;
   --font-mono: "JetBrains Mono", "SuperSFMonoV1", ui-monospace, SFMono-Regular,
     Menlo, monospace;
 
@@ -461,10 +489,10 @@ body {
   --text-tertiary: var(--hue) 8% 50%;
   --text-quaternary: var(--hue) 6% 62%;
 
-  /* ---- 形状：卡片感，圆角偏大 ---- */
-  --radius-ctrl: 0.875rem;
-  --radius-card: 1.5rem;
-  --radius-panel: 1.75rem;
+  /* ---- 形状：非常圆润（用户要求）—— 卡片近乎胶囊 ---- */
+  --radius-ctrl: 1.5rem;
+  --radius-card: 2.25rem;
+  --radius-panel: 2.75rem;
   --radius-pill: 999px;
 
   /* ---- 表面：卡片有明确的存在感和轻微抬起 ---- */
@@ -489,10 +517,21 @@ body {
   --glass-bg: 0 0% 100%;
   --glass-border: var(--hue) 18% 88%;
 
-  --radius: 1rem;
-  --radius-ios: 0.875rem;
-  --radius-ios-lg: 1.5rem;
-  --radius-ios-xl: 1.75rem;
+  --radius: 1.75rem;
+  --radius-ios: 1.5rem;
+  --radius-ios-lg: 2.25rem;
+  --radius-ios-xl: 2.75rem;
+}
+
+/* Fuwari 下所有卡片/容器强制走大圆角，避免组件里写死的 rounded-* 破坏整体感 */
+[data-theme="fuwari"] .rounded-lg,
+[data-theme="fuwari"] .rounded-xl,
+[data-theme="fuwari"] .rounded-2xl,
+[data-theme="fuwari"] .rounded-md {
+  border-radius: 1.75rem;
+}
+[data-theme="fuwari"] .rounded-full {
+  border-radius: 999px;
 }
 
 [data-theme="fuwari"].dark {
@@ -585,11 +624,11 @@ body {
   --text-tertiary: 292 10% 50%;
   --text-quaternary: 292 8% 62%;
 
-  /* ---- 形状：最大圆角，糖果感 ---- */
-  --radius-ctrl: 1.125rem;
-  --radius-card: 1.75rem;
-  --radius-panel: 2rem;
-  --radius-pill: 999px;
+  /* ---- 形状：**完全无圆角**（用户要求）—— 利落的直角切边 ---- */
+  --radius-ctrl: 0;
+  --radius-card: 0;
+  --radius-panel: 0;
+  --radius-pill: 0;
 
   /* ---- 表面：带紫色调的柔和扩散阴影 ---- */
   --shadow-card:
@@ -615,10 +654,30 @@ body {
   --glass-bg: 0 0% 100%;
   --glass-border: 295 20% 88%;
 
-  --radius: 1.375rem;
-  --radius-ios: 1.125rem;
-  --radius-ios-lg: 1.75rem;
-  --radius-ios-xl: 2rem;
+  --radius: 0;
+  --radius-ios: 0;
+  --radius-ios-lg: 0;
+  --radius-ios-xl: 0;
+}
+
+/*
+ * Violet Rose 要**彻底无圆角**：直角切边。
+ * 组件里大量写死了 rounded-*，这里统一压平。
+ * 只有头像和圆形指示器保留圆形（否则会变成难看的正方形色块）。
+ */
+[data-theme="violet-rose"] .rounded-sm,
+[data-theme="violet-rose"] .rounded,
+[data-theme="violet-rose"] .rounded-md,
+[data-theme="violet-rose"] .rounded-lg,
+[data-theme="violet-rose"] .rounded-xl,
+[data-theme="violet-rose"] .rounded-2xl,
+[data-theme="violet-rose"] .rounded-3xl {
+  border-radius: 0;
+}
+/* 例外：头像、状态点、开关这类"本身就是圆的东西"保持圆形 */
+[data-theme="violet-rose"] .rounded-full,
+[data-theme="violet-rose"] [class*="rounded-full"] {
+  border-radius: 999px !important;
 }
 
 [data-theme="violet-rose"].dark {
