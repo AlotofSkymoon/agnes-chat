@@ -255,6 +255,25 @@ UPSTASH_REDIS_REST_TOKEN=xxx
 > ⚠️ 选 `unified` 时 `UPSTASH_REDIS_REST_URL` / `TOKEN` **必填**，
 > 缺了会直接启动报错（而不是悄悄退回本地存储，那样更难排查）。
 
+### 怎么验证两个站真的共用同一份数据
+
+分别访问两个站的 `/api/health`，比对 `storage.storageFingerprint`：
+
+```bash
+curl https://站A/api/health | grep storageFingerprint
+curl https://站B/api/health | grep storageFingerprint
+```
+
+| 结果 | 含义 |
+|---|---|
+| 两值**相同** | ✅ 同一份数据，账号 / 聊天记录 / 站点配置互通 |
+| 两值**不同** | ❌ 各存各的，换个域名记录就没了 |
+
+指纹的原理：首次访问时往库里种一个随机串，后续同库的其他平台会读到同一个值。
+
+**聊天记录的 key 是 `chat:{userId}:{conversationId}`** —— 不含任何平台标识，
+所以只要指向同一个库，A 站发的消息在 B 站一定看得到。
+
 ---
 
 ## 🎬 视频播放（含 WMV / MPG）

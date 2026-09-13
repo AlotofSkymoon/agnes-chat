@@ -17,13 +17,33 @@ export async function GET() {
   const platform = detectPlatform();
   const backend = backendKind();
 
-  // 试着真正读一次，确认不只是"配置了"而是"能连上"
+  // 试着真正读写一次，确认不只是"配置了"而是"能连上"
   let storeOk = false;
   let storeError = "";
+  /**
+   * 跨库指纹：写个随机值再读回，用来验证两个平台的部署
+   * 是否真的指向**同一个**存储。
+   *
+   * 判据很简单：Vercel 站和 Cloudflare 站各访问一次 /api/health，
+   * 两边的 `storageFingerprint` 相同 → 同一份数据，账号和聊天记录互通；
+   * 不同 → 各存各的，换个域名记录就没了。
+   */
+  let storageFingerprint: string | null = null;
   try {
     if (backend !== "none") {
       const { getStore } = await import("@/lib/storage");
-      await getStore().get("__healthcheck__");
+      const store = getStore();
+      await store.get("__healthcheck__");
+
+      const existing = await store.get<string>("__sync_probe__");
+      if (existing) {
+        storageFingerprint = existing;
+      } else {
+        // 首次访问时种下一个随机串；同库的其他平台会直接读到它
+        const fresh = Math.random().toString(36).slice(2, 12);
+        await store.set("__sync_probe__", fresh);
+        storageFingerprint = fresh;
+      }
       storeOk = true;
     }
   } catch (err) {
@@ -59,6 +79,14 @@ export async function GET() {
       upstashConfigured: hasUpstashConfig(),
       // 用 Upstash 时，Vercel 与 Cloudflare 部署指向同一个库即可共用账号数据
       sharedAcrossPlatforms: backend === "upstash",
+      /**
+       * 两个平台各访问一次本接口，比对这个值：
+       * 相同 → 同一份数据（账号、聊天记录、站点配置互通）
+       * 不同 → 各存各的
+       */
+      storageFingerprint,
+      // 聊天记录 key 不含平台标识，因此同库即跨端可见
+      chatKeyPattern: "chat:{userId}:{conversationId}",
     },
     objectStorage: {
       kind: s3.kind,
