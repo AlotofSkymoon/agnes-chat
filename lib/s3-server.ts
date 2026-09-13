@@ -70,8 +70,11 @@ export async function resolveAccountId(): Promise<{ id: string; error?: string }
     return {
       id: "",
       error:
-        "缺少 Cloudflare API 令牌，且未配置账户 ID。请设置 CLOUDFLARE_API_TOKEN" +
-        "（Workers 上用 wrangler secret put 写入），或直接在 R2 设置里填账户 ID",
+        "读不到 Cloudflare API 令牌，且未配置账户 ID。" +
+        "注意：填在 GitHub 仓库 Settings 里的 Secrets 只对 GitHub Actions 生效，" +
+        "线上运行的站点读不到 —— 需要在 Cloudflare 后台（Workers → 设置 → 变量和机密）" +
+        "或用 wrangler secret put 再写一遍。" +
+        "其实更省事的做法是绑定 R2 桶：绑了就完全不需要令牌，也不用填账户 ID。",
     };
   }
 

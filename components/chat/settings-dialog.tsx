@@ -369,6 +369,8 @@ export function SettingsDialog({
     bucket: string;
     publicBaseUrl: string;
     platform?: "cloudflare" | "vercel" | "local";
+    /** 服务端是否通过 Worker binding 直连 R2（有则完全免配置） */
+    r2Bound?: boolean;
   } | null>(null);
 
   // 只展示当前部署平台支持的对象存储
@@ -742,7 +744,28 @@ export function SettingsDialog({
             </summary>
 
             <div className="mt-3 space-y-3">
-              {siteInfo?.siteManaged ? (
+              {/*
+               * binding 模式：桶已经挂在 Worker 上，权限来自 binding 本身。
+               * 这时 Endpoint / AK / SK 全都无意义 —— 显示出来只会让人
+               * 以为"还得填点什么"，甚至去搜怎么生成 Access Key。
+               * 所以整块手填表单隐藏，只留一张说明卡。
+               */}
+              {siteInfo?.r2Bound ? (
+                <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+                  <p className="text-xs font-medium text-primary">
+                    ✓ 已通过 Worker 绑定直连 R2
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                    桶是本站自己的，Worker 通过 binding 直接读写，
+                    <strong>不需要 Access Key / Secret Key，也不需要 API 令牌</strong>。
+                    上传走 <code>/api/upload/direct</code>，读取走{" "}
+                    <code>/api/r2/&lt;key&gt;</code>（桶不必开公开读）。
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    现在就可以直接传图，这里<strong>什么都不用填</strong>。
+                  </p>
+                </div>
+              ) : siteInfo?.siteManaged ? (
                 <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
                   <p className="text-xs font-medium text-primary">站点已配置 R2，可直接使用</p>
                   <p className="text-[11px] text-muted-foreground">
@@ -773,6 +796,9 @@ export function SettingsDialog({
                 </div>
               ) : null}
 
+              {/* binding 模式下整个手填表单没有意义，直接不渲染 */}
+              {siteInfo?.r2Bound ? null : (
+              <>
               <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2">
                 <div className="pr-3">
                   <p className="text-sm">启用对象存储</p>
@@ -958,6 +984,8 @@ export function SettingsDialog({
                   </p>
                 ) : null}
               </div>
+              </>
+              )}
             </div>
           </details>
           )}
