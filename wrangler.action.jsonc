@@ -1,0 +1,64 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agnes-chat",
+  // OpenNext 构建产物入口，不要手改
+  "main": ".open-next/worker.js",
+  // 兼容日期：必须是「今天或更早」，不能是未来日期（否则报尚未发布）。
+  // 也不要设得太旧——Next.js 14 依赖较新的 nodejs_compat 行为。
+  // 这里取当月初，既已发布又足够新。
+  "compatibility_date": "2026-09-01",
+  // Next.js 需要 Node 兼容层
+  "compatibility_flags": ["nodejs_compat"],
+
+  // 静态资源（Next.js 的 _next/static 等）
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  // ---------- Cloudflare 三件套 ----------
+  // 这是 **GitHub Actions 专用**配置：占位符由 scripts/prepare-deploy.mjs
+  // 自动替换成真实 ID（KV / D1 / R2 找不到就自动创建）。
+  // 界面部署请用 wrangler.dashboard.jsonc —— 那份不含 ID，
+  // 绑定在 Cloudflare 后台点即可。
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "__KV_ID__"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "agnes-chat-db",
+      "database_id": "__D1_ID__"
+    }
+  ],
+
+  // ---------------------------------------------------------------------------
+  // R2 对象存储（图片 / 视频等文件）
+  //
+  // ⚠️ 桶由 prepare-deploy.mjs 自动创建；创建失败时会自动移除这段，
+  //    绝不让部署因为缺桶而挂掉。
+  //
+  // 上传走「预签名直传」：浏览器从 /api/upload/presign 拿到签名链接后
+  // 直接 PUT 到 R2，文件不经过 Worker —— 所以能传大文件，
+  // 不受 Workers 请求体大小限制。
+  // 这个 binding 供服务端直接读写（删除、列举、生成临时链接）使用。
+  // ---------------------------------------------------------------------------
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "agnes-chat"
+    }
+  ],
+
+  // 非敏感配置；密钥一律用 wrangler secret put（见部署教程）
+  "vars": {
+    "NEXT_PUBLIC_SITE_NAME": "Agnes AI"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}

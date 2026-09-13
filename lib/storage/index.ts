@@ -25,6 +25,10 @@ let upstashClient: Redis | null = null;
 let storeSingleton: Store | null = null;
 
 /** 供应用启动时显式注入（例如从 OpenNext 的 getCloudflareContext() 拿到 env） */
+import { hasBinding, pickBinding } from "./binding";
+
+export { pickBinding, hasBinding };
+
 export function setCloudflareEnv(env: CloudflareEnv | null): void {
   cfEnvOverride = env;
   storeSingleton = null; // 让下次 getStore() 重新解析
@@ -41,7 +45,16 @@ function looksLikeBindings(value: unknown): CloudflareEnv | null {
   // OpenNext 的 context 形如 { env: {...}, ctx, cf }，先剥一层
   const inner = (obj.env ?? obj) as Record<string, unknown>;
   if (!inner || typeof inner !== "object") return null;
-  if (inner.KV || inner.DB) return inner as unknown as CloudflareEnv;
+  /**
+   * binding 名**大小写不敏感**。
+   *
+   * 原因：在 Cloudflare 后台手动绑定时，不同教程写的名字不一样 ——
+   * 我们的文档写 KV / DB / R2，而 cloud-mail 那类项目用的是小写 kv / db / r2。
+   * 用户照着任一教程填都可能，写死大写会导致"明明绑了却检测不到"。
+   */
+  if (pickBinding(inner, "kv") || pickBinding(inner, "db") || pickBinding(inner, "r2")) {
+    return inner as unknown as CloudflareEnv;
+  }
   return null;
 }
 
@@ -61,16 +74,15 @@ export function probeCloudflareEnv(): CloudflareEnv | null {
     if (hit) return hit;
   }
 
-  // 2) 兜底：扫 globalThis 上所有属性，找含 KV / DB 的对象。
+  // 2) 兜底：扫 globalThis 上所有属性，找含 KV / DB / R2 的对象。
   //    不同版本 OpenNext / workerd 注入的全局名可能变化，
   //    与其猜名字，不如按"是否含我们要的 binding"来认。
-  //    只扫一层、跳过常见巨型对象，开销可忽略。
   try {
     for (const key of Object.getOwnPropertyNames(g)) {
       if (key === "globalThis" || key === "global" || key === "window" || key === "self") continue;
       let value: unknown;
       try {
-        value = (g as Record<string, unknown>)[key];
+        value = g[key];
       } catch {
         continue; // 某些 getter 会抛
       }
@@ -90,13 +102,12 @@ export function getCloudflareEnv(): CloudflareEnv | null {
 
 /**
  * 是否已绑定 R2 桶。
- *
- * 这个判断很重要：绑定了就**不需要任何 Access Key / Secret Key**，
+ * 绑定了就**不需要任何 Access Key / Secret Key** ——
  * 桶是站长自己的，Worker 通过 binding 天然拥有读写权。
- * 上传走 /api/upload/direct，读取走 /api/r2/<key>。
  */
 export function hasR2Binding(): boolean {
-  return Boolean(getCloudflareEnv()?.R2);
+  const env = getCloudflareEnv();
+  return hasBinding(env as unknown as Record<string, unknown> | null, "r2");
 }
 
 export function hasUpstashConfig(): boolean {

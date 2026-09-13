@@ -23,7 +23,11 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-const CONFIG_PATH = resolve(process.cwd(), "wrangler.jsonc");
+/**
+ * Actions 专用配置。界面部署用 wrangler.dashboard.jsonc（不含 ID，
+ * 绑定在 Cloudflare 后台点）—— 两份分开，互不干扰。
+ */
+const CONFIG_PATH = resolve(process.cwd(), process.env.WRANGLER_CONFIG ?? "wrangler.action.jsonc");
 
 /** 桶/库/命名空间的名字，可用同名环境变量覆盖 */
 const NAME = {
@@ -180,7 +184,7 @@ async function ensureR2(src) {
 
 async function main() {
   if (!existsSync(CONFIG_PATH)) {
-    console.log("::error::未找到 wrangler.jsonc");
+    console.log(`::error::未找到 ${process.env.WRANGLER_CONFIG ?? "wrangler.action.jsonc"}`);
     process.exit(1);
   }
   let src = readFileSync(CONFIG_PATH, "utf8");

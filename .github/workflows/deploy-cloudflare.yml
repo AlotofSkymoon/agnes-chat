@@ -119,7 +119,7 @@ jobs:
             echo "⏭ 统一 Upstash 模式，跳过 D1 建表"
             exit 0
           fi
-          npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote --yes \
+          npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote --yes -c wrangler.action.jsonc \
             || echo "::warning::D1 建表失败（可能是统一 Upstash 模式，或数据库不存在）"
 
       - name: 构建（OpenNext）
@@ -141,7 +141,7 @@ jobs:
         id: deploy
         run: |
           set -o pipefail
-          if ! npx wrangler deploy 2>&1 | tee deploy.log; then
+          if ! npx wrangler deploy -c wrangler.action.jsonc 2>&1 | tee deploy.log; then
             echo "::error::wrangler deploy 失败"
             echo ""
             echo "================ 常见原因 ================"

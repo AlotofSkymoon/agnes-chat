@@ -1,4 +1,5 @@
 import type { Pipeline, SetOptions, Store, UserRecord } from "@/lib/storage/types";
+import { pickBinding } from "./binding";
 
 /**
  * Cloudflare 后端：KV + D1。
@@ -104,13 +105,19 @@ export class CloudflareStore implements Store {
   constructor(private env: CloudflareEnv) {}
 
   private get kv(): KVLike {
-    if (!this.env.KV) throw new Error("Cloudflare 部署缺少 KV 绑定（binding 名应为 KV）");
-    return this.env.KV;
+    const kv = pickBinding(this.env as unknown as Record<string, unknown>, "kv") as
+      | NonNullable<CloudflareEnv["KV"]>
+      | undefined;
+    if (!kv) throw new Error("Cloudflare 部署缺少 KV 绑定（binding 名应为 KV 或 kv）");
+    return kv;
   }
 
   private get db(): D1Like {
-    if (!this.env.DB) throw new Error("Cloudflare 部署缺少 D1 绑定（binding 名应为 DB）");
-    return this.env.DB;
+    const db = pickBinding(this.env as unknown as Record<string, unknown>, "db") as
+      | NonNullable<CloudflareEnv["DB"]>
+      | undefined;
+    if (!db) throw new Error("Cloudflare 部署缺少 D1 绑定（binding 名应为 DB 或 db）");
+    return db;
   }
 
   /* ------------------------------ get ------------------------------ */
