@@ -47,12 +47,47 @@ export const S3_PRESETS: S3Preset[] = [
     platform: "vercel",
     limited: true,
   },
+  {
+    id: "minio",
+    label: "MinIO 自建",
+    endpointHint: "https://minio.example.com:9000",
+    regionHint: "us-east-1",
+    note: "自建对象存储，完全免费；内网 IP / 本机会自动用 path-style",
+    docs: "https://min.io/",
+    platform: "vercel",
+  },
+  {
+    id: "aws",
+    label: "AWS S3",
+    endpointHint: "https://s3.<region>.amazonaws.com",
+    regionHint: "us-east-1",
+    note: "标准 S3，兼容性最好；用 virtual-host 寻址（自动识别）",
+    docs: "https://aws.amazon.com/s3/",
+    platform: "vercel",
+  },
+  {
+    id: "generic",
+    label: "通用 S3 兼容",
+    endpointHint: "https://s3.example.com",
+    regionHint: "auto",
+    note: "任何 S3 兼容服务（阿里云 OSS、腾讯 COS、七牛等填对应 endpoint）",
+    docs: "",
+    platform: "vercel",
+  },
 ];
 
-/** 按平台筛选可用预设；本地开发返回全部以便调试 */
+/**
+ * 平台筛选放宽：cloudflare 平台也能用外部 S3。
+ *
+ * 原来只按平台硬筛，导致 Workers 上想改用别的存储时一个选项都不显示。
+ * 现在 Cloudflare 上额外给出「通用 S3 兼容」，其余保持推荐顺序。
+ */
 export function presetsForPlatform(platform: "cloudflare" | "vercel" | "local"): S3Preset[] {
   if (platform === "local") return S3_PRESETS;
-  return S3_PRESETS.filter((p) => p.platform === platform);
+  if (platform === "cloudflare") {
+    return [...S3_PRESETS.filter((p) => p.platform === "cloudflare"), ...S3_PRESETS.filter((p) => p.id === "generic" || p.id === "minio")];
+  }
+  return S3_PRESETS.filter((p) => p.platform === "vercel");
 }
 
 /** S3 配置（保存在浏览器本地，随上传请求一起发到服务端代理） */

@@ -1,37 +1,27 @@
 name: 部署到 Cloudflare Workers
 
 # =============================================================================
-# 推荐部署方式：Workers + KV + D1 + R2，不需要 Redis
+# 唯一推荐的部署方式：**只填 GitHub Secrets，其余全自动**
 #
-# 首次使用请先在仓库 Settings → Secrets and variables → Actions 里配置：
-#   必需：CLOUDFLARE_API_TOKEN、CLOUDFLARE_ACCOUNT_ID
-#         KV_NAMESPACE_ID、D1_DATABASE_ID
-#         SESSION_SECRET、PRESET_AGNES_API_KEY
-#   可选：R2_ACCOUNT_ID、R2_ACCESS_KEY_ID、R2_SECRET_ACCESS_KEY、
-#         R2_BUCKET、R2_PUBLIC_BASE_URL（图片/视频上传）
+# 要做的只有一件事 —— 去仓库 Settings → Secrets and variables → Actions 填值，
+# 然后推送（或手动 Run workflow）。脚本会自动：
+#   · 查找或创建 KV 命名空间 / D1 数据库 / R2 桶（不用手抄 32 位 ID）
+#   · 把 ID 写回 wrangler.jsonc
+#   · 把站点密钥注入运行时（解决「GitHub Secrets 线上读不到」的坑）
+#   · 建 D1 表
+#   · 构建并部署
+#
+# 不需要在 Cloudflare 后台做任何事，也不需要访问任何建表地址。
 # =============================================================================
 
-# =============================================================================
-# 触发方式（参考 cloud-mail 的做法）
-#
-#   1. 推送到 main 自动部署 —— 只要改了代码或配置就自动更新线上版本
-#   2. 手动触发 —— Actions 页面点 Run workflow
-#
-# ⚠️ 如果你同时启用了「Cloudflare 界面部署（Workers Builds）」，
-#    一次推送会部署两遍、互相覆盖。二选一即可：
-#    想保留界面部署 → 在仓库 Variables 里加 AUTO_DEPLOY=false
-# =============================================================================
 on:
   push:
     branches: [main]
-    # 只改文档时不必重新部署
     paths-ignore:
       - "**.md"
-      - "docs/**"
       - "LICENSE"
   workflow_dispatch:
 
-# 并发控制：同一分支只跑最新一次，避免多次推送互相覆盖
 concurrency:
   group: deploy-cloudflare-${{ github.ref }}
   cancel-in-progress: true
@@ -42,222 +32,153 @@ jobs:
     permissions:
       contents: read
 
-    # -------------------------------------------------------------------------
-    # 同时支持 Secrets 和 Variables（写法参考 cloud-mail）。
-    # 这样非敏感配置（如桶名）可以直接放 Variables，改起来不用重新加密。
-    # -------------------------------------------------------------------------
     env:
+      # 同时支持 Secrets 和 Variables（写法参考 cloud-mail）
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || vars.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID }}
       KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID || vars.KV_NAMESPACE_ID }}
       D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID || vars.D1_DATABASE_ID }}
-      SESSION_SECRET: ${{ secrets.SESSION_SECRET || vars.SESSION_SECRET }}
-      PRESET_AGNES_API_KEY: ${{ secrets.PRESET_AGNES_API_KEY || vars.PRESET_AGNES_API_KEY }}
       R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || vars.R2_BUCKET_NAME || 'agnes-chat' }}
-      AUTO_DEPLOY: ${{ vars.AUTO_DEPLOY || 'true' }}
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+      PRESET_AGNES_API_KEY: ${{ secrets.PRESET_AGNES_API_KEY }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      STORAGE_BACKEND: ${{ vars.STORAGE_BACKEND || 'auto' }}
+      UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+      SITE_NAME: ${{ vars.SITE_NAME || 'Agnes AI' }}
+      NEXT_PUBLIC_REQUIRE_LOGIN: ${{ vars.NEXT_PUBLIC_REQUIRE_LOGIN || 'false' }}
+      NEXT_PUBLIC_ALLOW_WEB_SEARCH: ${{ vars.NEXT_PUBLIC_ALLOW_WEB_SEARCH || 'true' }}
+      SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
 
     steps:
-      # 界面部署与 Actions 同时启用时的保险丝
-      - name: 检查是否启用自动部署
-        if: github.event_name == 'push'
-        run: |
-          if [ "${AUTO_DEPLOY}" = "false" ]; then
-            echo "::notice::AUTO_DEPLOY=false，跳过本次自动部署（你可能正在使用 Cloudflare 界面部署）。需要时请手动 Run workflow。"
-            exit 0
-          fi
-          echo "✅ 自动部署已启用"
       - name: 拉取代码
         uses: actions/checkout@v4
 
       - name: 准备 Node
         uses: actions/setup-node@v4
         with:
-          # Node 20 已被 GitHub Actions 弃用（会被强制在 Node 24 上运行并告警），
-          # 用 22 消除该告警；Next 14 在 22 上完全兼容
           node-version: "22"
 
       - name: 安装依赖
-        # 不用 npm ci：仓库没提交 lock 文件，ci 会直接失败
         run: npm install
 
       # ------------------------------------------------------------------
-      # 前置校验：把缺 Secrets 的情况拦在构建之前，
-      # 避免构建 5 分钟后才发现配置不全
+      # 只校验真正必需的两项。KV / D1 / R2 的 ID 全部自动处理，
+      # 不需要也不应该手填 —— 手填反而容易填错。
       # ------------------------------------------------------------------
-      - name: 校验必需 Secrets
+      - name: 校验必需配置
         run: |
           set -e
           missing=0
           check() {
             if [ -z "$2" ]; then
-              echo "::error::缺少 Secret $1 —— 请在仓库 Settings → Secrets and variables → Actions 里添加"
+              echo "::error::缺少 $1 —— 请在 Settings → Secrets and variables → Actions 里添加"
               missing=1
             fi
           }
-          # KV / D1 的 ID 不必填 —— 后面的步骤会自动查找或创建
-          check CLOUDFLARE_API_TOKEN      "${{ env.CLOUDFLARE_API_TOKEN }}"
-          check CLOUDFLARE_ACCOUNT_ID     "${{ env.CLOUDFLARE_ACCOUNT_ID }}"
-          check SESSION_SECRET            "${{ env.SESSION_SECRET }}"
-          check PRESET_AGNES_API_KEY      "${{ env.PRESET_AGNES_API_KEY }}"
+          check CLOUDFLARE_API_TOKEN  "${CLOUDFLARE_API_TOKEN}"
+          check CLOUDFLARE_ACCOUNT_ID "${CLOUDFLARE_ACCOUNT_ID}"
+          check SESSION_SECRET        "${SESSION_SECRET}"
+          check PRESET_AGNES_API_KEY  "${PRESET_AGNES_API_KEY}"
           if [ "$missing" -ne 0 ]; then
             echo ""
             echo "=============================================="
-            echo "配置不全，已停止。补齐上面列出的 Secrets 后重新运行。"
+            echo "配置不全。上面列出的补齐后重新运行即可。"
+            echo "其余（KV / D1 / R2）会自动创建，不用管。"
             echo "=============================================="
             exit 1
           fi
-          echo "✅ 必需 Secrets 齐全"
+          echo "✅ 必需配置齐全"
 
       # ------------------------------------------------------------------
-      # 把 Secrets 里的 ID 填进 wrangler.jsonc 占位符。
-      # 用 python 而不是 sed：ID 里若含特殊字符也不会破坏 JSON 结构
-      # ------------------------------------------------------------------
-      # ------------------------------------------------------------------
-      # 自动准备 KV / D1 绑定（不需要手填 ID）
+      # 核心一步：准备 KV / D1 / R2 并注入密钥
       #
-      # 参考 cloud-mail 的思路，但用 API 而不是 wrangler 子命令：
-      #   给了 ID      → 直接用
-      #   没给         → 找同名命名空间 / 数据库；没有就创建
-      # 省去复制 32 位十六进制串的麻烦，也不会因为填错 ID
-      # 导致"部署成功但数据存不进去"。
+      # 这是"只填 GitHub"能成立的关键 —— 密钥在这里被写进配置，
+      # 所以部署后 Worker 运行时真的读得到。
+      # 想改回自己在 Cloudflare 后台配，设变量 INJECT_SECRETS=false。
       # ------------------------------------------------------------------
-      - name: 自动准备 KV / D1 绑定
+      - name: 准备资源并注入配置
+        env:
+          INJECT_SECRETS: ${{ vars.INJECT_SECRETS || 'true' }}
+        run: node scripts/prepare-deploy.mjs
+
+      - name: 关闭 Wrangler 遥测
+        run: npx wrangler telemetry disable || true
+
+      # ------------------------------------------------------------------
+      # 建表。幂等（全部 CREATE TABLE IF NOT EXISTS），重复执行无害。
+      # 只有「Cloudflare 原生存储」模式才需要；统一用 Upstash 时会跳过。
+      # ------------------------------------------------------------------
+      - name: 建 D1 表
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-          KV_NAMESPACE_ID: ${{ env.KV_NAMESPACE_ID }}
-          D1_DATABASE_ID: ${{ env.D1_DATABASE_ID }}
-        run: node scripts/ensure-bindings.mjs
-
-      - name: 建 D1 表（幂等，已存在不会重复建）
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote --yes
-
-      # ------------------------------------------------------------------
-      # R2 桶准备 + 自动 binding
-      #
-      # `wrangler r2 bucket create` 在桶已存在时会报 code 10004 失败，
-      # 光用 `|| echo 跳过` 糊过去的话，没人保证 binding 真的写进了配置。
-      #
-      # 更危险的是反向情况：桶不存在又没权限创建，但 wrangler.jsonc 里
-      # 留着 r2_buckets —— 那 wrangler deploy 会直接报 "bucket not found"，
-      # 整个部署挂掉。
-      #
-      # 所以交给脚本判断：
-      #   桶可用   → 写入/保留 binding（这就是"跳过时自动 binding"）
-      #   桶不可用 → 移除 r2_buckets，降级为不启用对象存储，部署继续
-      # ------------------------------------------------------------------
-      - name: 确保 R2 桶存在并自动绑定
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          R2_BUCKET_NAME: ${{ vars.R2_BUCKET_NAME || 'agnes-chat' }}
-        run: node scripts/ensure-r2.mjs
+        run: |
+          if [ "${STORAGE_BACKEND}" = "upstash" ]; then
+            echo "⏭ 统一 Upstash 模式，跳过 D1 建表"
+            exit 0
+          fi
+          npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote --yes \
+            || echo "::warning::D1 建表失败（可能是统一 Upstash 模式，或数据库不存在）"
 
       - name: 构建（OpenNext）
         run: npm run cf:build
 
-      # ------------------------------------------------------------------
-      # 体积诊断：Next.js 应用最容易在这里踩坑 ——
-      # Cloudflare 免费版 Worker 脚本上限 1 MiB（压缩后），超出即部署失败。
-      # 先打印出来，失败时能一眼看出是不是体积问题。
-      # ------------------------------------------------------------------
       - name: 报告构建产物体积
         run: |
           echo "=== .open-next 产物 ==="
           du -sh .open-next/ 2>/dev/null || true
           if [ -f .open-next/worker.js ]; then
-            raw=$(stat -c%s .open-next/worker.js)
             gz=$(gzip -c .open-next/worker.js | wc -c)
-            echo "worker.js 原始: $((raw/1024)) KB"
-            echo "worker.js 压缩后: $((gz/1024)) KB  (上限 1024 KB = 1 MiB)"
+            echo "worker.js 压缩后: $((gz/1024)) KB  (免费版上限 1024 KB)"
             if [ "$gz" -gt 1048576 ]; then
-              echo "::warning::压缩后超过 1 MiB，免费版会部署失败。需升级 Workers 付费版（上限 10 MiB）"
+              echo "::warning::超过 1 MiB，免费版会失败，需升级 Workers 付费版（上限 10 MiB）"
             fi
           fi
 
       - name: 部署到 Workers
         id: deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -o pipefail
           if ! npx wrangler deploy 2>&1 | tee deploy.log; then
-            echo "::error::wrangler deploy 失败，完整输出见上方日志"
+            echo "::error::wrangler deploy 失败"
             echo ""
             echo "================ 常见原因 ================"
-            echo "1) API 令牌权限不足（最常见，报错 Authentication error 10000）："
-            echo "   令牌需要以下权限，缺一个就会鉴权失败 ——"
-            echo "     账户 → Workers 脚本           → 编辑"
-            echo "     账户 → Workers KV 存储        → 编辑"
-            echo "     账户 → D1                     → 编辑"
-            echo "     账户 → Workers R2 存储        → 编辑"
-            echo "     用户 → User Details           → 读取   ← 容易漏"
-            echo "     用户 → Memberships            → 读取   ← 容易漏"
-            echo "   重新生成令牌后，更新 Secret CLOUDFLARE_API_TOKEN"
-            echo "2) 未注册 workers.dev 子域名："
-            echo "   dash.cloudflare.com → Workers 和 Pages → 设置子域名"
-            echo "3) 脚本体积超标：看上一步「报告构建产物体积」，"
-            echo "   免费版上限 1 MiB，需升级 Workers 付费版"
-            echo "4) KV / D1 ID 填错：核对 Secrets 与 Cloudflare 后台是否一致"
+            echo "1) API 令牌权限不足（最常见，Authentication error 10000）："
+            echo "   令牌需要这些权限 ——"
+            echo "     账户 → Workers 脚本     → 编辑"
+            echo "     账户 → Workers KV 存储  → 编辑"
+            echo "     账户 → D1               → 编辑"
+            echo "     账户 → Workers R2 存储  → 编辑"
+            echo "     用户 → User Details     → 读取   ← 容易漏"
+            echo "     用户 → Memberships      → 读取   ← 容易漏"
+            echo "   最简单：用官方「编辑 Cloudflare Workers」模板，权限都已配好"
+            echo "2) 脚本体积超标：看上一步的体积报告，免费版上限 1 MiB"
+            echo "3) 未注册 workers.dev 子域名：Cloudflare 后台 → Workers 和 Pages → 设置子域名"
             echo "=========================================="
             exit 1
           fi
-
-      # ------------------------------------------------------------------
-      # 密钥：必须用 secret put，不能写进 wrangler.jsonc（会提交到仓库）
-      # ------------------------------------------------------------------
-      - name: 写入站点密钥
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          SEC_PRESET: ${{ secrets.PRESET_AGNES_API_KEY }}
-          SEC_SESSION: ${{ secrets.SESSION_SECRET }}
-          SEC_R2_ACCOUNT: ${{ secrets.R2_ACCOUNT_ID }}
-          SEC_R2_AK: ${{ secrets.R2_ACCESS_KEY_ID }}
-          SEC_R2_SK: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          SEC_R2_BUCKET: ${{ secrets.R2_BUCKET }}
-          SEC_R2_PUBLIC: ${{ secrets.R2_PUBLIC_BASE_URL }}
-        run: |
-          set -e
-          put() {
-            name="$1"; value="$2"
-            if [ -z "$value" ]; then echo "跳过 $name（未设置）"; return 0; fi
-            printf '%s' "$value" | npx wrangler secret put "$name" > /dev/null 2>&1
-            echo "已写入 $name"
-          }
-          put PRESET_AGNES_API_KEY "$SEC_PRESET"
-          put SESSION_SECRET       "$SEC_SESSION"
-          put R2_ACCOUNT_ID        "$SEC_R2_ACCOUNT"
-          put R2_ACCESS_KEY_ID     "$SEC_R2_AK"
-          put R2_SECRET_ACCESS_KEY "$SEC_R2_SK"
-          put R2_BUCKET            "$SEC_R2_BUCKET"
-          put R2_PUBLIC_BASE_URL   "$SEC_R2_PUBLIC"
-
-      - name: 确认密钥已生效（只列名称，不打印值）
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler secret list || true
+          URL=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1 || true)
+          if [ -n "$URL" ]; then
+            echo "::add-mask::$URL"
+            echo "worker_url=$URL" >> $GITHUB_OUTPUT
+          fi
 
       - name: 完成
         run: |
           echo "=============================================="
           echo "✅ 部署完成！"
           echo ""
-          echo "下一步：打开你的 Workers 域名，访问 /api/health"
-          echo "  - ok: true         → 一切正常，去注册第一个账号（自动成为管理员）"
-          echo "  - problems 有内容  → 按提示逐条修"
+          echo "站点地址：${{ steps.deploy.outputs.worker_url }}"
+          echo ""
+          echo "打开 /api/health 自检："
+          echo "  ok: true        → 正常，注册第一个账号即成为管理员"
+          echo "  problems 有内容 → 按提示修"
+          echo ""
+          echo "注意：本次没有让你手动访问任何建表地址 —— 表已经建好了。"
           echo "=============================================="
 
-      # ------------------------------------------------------------------
-      # 清理旧的运行记录（参考 cloud-mail）
-      # 作用：避免部署日志里长期残留 token 等敏感信息的痕迹，
-      #      也让 Actions 列表保持清爽。失败不影响部署结果。
-      # ------------------------------------------------------------------
       - name: 删除旧运行记录
         uses: GitRML/delete-workflow-runs@main
         continue-on-error: true

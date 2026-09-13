@@ -87,6 +87,52 @@ export interface S3PresignParams {
   secretAccessKey: string;
   /** 有效期（秒），默认 15 分钟 */
   expiresIn?: number;
+  /**
+   * 寻址风格：true = path-style（endpoint/bucket/key），
+   * false = virtual-host（bucket.endpoint/key）。
+   * 不传则按 endpoint 自动推断。
+   */
+  forcePathStyle?: boolean;
+}
+
+/**
+ * 推断寻址风格。
+ *
+ * 这是 S3 兼容性最容易翻车的地方 —— 各家默认不一样：
+ *
+ * | 服务     | 风格           |
+ * |----------|----------------|
+ * | R2       | path-style ✅  |
+ * | MinIO    | path-style ✅  |
+ * | 内网/本机 | path-style ✅  |
+ * | AWS S3   | virtual-host   |
+ * | B2       | virtual-host   |
+ *
+ * 写死 path-style 的话，B2 / AWS 会 307 重定向或直接 403；
+ * 反过来写死 virtual-host，自建 MinIO 又解析不了。
+ * 所以按 endpoint 自动判断，同时允许显式覆盖。
+ */
+export function inferPathStyle(endpoint: string): boolean {
+  const host = (() => {
+    try {
+      return new URL(endpoint.replace(/\/+$/, "")).hostname;
+    } catch {
+      return endpoint;
+    }
+  })();
+
+  // R2 / MinIO / 私有部署：明确用 path-style
+  if (/r2\.cloudflarestorage\.com$/i.test(host)) return true;
+  if (/r2\.dev$/i.test(host)) return true;
+  if (/^minio/i.test(host)) return true;
+
+  // IP 地址或 localhost 无法做 virtual-host（证书和 DNS 都不支持）
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return true;
+  if (/^(localhost|127\.0\.0\.1)$/i.test(host)) return true;
+  if (/^10\.|^192\.168\.|^172\.(1[6-9]|2\d|3[01])\./.test(host)) return true;
+
+  // 其余（AWS、B2、大部分云厂商）用 virtual-host
+  return false;
 }
 
 /**
@@ -103,12 +149,30 @@ export async function presignS3Put(params: S3PresignParams): Promise<string> {
     accessKeyId,
     secretAccessKey,
     expiresIn = 900,
+    forcePathStyle,
   } = params;
 
   const base = endpoint.replace(/\/+$/, "");
-  const pathEncoded =
-    encodeS3Path(`/${bucket}/${normalizeS3Path(key).replace(/^\/+/, "")}`) || "/";
-  const parsed = new URL(base + pathEncoded);
+  const cleanKey = normalizeS3Path(key).replace(/^\/+/, "");
+
+  /**
+   * 两种寻址风格拼出来的 URL 完全不同，host 也随之变化 ——
+   * 而 host 要参与签名，所以必须先定风格再算 URL。
+   */
+  const pathStyle = typeof forcePathStyle === "boolean" ? forcePathStyle : inferPathStyle(base);
+
+  let url: string;
+  if (pathStyle) {
+    // https://endpoint/bucket/key
+    url = base + (encodeS3Path(`/${bucket}/${cleanKey}`) || "/");
+  } else {
+    // https://bucket.endpoint/key
+    const u = new URL(base);
+    u.hostname = `${bucket}.${u.hostname}`;
+    url = u.origin + (encodeS3Path(`/${cleanKey}`) || "/");
+  }
+
+  const parsed = new URL(url);
   const host = parsed.host;
 
   const amzDateStr = new Date().toISOString().replace(/[:-]|\.\d{3}/g, "");
