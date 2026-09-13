@@ -351,19 +351,33 @@ Claude 从不用粗体标题，全部衬线 + 500，像同一个作者写下来�
 | `UPSTASH_REDIS_REST_URL` | Upstash REST URL（**多平台同步必须**） |
 | `UPSTASH_REDIS_REST_TOKEN` | Upstash REST TOKEN |
 
-**R2 对象存储（可选，只要两个变量）**
+**R2 对象存储 —— 推荐走 binding，零密钥**
+
+`wrangler.jsonc` 里已经绑好了：
+
+```jsonc
+"r2_buckets": [{ "binding": "R2", "bucket_name": "agnes-chat" }]
+```
+
+**只要这个 binding 存在，就不需要任何 Access Key / Secret Key。**
+
+R2 桶是你自己的，Worker 通过 binding 读写时，权限来自 binding 本身——
+再生成一对 AK/SK 纯属多余。绑定后：
+
+- 上传走 `/api/upload/direct`，文件经 Worker 落 R2
+- 读取走 `/api/r2/<key>`，**桶不用开公开读**也能正常访问
+- 前端会优先选这条路，预签名只在没有 binding 时才用
+
+> ⚠️ 唯一约束：文件要过 Worker，受请求体上限（免费版 100MB）限制。
+> 超大文件改用 `/api/upload/presign` 的预签名直传。
+
+**用 S3 兼容 API 时才需要这些**（比如 Vercel 上远程访问 R2）
 
 | Key | 说明 |
 |---|---|
-| `R2_BUCKET_NAME` | **桶名**，如 `agnes-chat` |
-| `CLOUDFLARE_API_TOKEN` | API 令牌（用来按桶名反查账户） |
-
-只要这两个 —— **不用填账户 ID**。系统会拿 token 调 `/accounts` 反查账户 ID，
-再按 `R2_BUCKET_NAME` 匹配桶，自动拼出 endpoint。
-
-| Key（可选） | 说明 |
-|---|---|
-| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 的 S3 密钥（上传必需） |
+| `R2_BUCKET_NAME` | 桶名，如 `agnes-chat` |
+| `CLOUDFLARE_API_TOKEN` | 用来按桶名反查账户 ID |
+| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 的 S3 密钥 |
 | `S3_ACCESS_HOST` | 自定义访问域名，如 `https://images.example.com` |
 | `R2_ACCOUNT_ID` | 账户 ID（**一般不用填**，token 能反查） |
 

@@ -34,6 +34,8 @@ export interface SiteS3Info {
   publicBaseUrl: string;
   /** 站点是否内置了 Agnes Key（给前端提示用，不含密钥本身） */
   hasPresetKey: boolean;
+  /** 是否通过 Worker binding 直连 R2（有则免 AK/SK 直传） */
+  r2Bound?: boolean;
 }
 
 /**
@@ -342,12 +344,43 @@ export function getSiteS3Info(): SiteS3Info {
   const platform = detectPlatform();
   const kind: SiteS3Info["kind"] = platform === "cloudflare" ? "r2" : platform === "vercel" ? "b2" : "none";
 
+  /**
+   * R2 binding 是否可用。
+   *
+   * 有 binding 就等于开通了对象存储 —— 不需要 AK/SK，
+   * 桶是用户自己的，权限来自 binding 本身。
+   */
+  const bound = hasR2Binding();
+
   return {
-    siteManaged: Boolean(cfg),
+    // 有 binding 时即使没填任何 S3 变量也算已托管
+    siteManaged: Boolean(cfg) || bound,
     kind,
     endpoint: cfg?.endpoint ?? "",
     bucket: cfg?.bucket ?? "",
     publicBaseUrl: cfg?.publicBaseUrl ?? "",
     hasPresetKey: Boolean(process.env.PRESET_AGNES_API_KEY?.trim()),
+    /** 有 binding → 前端走 /api/upload/direct，不用预签名 */
+    r2Bound: bound,
   };
+}
+
+/**
+ * 检测 R2 binding。
+ * 这里不能 import cloudflare.ts（会造成循环依赖），直接探测全局对象。
+ */
+export function hasR2Binding(): boolean {
+  const g = globalThis as unknown as Record<string, unknown>;
+  const candidates: unknown[] = [
+    g.__env__,
+    g.__cloudflare_env__,
+    g.__cloudflareContext__,
+    g.__cf_env__,
+  ];
+  for (const c of candidates) {
+    if (!c || typeof c !== "object") continue;
+    const inner = ((c as Record<string, unknown>).env ?? c) as Record<string, unknown>;
+    if (inner && typeof inner === "object" && (inner as { R2?: unknown }).R2) return true;
+  }
+  return false;
 }

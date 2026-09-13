@@ -39,6 +39,23 @@ export interface D1Like {
 export interface CloudflareEnv {
   KV?: KVLike;
   DB?: D1Like;
+  /**
+   * R2 对象存储绑定（wrangler.jsonc 里的 binding 名固定为 R2）。
+   *
+   * 有了它，Worker 可以直接读写桶，**完全不需要 Access Key / Secret Key** ——
+   * 权限来自 binding 本身，桶是用户自己的，用户天然拥有全部使用权。
+   * 这正是 Workers 部署比走 S3 兼容 API 更省事的地方。
+   */
+  R2?: R2BucketLike;
+}
+
+/** R2Bucket 的最小可用接口（R2ObjectBody / head 等只用到这几个方法） */
+export interface R2BucketLike {
+  put(key: string, value: ArrayBuffer | Uint8Array | string | ReadableStream, options?: Record<string, unknown>): Promise<unknown>;
+  get(key: string): Promise<{ body?: ReadableStream; size?: number } | null>;
+  head(key: string): Promise<unknown | null>;
+  delete(key: string | string[]): Promise<unknown>;
+  list?(options?: Record<string, unknown>): Promise<{ objects?: { key: string }[] }>;
 }
 
 /* --------------------------- key 路由判断 --------------------------- */

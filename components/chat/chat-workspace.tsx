@@ -214,8 +214,9 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     let alive = true;
     fetch("/api/upload/config")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { siteManaged?: boolean } | null) => {
+      .then((d: { siteManaged?: boolean; r2Bound?: boolean } | null) => {
         if (!alive) return;
+        storageBoundRef.current = Boolean(d?.r2Bound);
         setStorageReady(Boolean(d?.siteManaged) || Boolean(settings.s3?.enabled));
       })
       .catch(() => {
@@ -654,6 +655,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
    * 未配置时隐藏上传入口 —— 否则用户传了文件才发现发不出去，体验很差。
    */
   const [storageReady, setStorageReady] = React.useState(false);
+  /** 服务端是否通过 Worker binding 直连了 R2（有则免密钥直传） */
+  const storageBoundRef = React.useRef(false);
 
   /** 联网搜索开关（同样用 ref，理由同上：避免重建 useCallback） */
   const webSearchRef = React.useRef(false);
@@ -679,6 +682,41 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       });
     return () => {
       alive = false;
+    };
+  }, []);
+
+  /**
+   * 通过 R2 binding 直传 —— **不需要 AK/SK**。
+   *
+   * Worker 绑了 R2 之后，权限来自 binding 本身（桶是站长自己的），
+   * 所以这条路优先于预签名：不用配任何密钥，也不用桶开公开读。
+   * 文件经 Worker 落 R2，受 100MB 请求体上限约束。
+   */
+  const uploadViaBinding = React.useCallback(async (file: File): Promise<Attachment> => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("filename", file.name);
+    form.append("prefix", s3Ref.current?.prefix?.trim() || "agnes-chat");
+
+    const res = await fetch("/api/upload/direct", { method: "POST", body: form });
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      url?: string;
+      size?: number;
+      contentType?: string;
+    };
+    if (!res.ok || !data.url) {
+      throw new Error(data.error ?? `直传失败（${res.status}）`);
+    }
+
+    const mime = data.contentType || file.type || "application/octet-stream";
+    return {
+      id: createId(),
+      name: file.name,
+      size: data.size ?? file.size,
+      mime,
+      kind: mime.startsWith("video/") ? "video" : mime.startsWith("image/") ? "image" : "file",
+      content: data.url,
     };
   }, []);
 
@@ -779,7 +817,10 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       picked.map(async (f) => {
         if (s3.enabled && needsRemote(f)) {
           try {
-            const att = await uploadViaS3(f);
+            /* 优先走 R2 binding（免密钥），失败再退回预签名 */
+            const att = storageBoundRef.current
+              ? await uploadViaBinding(f)
+              : await uploadViaS3(f);
 
             /**
              * 上传"成功"不等于 AI 看得到。
@@ -858,7 +899,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     setAttachments((prev) => [...prev, ...parsed]);
     const failed = parsed.filter((a) => a.note);
     if (failed.length) toast.warning(failed[0].note);
-  }, [attachments.length, uploadViaS3]);
+  }, [attachments.length, uploadViaS3, uploadViaBinding]);
 
   const removeAttachment = React.useCallback((id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
