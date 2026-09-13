@@ -50,6 +50,72 @@ function r2AccountId(): string {
 }
 
 /**
+ * 通过 API Token 反查账户 ID。
+ *
+ * 用户明确要求「不要根据 ID 那些」—— 手抄 32 位十六进制账户 ID 既容易错，
+ * 又没任何必要：只要有 API Token，调一次 /accounts 就能拿到。
+ * 只有在 token 没权限或没配置时才要求手动填。
+ */
+export async function resolveAccountId(): Promise<{ id: string; error?: string }> {
+  const preset = r2AccountId();
+  if (preset) return { id: preset };
+
+  const token = (process.env.CLOUDFLARE_API_TOKEN ?? process.env.R2_API_TOKEN ?? "").trim();
+  if (!token) {
+    return { id: "", error: "缺少 CLOUDFLARE_API_TOKEN，且未配置账户 ID" };
+  }
+
+  try {
+    const res = await fetch("https://api.cloudflare.com/client/v4/accounts?per_page=50", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      return { id: "", error: `查询账户失败（HTTP ${res.status}）` };
+    }
+    const data = (await res.json()) as {
+      success?: boolean;
+      result?: { id?: string; name?: string }[];
+    };
+    const first = data.result?.find((a) => a.id);
+    if (!first?.id) {
+      return { id: "", error: "该令牌下没有可用账户" };
+    }
+    return { id: first.id };
+  } catch (err) {
+    return { id: "", error: err instanceof Error ? err.message : "查询账户失败" };
+  }
+}
+
+/**
+ * 桶名环境变量。
+ *
+ * 变量名沿用社区惯例（也是用户给的 Rin 部署指南里的写法）：**R2_BUCKET_NAME**。
+ * 老的 R2_BUCKET 仍然兼容，但推荐用 R2_BUCKET_NAME。
+ */
+export function r2BucketName(): string {
+  return (
+    process.env.R2_BUCKET_NAME?.trim() ||
+    process.env.R2_BUCKET?.trim() ||
+    process.env.CF_R2_BUCKET?.trim() ||
+    ""
+  );
+}
+
+/**
+ * 图片/文件的公开访问域名。
+ * 对应社区惯例的 S3_ACCESS_HOST —— 绑定了自定义域时填它，
+ * 没填则用 r2.dev 默认域名。
+ */
+export function r2PublicHost(): string {
+  return (
+    process.env.S3_ACCESS_HOST?.trim() ||
+    process.env.R2_PUBLIC_BASE_URL?.trim() ||
+    process.env.R2_PUBLIC_HOST?.trim() ||
+    ""
+  );
+}
+
+/**
  * 本站默认的 R2 桶名候选。
  *
  * 部署时只要账户里存在其中任意一个，就能自动选中，用户不用填桶名。
@@ -80,7 +146,10 @@ export async function discoverR2Bucket(
 }> {
   const wanted = bucketName.trim();
   const token = (process.env.CLOUDFLARE_API_TOKEN ?? process.env.R2_API_TOKEN ?? "").trim();
-  const account = r2AccountId();
+
+  // 账户 ID 没手填也没关系 —— 有 token 就能反查
+  const resolved = await resolveAccountId();
+  const account = resolved.id;
 
   if (!token || !account) {
     return {
@@ -88,7 +157,7 @@ export async function discoverR2Bucket(
       bucket: "",
       endpoint: "",
       publicBaseUrl: "",
-      error: "缺少 CLOUDFLARE_API_TOKEN 或账户 ID，无法自动查找",
+      error: resolved.error ?? "缺少 CLOUDFLARE_API_TOKEN，无法自动查找",
     };
   }
 
@@ -177,7 +246,7 @@ function fromR2(): S3Config | null {
   const account = r2AccountId();
   const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
-  const bucket = process.env.R2_BUCKET?.trim();
+  const bucket = r2BucketName();
   if (!account || !accessKeyId || !secretAccessKey || !bucket) return null;
 
   return {
@@ -187,7 +256,7 @@ function fromR2(): S3Config | null {
     bucket,
     accessKeyId,
     secretAccessKey,
-    publicBaseUrl: process.env.R2_PUBLIC_BASE_URL?.trim() || "",
+    publicBaseUrl: r2PublicHost(),
     prefix: "agnes-chat",
   };
 }
@@ -219,6 +288,52 @@ export function getSiteS3Config(): S3Config | null {
   if (platform === "cloudflare") return fromR2();
   if (platform === "vercel") return fromB2();
   return fromR2() ?? fromB2();
+}
+
+/**
+ * 异步版配置读取 —— 只在**缺账户 ID** 时才需要。
+ *
+ * 有了它，用户只填 `R2_BUCKET_NAME` + `CLOUDFLARE_API_TOKEN` 就够了：
+ * 账户 ID 会拿 token 去查，桶按名字匹配，endpoint 自动拼。
+ * 这正是用户要的「不要根据 ID 那些，根据桶名获取使用权」。
+ */
+export async function getSiteS3ConfigAsync(): Promise<S3Config | null> {
+  const sync = getSiteS3Config();
+  if (sync) return sync;
+
+  const platform = detectPlatform();
+  if (platform === "vercel") return null;
+
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
+  if (!accessKeyId || !secretAccessKey) return null;
+
+  const resolved = await resolveAccountId();
+  if (!resolved.id) return null;
+
+  const bucket =
+    r2BucketName() ||
+    (await (async () => {
+      // 没指定桶名就按候选顺序找第一个存在的
+      for (const name of R2_CANDIDATE_BUCKETS) {
+        const hit = await discoverR2Bucket(name);
+        if (hit.found) return hit.bucket;
+      }
+      return "";
+    })());
+
+  if (!bucket) return null;
+
+  return {
+    enabled: true,
+    endpoint: `https://${resolved.id}.r2.cloudflarestorage.com`,
+    region: "auto",
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+    publicBaseUrl: r2PublicHost() || `https://pub-${resolved.id}.r2.dev`,
+    prefix: "agnes-chat",
+  };
 }
 
 /** 给前端的脱敏信息（不含任何密钥） */

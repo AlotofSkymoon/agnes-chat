@@ -104,23 +104,22 @@ export function getUpstash(): Redis {
 }
 
 /**
- * 统一后端开关。
+ * 存储后端选择。
  *
- * 之前是"各平台用各平台的原生存储"，结果同一个账号在
- * Vercel 站和 Cloudflare 站是两套互不相通的数据 —— 换个域名就丢了聊天记录。
+ * ⚠️ 默认就是**统一 Upstash**：只要配了 Upstash，无论部署在
+ * Vercel / Netlify / Cloudflare，都连同一个库，账号、聊天记录、站点配置全部互通。
  *
- * 设 STORAGE_BACKEND=unified 后，**所有平台都连同一个 Upstash**，
- * 账号 / 聊天记录 / 站点配置天然共享，不需要自己做双写同步
- * （双写要处理冲突、重试、乱序，是这类需求里最容易埋雷的做法）。
+ * 这是用户的硬性要求 —— 早期版本是"各平台用各平台原生存储"，
+ * 结果同一个账号在 Vercel 站和 Cloudflare 站是两套数据，换个域名记录就没了。
  *
- * 代价：Cloudflare 上要跨网络回源到 Upstash，比原生 KV 略慢。
- * 如果你只部署一个平台，用 auto 就好。
+ * 为什么统一后端而不是双写同步：双写要处理冲突、重试、乱序到达、部分失败，
+ * 是这类需求里最容易埋雷的做法。统一后端所有平台读写同一份数据，天然一致。
  *
  * 取值：
- *   auto     —— 默认，平台原生优先（Cloudflare 用 KV+D1，其余用 Upstash）
- *   unified  —— 全平台统一走 Upstash（多平台共用数据，推荐）
- *   cloudflare —— 强制 KV + D1
- *   upstash  —— 强制 Upstash
+ *   auto（默认）—— **有 Upstash 就用 Upstash（统一）**；没配才退回平台原生
+ *   unified     —— 强制 Upstash，缺配置直接报错（不会静默退回）
+ *   cloudflare  —— 强制 KV + D1（单平台部署、不想跨网络回源时用）
+ *   upstash     —— 强制 Upstash，同 unified 但不校验
  */
 export type StorageBackendMode = "auto" | "unified" | "cloudflare" | "upstash";
 
@@ -135,7 +134,7 @@ export function storageMode(): StorageBackendMode {
 export function backendKind(): BackendKind {
   const mode = storageMode();
 
-  // 统一模式：无视平台，一律 Upstash（这才是"多平台同步"的关键）
+  // 统一 / 强制 Upstash：无视平台，一律同一个库
   if (mode === "unified") return hasUpstashConfig() ? "upstash" : "none";
   if (mode === "upstash") return hasUpstashConfig() ? "upstash" : "none";
 
@@ -144,10 +143,12 @@ export function backendKind(): BackendKind {
     return cfOnly && (cfOnly.KV || cfOnly.DB) ? "cloudflare" : "none";
   }
 
-  // auto：Cloudflare Workers 优先用平台原生的 KV + D1
+  // auto（默认）：**Upstash 优先** —— 配了就全平台共用，保证数据互通
+  if (hasUpstashConfig()) return "upstash";
+
+  // 没配 Upstash 才用 Cloudflare 原生的 KV + D1
   const cf = getCloudflareEnv();
   if (cf && (cf.KV || cf.DB)) return "cloudflare";
-  if (hasUpstashConfig()) return "upstash";
   return "none";
 }
 
@@ -169,14 +170,20 @@ export function getStore(): Store {
     );
   }
 
-  // 1) Cloudflare Workers → KV + D1
+  // auto 模式：Upstash 优先（默认就跨平台统一）
+  if (mode === "auto" && hasUpstashConfig()) {
+    storeSingleton = new UpstashStore(getUpstash());
+    return storeSingleton;
+  }
+
+  // Cloudflare Workers → KV + D1（仅在没有 Upstash 时）
   const cf = getCloudflareEnv();
   if (cf && (cf.KV || cf.DB)) {
     storeSingleton = new CloudflareStore(cf);
     return storeSingleton;
   }
 
-  // 2) Vercel / 本地 → Upstash Redis
+  // 兜底 → Upstash Redis
   if (hasUpstashConfig()) {
     storeSingleton = new UpstashStore(getUpstash());
     return storeSingleton;

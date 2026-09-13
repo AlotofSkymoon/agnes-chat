@@ -226,20 +226,23 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 
 ## 🔄 多平台数据同步
 
-同一个仓库部署到 Vercel + Cloudflare 两个站，**默认是两套互不相通的数据**
-（各平台用各自的原生存储，换个域名聊天记录就没了）。
-
-要打通，加一个环境变量：
+**默认就是统一的**：只要配了 Upstash，无论部署到 Vercel / Netlify / Cloudflare，
+都连**同一个库**，账号、聊天记录、站点配置全部互通。
 
 ```bash
-STORAGE_BACKEND=unified
+UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=xxx
 ```
+
+填完这两个，多平台同步就生效了 —— 不需要额外开关。
+
+`STORAGE_BACKEND` 只在你想**改变**这个默认行为时才需要：
 
 | 取值 | 行为 |
 |---|---|
-| `auto`（默认） | Cloudflare 用 KV+D1，Vercel/Netlify 用 Upstash，**数据不互通** |
-| `unified` ⭐ | **所有平台统一走 Upstash**，账号 / 聊天记录 / 站点配置全部共享 |
-| `cloudflare` | 强制 KV + D1 |
+| `auto`（默认） | **有 Upstash 就统一用 Upstash**（数据互通）；没配才退回平台原生 |
+| `unified` | 强制 Upstash，缺配置直接报错（不会静默退回本地） |
+| `cloudflare` | 强制 KV + D1（单平台部署、不想跨网络回源时用） |
 | `upstash` | 强制 Upstash |
 
 **为什么统一后端比双写同步好**：双写要处理冲突、重试、乱序到达、
@@ -343,26 +346,38 @@ Claude 从不用粗体标题，全部衬线 + 500，像同一个作者写下来�
 
 | Key | 说明 |
 |---|---|
-| `CLOUDFLARE_API_TOKEN` | API 令牌（仅 Actions 方式需要） |
-| `CLOUDFLARE_ACCOUNT_ID` | 账户 ID（Dashboard 右侧栏） |
-| `KV_NAMESPACE_ID` | KV 命名空间 ID |
-| `D1_DATABASE_ID` | D1 数据库 ID |
 | `SESSION_SECRET` | `openssl rand -base64 32` 生成 |
 | `PRESET_AGNES_API_KEY` | 站点内置 Key |
+| `UPSTASH_REDIS_REST_URL` | Upstash REST URL（**多平台同步必须**） |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash REST TOKEN |
 
-**可选**
+**R2 对象存储（可选，只要两个变量）**
 
 | Key | 说明 |
 |---|---|
-| `R2_ACCOUNT_ID` | R2 账户 ID |
-| `R2_ACCESS_KEY_ID` | R2 令牌 Access Key |
-| `R2_SECRET_ACCESS_KEY` | R2 令牌 Secret |
-| `R2_BUCKET` | 桶名，如 `agnes-chat` |
-| `R2_PUBLIC_BASE_URL` | 公开域名，如 `https://pub-xxx.r2.dev` |
-| `JWT_SECRET` | 建表接口 `/api/d1/cshsjk/<token>` 用 |
+| `R2_BUCKET_NAME` | **桶名**，如 `agnes-chat` |
+| `CLOUDFLARE_API_TOKEN` | API 令牌（用来按桶名反查账户） |
 
-> ❌ **不要填** `UPSTASH_*` —— Cloudflare 上不读。
+只要这两个 —— **不用填账户 ID**。系统会拿 token 调 `/accounts` 反查账户 ID，
+再按 `R2_BUCKET_NAME` 匹配桶，自动拼出 endpoint。
+
+| Key（可选） | 说明 |
+|---|---|
+| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | R2 的 S3 密钥（上传必需） |
+| `S3_ACCESS_HOST` | 自定义访问域名，如 `https://images.example.com` |
+| `R2_ACCOUNT_ID` | 账户 ID（**一般不用填**，token 能反查） |
+
+**仅 Cloudflare 原生存储模式需要**（设了 `STORAGE_BACKEND=cloudflare` 时）
+
+| Key | 说明 |
+|---|---|
+| `KV_NAMESPACE_ID` | KV 命名空间 ID |
+| `D1_DATABASE_ID` | D1 数据库 ID |
+| `JWT_SECRET` | 建表接口 `/api/d1/cshsjk/<token>` 用 |
+| `CLOUDFLARE_ACCOUNT_ID` | 账户 ID（Actions 部署用） |
+
 > ⚠️ 密钥走 `wrangler secret put`，别写进 `wrangler.jsonc`（会提交到仓库）。
+> 💡 默认 `STORAGE_BACKEND=auto` 且配了 Upstash 时，**KV / D1 不会被用到**。
 
 ---
 

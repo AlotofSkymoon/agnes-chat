@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { presignS3Put } from "@/lib/s3-sign";
 import { UPLOAD_LIMITS, type S3Config } from "@/lib/s3-presets";
-import { getSiteS3Config } from "@/lib/s3-server";
+import { getSiteS3Config, getSiteS3ConfigAsync } from "@/lib/s3-server";
 import { detectPlatform, platformLabel } from "@/lib/platform";
 import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
 
@@ -61,7 +61,8 @@ export async function POST(request: Request) {
    * 站点托管模式：管理员已在服务端配好 R2，
    * 前端只需传 { enabled: true, useSiteConfig: true }，密钥不会离开服务器。
    */
-  const siteCfg = getSiteS3Config();
+  // 同步读不到时用异步版：只填了 R2_BUCKET_NAME + API Token 的情况
+  const siteCfg = getSiteS3Config() ?? (await getSiteS3ConfigAsync());
   const useSite = Boolean(config?.enabled && (config as { useSiteConfig?: boolean }).useSiteConfig);
 
   let effective: S3Config | undefined = config;
