@@ -276,6 +276,45 @@ curl https://站B/api/health | grep storageFingerprint
 
 ---
 
+## 🔑 Cloudflare 令牌识别不到怎么办
+
+**先确认一件事：如果用 R2 binding（推荐方式），你根本不需要 API 令牌。**
+
+binding 的权限来自 Worker 本身，不走 API。令牌只在「自动查找账户 ID / 桶名」时才用得上。
+所以如果你只是想让上传能用，绑好 `r2_buckets` 就够了，令牌配不配无所谓。
+
+真需要令牌时（比如自动发现桶），识别不到通常是下面四种原因：
+
+| 原因 | 现象 | 处理 |
+|---|---|---|
+| **Workers 上 `process.env` 读不到 secret** | 本地好使，部署后失效 | 用 `wrangler secret put CLOUDFLARE_API_TOKEN` 写入；代码会同时去 binding 里找 |
+| **变量名不一致** | 一直报"缺少令牌" | 已兼容 `CLOUDFLARE_API_TOKEN` / `CF_API_TOKEN` / `R2_API_TOKEN` / `CLOUDFLARE_TOKEN` / `CF_TOKEN` |
+| **粘贴混入换行或引号** | 401，但令牌看着没错 | 已自动 trim 并去掉误粘的引号；请求前会校验是否残留空白 |
+| **填成了 Global API Key** | 401 | Global Key 是 **37 位**，API Token 是 **40 位**，前者不能单独用于 Bearer 鉴权 |
+
+**排查方式**：管理员访问 `/api/diagnose`，看 `cloudflareCredentials` 字段：
+
+```jsonc
+{
+  "token": {
+    "present": true,
+    "key": "CLOUDFLARE_API_TOKEN",   // 实际命中的变量名
+    "from": "cf-binding",            // process.env 还是 Worker binding
+    "masked": "abcd************wxyz", // 脱敏，只给前4后4
+    "ok": true,
+    "hint": ""
+  }
+}
+```
+
+`present: false` → 完全没读到，检查变量名和部署方式。
+`present: true` 但 `ok: false` → 读到了但形态不对，看 `hint`。
+
+> ⚠️ 用 `wrangler secret put` 写入的是 **binding 而非 process.env**，
+> OpenNext 各版本对 `process.env` 的垫片行为不一致 —— 这是部署后"突然读不到"的主因。
+
+---
+
 ## 🎬 视频播放（含 WMV / MPG）
 
 浏览器原生只支持 **mp4 / webm / ogg** 三种容器。

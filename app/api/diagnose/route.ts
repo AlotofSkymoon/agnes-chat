@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/auth";
 import { DEFAULT_BASE_URL, DEFAULT_MODEL, resolveTarget } from "@/lib/config";
+import { credentialStatus } from "@/lib/cf-credentials";
 import { detectPlatform } from "@/lib/platform";
 
 export const runtime = "nodejs";
@@ -57,6 +58,17 @@ export async function GET() {
     providerId: target.providerId,
     hasKey: Boolean(key),
     keyPrefix: key ? `${key.slice(0, 6)}…${key.slice(-4)}` : "",
+    /**
+     * Cloudflare 凭证识别情况。
+     *
+     * 「配了 R2 但用不了」绝大多数时候不是配置错，而是**根本没读到** ——
+     * 变量名五花八门、Workers 上 process.env 拿不到 secret、
+     * 粘贴混入换行…… 表现全一样，光看现象分不清。
+     *
+     * 这里把"读到了哪个变量、从哪读的、长度对不对"直接列出来，
+     * 一眼就能看出是没填、名字不对，还是形态不对。
+     */
+    cloudflareCredentials: credentialStatus(),
   };
 
   if (!key) {

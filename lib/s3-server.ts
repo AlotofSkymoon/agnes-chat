@@ -1,4 +1,10 @@
 import { detectPlatform } from "@/lib/platform";
+import {
+  cloudflareApiToken,
+  cloudflareAccountId,
+  r2BucketNameSource,
+  r2S3Keys,
+} from "@/lib/cf-credentials";
 import type { S3Config } from "@/lib/s3-presets";
 
 /**
@@ -43,12 +49,8 @@ export interface SiteS3Info {
  * 这样只配了 CF_ACCOUNT_ID 的部署也能自动拼出 endpoint。
  */
 function r2AccountId(): string {
-  return (
-    process.env.R2_ACCOUNT_ID?.trim() ||
-    process.env.CF_ACCOUNT_ID?.trim() ||
-    process.env.CLOUDFLARE_ACCOUNT_ID?.trim() ||
-    ""
-  );
+  // 统一解析：同时看 process.env 与 Worker binding，兼容多种变量名
+  return cloudflareAccountId()?.value ?? "";
 }
 
 /**
@@ -62,9 +64,15 @@ export async function resolveAccountId(): Promise<{ id: string; error?: string }
   const preset = r2AccountId();
   if (preset) return { id: preset };
 
-  const token = (process.env.CLOUDFLARE_API_TOKEN ?? process.env.R2_API_TOKEN ?? "").trim();
+  const tokenSrc = cloudflareApiToken();
+  const token = tokenSrc?.value ?? "";
   if (!token) {
-    return { id: "", error: "缺少 CLOUDFLARE_API_TOKEN，且未配置账户 ID" };
+    return {
+      id: "",
+      error:
+        "缺少 Cloudflare API 令牌，且未配置账户 ID。请设置 CLOUDFLARE_API_TOKEN" +
+        "（Workers 上用 wrangler secret put 写入），或直接在 R2 设置里填账户 ID",
+    };
   }
 
   try {
@@ -95,12 +103,7 @@ export async function resolveAccountId(): Promise<{ id: string; error?: string }
  * 老的 R2_BUCKET 仍然兼容，但推荐用 R2_BUCKET_NAME。
  */
 export function r2BucketName(): string {
-  return (
-    process.env.R2_BUCKET_NAME?.trim() ||
-    process.env.R2_BUCKET?.trim() ||
-    process.env.CF_R2_BUCKET?.trim() ||
-    ""
-  );
+  return r2BucketNameSource()?.value ?? "";
 }
 
 /**
@@ -147,7 +150,7 @@ export async function discoverR2Bucket(
   error?: string;
 }> {
   const wanted = bucketName.trim();
-  const token = (process.env.CLOUDFLARE_API_TOKEN ?? process.env.R2_API_TOKEN ?? "").trim();
+  const token = cloudflareApiToken()?.value ?? "";
 
   // 账户 ID 没手填也没关系 —— 有 token 就能反查
   const resolved = await resolveAccountId();
@@ -159,7 +162,7 @@ export async function discoverR2Bucket(
       bucket: "",
       endpoint: "",
       publicBaseUrl: "",
-      error: resolved.error ?? "缺少 CLOUDFLARE_API_TOKEN，无法自动查找",
+      error: resolved.error ?? "缺少 Cloudflare API 令牌，无法自动查找",
     };
   }
 
@@ -246,8 +249,7 @@ export async function discoverR2Bucket(
 
 function fromR2(): S3Config | null {
   const account = r2AccountId();
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
+  const { accessKeyId, secretAccessKey } = r2S3Keys();
   const bucket = r2BucketName();
   if (!account || !accessKeyId || !secretAccessKey || !bucket) return null;
 
@@ -306,8 +308,7 @@ export async function getSiteS3ConfigAsync(): Promise<S3Config | null> {
   const platform = detectPlatform();
   if (platform === "vercel") return null;
 
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
+  const { accessKeyId, secretAccessKey } = r2S3Keys();
   if (!accessKeyId || !secretAccessKey) return null;
 
   const resolved = await resolveAccountId();

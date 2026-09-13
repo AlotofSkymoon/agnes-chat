@@ -26,8 +26,42 @@ import { resolve } from "node:path";
 const CONFIG_PATH = resolve(process.cwd(), "wrangler.jsonc");
 const DEFAULT_BUCKET = process.env.R2_BUCKET_NAME?.trim() || "agnes-chat";
 
-const token = (process.env.CLOUDFLARE_API_TOKEN ?? "").trim();
-const accountId = (process.env.CLOUDFLARE_ACCOUNT_ID ?? "").trim();
+/**
+ * 变量名不统一是"识别不到"的高频原因 ——
+ * 有人填 CF_API_TOKEN，有人填 R2_API_TOKEN，还有人只填了 CLOUDFLARE_TOKEN。
+ * 这里按优先级依次尝试，并顺手去掉粘贴时混入的空白与引号
+ * （尾部换行会让 Authorization 头变成 `Bearer xxx\n`，Cloudflare 直接 401）。
+ */
+const TOKEN_KEYS = ["CLOUDFLARE_API_TOKEN", "CF_API_TOKEN", "R2_API_TOKEN", "CLOUDFLARE_TOKEN", "CF_TOKEN"];
+const ACCOUNT_KEYS = ["CLOUDFLARE_ACCOUNT_ID", "CF_ACCOUNT_ID", "R2_ACCOUNT_ID", "ACCOUNT_ID"];
+
+function clean(v) {
+  if (typeof v !== "string") return "";
+  return v.trim().replace(/^["']+|["']+$/g, "").trim();
+}
+function pick(keys) {
+  for (const k of keys) {
+    const v = clean(process.env[k]);
+    if (v) return { value: v, key: k };
+  }
+  return null;
+}
+
+const tokenSrc = pick(TOKEN_KEYS);
+const accountSrc = pick(ACCOUNT_KEYS);
+const token = tokenSrc?.value ?? "";
+const accountId = accountSrc?.value ?? "";
+
+if (token) {
+  console.log(`::notice::已读取 API 令牌（${tokenSrc.key}，长度 ${token.length}）`);
+  // Global API Key 是 37 位，不能单独用于 Bearer 鉴权 —— 提前点破，别让人对着 401 猜
+  if (token.length === 37) {
+    console.log(
+      "::warning::令牌长度 37 位，疑似 Global API Key 而非 API Token（40 位）。" +
+        "Global Key 不能单独用于 Bearer 鉴权，请改用 API 令牌。",
+    );
+  }
+}
 
 /** 去掉 jsonc 的注释，便于用 JSON.parse 读取（不引入额外依赖） */
 function stripComments(src) {
@@ -124,7 +158,9 @@ async function main() {
   let src = readFileSync(CONFIG_PATH, "utf8");
 
   if (!token || !accountId) {
-    console.log("::warning::缺少 CLOUDFLARE_API_TOKEN 或 CLOUDFLARE_ACCOUNT_ID，跳过 R2 准备");
+    console.log(
+      `::warning::缺少 Cloudflare 凭证（已尝试 ${TOKEN_KEYS.join(" / ")} 与 ` +
+        `${ACCOUNT_KEYS.join(" / ")}），跳过 R2 准备`);
     // 无法确认桶是否存在时，保守起见移除 binding —— 宁可没存储，也不能让部署失败
     writeFileSync(CONFIG_PATH, removeBinding(src));
     console.log("已移除 r2_buckets（无法确认桶是否存在，避免部署报 bucket not found）");
