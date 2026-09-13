@@ -88,6 +88,17 @@ export function getCloudflareEnv(): CloudflareEnv | null {
   return cfEnvOverride ?? probeCloudflareEnv();
 }
 
+/**
+ * 是否已绑定 R2 桶。
+ *
+ * 这个判断很重要：绑定了就**不需要任何 Access Key / Secret Key**，
+ * 桶是站长自己的，Worker 通过 binding 天然拥有读写权。
+ * 上传走 /api/upload/direct，读取走 /api/r2/<key>。
+ */
+export function hasR2Binding(): boolean {
+  return Boolean(getCloudflareEnv()?.R2);
+}
+
 export function hasUpstashConfig(): boolean {
   return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
 }
