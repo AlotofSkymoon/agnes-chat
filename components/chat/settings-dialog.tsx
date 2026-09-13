@@ -420,7 +420,28 @@ export function SettingsDialog({
         publicBaseUrl?: string;
         available?: string[];
         error?: string;
+        message?: string;
+        mode?: "binding" | "api" | "none";
+        noCredentialsNeeded?: boolean;
       };
+
+      /**
+       * binding 模式：桶已经通过 wrangler.jsonc 绑定好了，
+       * **不需要 endpoint / AK / SK** —— 上传走 /api/upload/direct。
+       * 这时 endpoint 为空是正常的，不能用它来判断成功与否。
+       */
+      if (data.found && data.mode === "binding") {
+        patchS3({
+          enabled: true,
+          endpoint: "",
+          region: "auto",
+          bucket: data.bucket ?? "agnes-chat",
+          publicBaseUrl: data.publicBaseUrl ?? "",
+        });
+        setDiscoverMsg(data.message ?? "已直连 R2 绑定，无需任何密钥");
+        return;
+      }
+
       if (data.found && data.endpoint && data.bucket) {
         patchS3({
           enabled: true,

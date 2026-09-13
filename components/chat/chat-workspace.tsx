@@ -804,7 +804,15 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     const s3 = s3Ref.current;
     // 图片 / 视频 / 非文本文件走对象存储；文本文件本地抽取，直接进上下文
     const needsRemote = (f: File) => isImageFile(f) || isVideoFile(f) || !isTextFile(f);
-    const willUpload = s3.enabled && picked.some(needsRemote);
+
+    /**
+     * 「能用对象存储」的判定：用户前端配了 S3 **或** 服务端已绑定 R2。
+     *
+     * 之前只看 s3.enabled，于是 binding 模式下（用户压根没在设置里填过任何东西）
+     * 传图片会静默走 base64 内嵌 —— 又慢又容易超限。
+     */
+    const storageAvailable = s3.enabled || storageBoundRef.current;
+    const willUpload = storageAvailable && picked.some(needsRemote);
 
     let toastId: string | number | undefined;
     if (willUpload) toastId = toast.loading("正在上传到对象存储…");
@@ -815,7 +823,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
 
     const parsed = await Promise.all(
       picked.map(async (f) => {
-        if (s3.enabled && needsRemote(f)) {
+        if (storageAvailable && needsRemote(f)) {
           try {
             /* 优先走 R2 binding（免密钥），失败再退回预签名 */
             const att = storageBoundRef.current

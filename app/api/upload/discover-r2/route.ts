@@ -1,17 +1,28 @@
 import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/auth";
-import { discoverR2Bucket } from "@/lib/s3-server";
+import { getCloudflareEnv, hasR2Binding } from "@/lib/storage";
+import { discoverR2Bucket, r2BucketName, r2PublicHost } from "@/lib/s3-server";
+import { credentialStatus } from "@/lib/cf-credentials";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/upload/discover-r2 —— 只填桶名，自动定位 R2 桶。
+ * POST /api/upload/discover-r2 —— 自动定位 R2 桶。
  *
- * 用 Cloudflare API 列出账户下所有桶并匹配名字，
- * 自动返回 endpoint 与公开域名，免去手抄 32 位账户 ID。
- * 仅管理员可用（会用到账户级 API 令牌）。
+ * ⚠️ 之前这个接口**只会**去调 Cloudflare API，于是没配 API 令牌时
+ * 一律报"缺少 CLOUDFLARE_API_TOKEN"。但其实绝大多数情况下根本不需要调 API：
+ *
+ * 桶只要在 wrangler.jsonc 里绑定了，Worker 就已经能直接读写它了 ——
+ * 权限来自 binding，跟 API 令牌毫无关系。
+ * 用户点了"自动寻找"却被告知"没有 API key"，完全是自找麻烦。
+ *
+ * 所以现在分三级：
+ *
+ *   1. **有 R2 binding** → 直接用，零配置（最常见，界面部署默认如此）
+ *   2. **有 API 令牌**   → 调 API 列出账户下的桶，按名字匹配
+ *   3. **都没有**        → 明确告诉用户走哪条路能解决
  */
 export async function POST(request: Request) {
   const admin = await requireAdmin();
@@ -24,7 +35,62 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "请求格式错误" }, { status: 400 });
   }
 
-  // 桶名留空 = 自动在账户里找 agnes-chat / agnes-chat-r2
-  const result = await discoverR2Bucket(body.bucket ?? "");
-  return NextResponse.json(result, { status: result.found ? 200 : 404 });
+  const wanted = body.bucket?.trim() || r2BucketName() || "";
+
+  /* ---- 第 1 级：R2 binding（不需要任何密钥） ---- */
+  if (hasR2Binding()) {
+    const env = getCloudflareEnv();
+    void env; // binding 存在即可用
+
+    return NextResponse.json({
+      found: true,
+      // binding 模式下桶名以 wrangler.jsonc 为准；用户填的名字仅作参考
+      bucket: wanted || "agnes-chat",
+      endpoint: "",
+      publicBaseUrl: r2PublicHost(),
+      /**
+       * 关键标记：告诉前端"走 binding 直传"。
+       * 此时 endpoint 为空是正常的 —— 不需要拼 S3 地址，
+       * 上传走 /api/upload/direct，读取走 /api/r2/<key>。
+       */
+      mode: "binding",
+      noCredentialsNeeded: true,
+      message:
+        "已通过 Worker 绑定直连 R2，无需配置任何 Access Key / Secret Key。",
+    });
+  }
+
+  /* ---- 第 2 级：调 Cloudflare API 查找 ---- */
+  const creds = credentialStatus();
+  if (creds.token.present) {
+    const result = await discoverR2Bucket(wanted);
+    return NextResponse.json(
+      { ...result, mode: "api" },
+      { status: result.found ? 200 : 404 },
+    );
+  }
+
+  /* ---- 第 3 级：都没有，给出可操作的指引 ---- */
+  const platform =
+    process.env.CF_PAGES === "1" || (getCloudflareEnv() ? true : false)
+      ? "cloudflare"
+      : "other";
+
+  return NextResponse.json(
+    {
+      found: false,
+      bucket: "",
+      endpoint: "",
+      publicBaseUrl: "",
+      mode: "none",
+      error:
+        "没找到 R2 绑定，也没有配置 Cloudflare API 令牌。" +
+        (platform === "cloudflare"
+          ? "请在 wrangler.jsonc 的 r2_buckets 里绑定桶（界面部署时 Cloudflare 会自动完成绑定），然后重新部署。"
+          : "当前不在 Cloudflare Workers 环境，R2 只能通过 S3 兼容 API 访问，请配置 R2_BUCKET_NAME 与 API 令牌。"),
+      hint:
+        "最省事的做法：在 wrangler.jsonc 里写好 r2_buckets，桶由部署流程自动创建并绑定 —— 这样连 API 令牌都不需要。",
+    },
+    { status: 404 },
+  );
 }
