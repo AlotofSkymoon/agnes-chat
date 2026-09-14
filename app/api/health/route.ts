@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { detectPlatform, platformLabel } from "@/lib/platform";
 import { getSiteS3Info } from "@/lib/s3-server";
 import { backendKind, hasUpstashConfig } from "@/lib/storage";
+import { configValue } from "@/lib/runtime-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,10 +62,10 @@ export async function GET() {
     );
   }
   if (backend !== "none" && !storeOk) problems.push(`存储读写失败：${storeError}`);
-  if (!process.env.PRESET_AGNES_API_KEY?.trim()) {
+  if (!configValue("PRESET_AGNES_API_KEY")) {
     problems.push("未设置 PRESET_AGNES_API_KEY：未填自己 Key 的访客将无法聊天");
   }
-  if (!process.env.SESSION_SECRET?.trim()) {
+  if (!configValue("SESSION_SECRET")) {
     problems.push("未设置 SESSION_SECRET：当前使用不安全的默认值");
   }
 
@@ -94,8 +95,8 @@ export async function GET() {
       bucket: s3.bucket || null,
     },
     env: {
-      presetKey: Boolean(process.env.PRESET_AGNES_API_KEY?.trim()),
-      sessionSecret: Boolean(process.env.SESSION_SECRET?.trim()),
+      presetKey: Boolean(configValue("PRESET_AGNES_API_KEY")),
+      sessionSecret: Boolean(configValue("SESSION_SECRET")),
     },
     problems,
   });

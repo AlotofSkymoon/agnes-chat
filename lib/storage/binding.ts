@@ -8,7 +8,10 @@
  * 本项目文档写 KV / DB / R2，而 cloud-mail 那类项目用小写 kv / db / r2。
  * 用户照着任一教程填都可能，写死大写会导致"明明绑了却检测不到"。
  */
-export function pickBinding(env: Record<string, unknown>, name: string): unknown {
+export function pickBinding(
+  env: Record<string, unknown> | null | undefined,
+  name: string,
+): unknown {
   if (!env || typeof env !== "object") return undefined;
 
   const upper = name.toUpperCase();

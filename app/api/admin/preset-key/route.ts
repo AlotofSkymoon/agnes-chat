@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/auth";
+import { configValue } from "@/lib/runtime-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     await requireAdmin();
-    const key = process.env.PRESET_AGNES_API_KEY?.trim() ?? "";
+    const key = configValue("PRESET_AGNES_API_KEY");
     return NextResponse.json({
       configured: Boolean(key),
       apiKey: key,

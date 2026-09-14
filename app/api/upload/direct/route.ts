@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getCloudflareEnv } from "@/lib/storage";
 import { r2PublicHost } from "@/lib/s3-server";
+import { pickBinding } from "@/lib/storage/binding";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +39,12 @@ function safeName(name: string): string {
 
 export async function POST(request: Request) {
   const env = getCloudflareEnv();
-  const bucket = env?.R2;
+  const bucket = pickBinding(
+      env as unknown as Record<string, unknown> | null,
+      "r2",
+    ) as unknown as
+      | { put: (k: string, v: unknown, o?: unknown) => Promise<unknown> }
+      | undefined;
 
   if (!bucket) {
     return bad(

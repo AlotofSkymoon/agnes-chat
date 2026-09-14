@@ -28,9 +28,9 @@
   // 这样省去复制 32 位十六进制串的麻烦，也避免填错 ID 导致
   //「部署成功但数据存不进去」这种极难排查的问题。
   //
-  // "kv_namespaces": [{ "binding": "KV", "id": "" }],
+  // "kv_namespaces": [{ "binding": "kv", "id": "" }],
   // "d1_databases": [
-  //   { "binding": "DB", "database_name": "agnes-chat-db", "database_id": "" }
+  //   { "binding": "db", "database_name": "agnes-chat-db", "database_id": "" }
   // ],
 
   // ---------------------------------------------------------------------------
@@ -44,7 +44,7 @@
   // 不受 Workers 请求体大小限制。
   // 这个 binding 供服务端直接读写（删除、列举、生成临时链接）使用。
   // ---------------------------------------------------------------------------
-  // "r2_buckets": [{ "binding": "R2", "bucket_name": "agnes-chat" }],
+  // "r2_buckets": [{ "binding": "r2", "bucket_name": "agnes-chat" }],
 
   // 非敏感配置。
   // 敏感值（PRESET_AGNES_API_KEY / SESSION_SECRET）请在

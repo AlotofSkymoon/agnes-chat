@@ -21,13 +21,13 @@
   // 手动部署时把这里改成你自己的 ID 即可。
   "kv_namespaces": [
     {
-      "binding": "KV",
+      "binding": "kv",
       "id": "__KV_ID__"
     }
   ],
   "d1_databases": [
     {
-      "binding": "DB",
+      "binding": "db",
       "database_name": "agnes-chat-db",
       "database_id": "__D1_ID__"
     }
@@ -46,7 +46,7 @@
   // ---------------------------------------------------------------------------
   "r2_buckets": [
     {
-      "binding": "R2",
+      "binding": "r2",
       "bucket_name": "agnes-chat"
     }
   ],

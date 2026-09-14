@@ -135,6 +135,22 @@ export async function POST(request: Request) {
   const key = `${prefix}/${yyyy}/${mm}/${crypto.randomUUID()}.${ext}`;
 
   try {
+    /**
+     * 寻址风格（参考 Rin 的 S3_FORCE_PATH_STYLE）。
+     *
+     * 不配置时按 endpoint 自动推断：R2 / MinIO / 内网 IP 走 path-style，
+     * AWS S3 / B2 / 阿里云 OSS 走 virtual-host。
+     * 遇到自动判断不对的自建服务，可以用环境变量显式覆盖：
+     *   S3_FORCE_PATH_STYLE=true   → 一律 path-style
+     *   S3_FORCE_PATH_STYLE=false  → 一律 virtual-host
+     */
+    const forcePathStyle = (() => {
+      const v = (process.env.S3_FORCE_PATH_STYLE ?? "").trim().toLowerCase();
+      if (v === "true" || v === "1") return true;
+      if (v === "false" || v === "0") return false;
+      return undefined; // 交给 presignS3Put 自动推断
+    })();
+
     const uploadUrl = await presignS3Put({
       endpoint,
       bucket: cfg.bucket.trim(),
@@ -143,12 +159,23 @@ export async function POST(request: Request) {
       accessKeyId: cfg.accessKeyId.trim(),
       secretAccessKey: cfg.secretAccessKey.trim(),
       expiresIn: 900,
+      forcePathStyle,
     });
 
     const publicBase = cfg.publicBaseUrl?.trim().replace(/\/+$/, "");
+    /**
+     * 没配自定义域名时，外链拼法必须和签名用的寻址风格一致 ——
+     * 否则签名走 virtual-host、外链却是 path-style（或反过来），
+     * 结果上传成功但链接打不开，极难排查。
+     */
     const publicUrl = publicBase
       ? `${publicBase}/${key}`
-      : `${endpoint}/${cfg.bucket.trim()}/${key}`;
+      : forcePathStyle === false
+        ? (() => {
+            const u = new URL(endpoint);
+            return `${u.protocol}//${cfg.bucket.trim()}.${u.host}/${key}`;
+          })()
+        : `${endpoint}/${cfg.bucket.trim()}/${key}`;
 
     return NextResponse.json({
       uploadUrl,

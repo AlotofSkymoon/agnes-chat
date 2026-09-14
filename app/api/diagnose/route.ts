@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { DEFAULT_BASE_URL, DEFAULT_MODEL, resolveTarget } from "@/lib/config";
 import { credentialStatus } from "@/lib/cf-credentials";
 import { detectPlatform } from "@/lib/platform";
+import { configValue } from "@/lib/runtime-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,7 +46,7 @@ export async function GET() {
 
   const platform = detectPlatform();
   const target = resolveTarget(DEFAULT_MODEL, []);
-  const key = process.env.PRESET_AGNES_API_KEY?.trim() ?? "";
+  const key = configValue("PRESET_AGNES_API_KEY");
 
   if (!target) {
     return NextResponse.json({ error: "找不到默认模型所属供应商" }, { status: 500 });

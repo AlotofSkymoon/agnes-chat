@@ -5,6 +5,8 @@
  * 判定顺序：Cloudflare bindings → Cloudflare 环境变量 → Vercel → 本地
  */
 
+import { pickBinding } from "@/lib/storage/binding";
+
 export type Platform = "cloudflare" | "vercel" | "local";
 
 export function detectPlatform(): Platform {
@@ -20,7 +22,8 @@ export function detectPlatform(): Platform {
     for (const c of candidates) {
       if (c && typeof c === "object") {
         const env = c as Record<string, unknown>;
-        if (env.KV || env.DB || env.R2) return "cloudflare";
+        if (pickBinding(env, "kv") || pickBinding(env, "db") || pickBinding(env, "r2"))
+          return "cloudflare";
       }
     }
   } catch {

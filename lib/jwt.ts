@@ -1,3 +1,5 @@
+import { configValue } from "@/lib/runtime-config";
+
 /**
  * 极简 JWT（HS256）实现。
  *
@@ -51,7 +53,7 @@ export class JwtError extends Error {}
 
 /** 读取密钥；没配置就抛错，由调用方转成友好提示 */
 function requireSecret(): string {
-  const s = process.env.JWT_SECRET?.trim();
+  const s = configValue("JWT_SECRET");
   if (!s) throw new JwtError("服务端未配置 JWT_SECRET，无法校验访问令牌");
   return s;
 }

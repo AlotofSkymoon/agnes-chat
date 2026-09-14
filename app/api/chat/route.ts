@@ -12,6 +12,7 @@ import {
 import { detectPlatform } from "@/lib/platform";
 import { getRedis, hasRedisConfig, KEYS } from "@/lib/redis";
 import { REQUIRE_LOGIN } from "@/lib/site";
+import { configValue } from "@/lib/runtime-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
   // - deepseek / 自定义：必须用用户自己的 Key
   let finalKey = "";
   if (target.providerId === "agnes") {
-    const presetKey = process.env.PRESET_AGNES_API_KEY?.trim() ?? "";
+    const presetKey = configValue("PRESET_AGNES_API_KEY");
     finalKey = (keys?.agnes ?? apiKey ?? "").trim() || presetKey;
   } else {
     finalKey = (keys?.[target.providerId] ?? "").trim();

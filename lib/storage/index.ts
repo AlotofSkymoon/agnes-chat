@@ -26,6 +26,7 @@ let storeSingleton: Store | null = null;
 
 /** 供应用启动时显式注入（例如从 OpenNext 的 getCloudflareContext() 拿到 env） */
 import { hasBinding, pickBinding } from "./binding";
+import { configValue } from "@/lib/runtime-config";
 
 export { pickBinding, hasBinding };
 
@@ -110,14 +111,30 @@ export function hasR2Binding(): boolean {
   return hasBinding(env as unknown as Record<string, unknown> | null, "r2");
 }
 
+/**
+ * 是否已配置 Upstash。
+ *
+ * ⚠️ 必须走 runtime-config 而不是直接读 process.env ——
+ * 在 Workers 上 secret 是 binding，process.env 读不到。
+ * 读不到的后果是：Cloudflare 退回 KV+D1、Vercel 用 Upstash，
+ * 两边明明配了同一个库却数据不通（聊天记录不互通）。
+ */
+export function upstashUrl(): string {
+  return configValue("UPSTASH_REDIS_REST_URL", "UPSTASH_REST_URL");
+}
+
+export function upstashToken(): string {
+  return configValue("UPSTASH_REDIS_REST_TOKEN", "UPSTASH_REST_TOKEN", "UPSTASH_TOKEN");
+}
+
 export function hasUpstashConfig(): boolean {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+  return Boolean(upstashUrl() && upstashToken());
 }
 
 export function getUpstash(): Redis {
   if (upstashClient) return upstashClient;
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = upstashUrl();
+  const token = upstashToken();
   if (!url || !token) {
     throw new Error("缺少 Upstash Redis 配置：UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN");
   }
@@ -146,7 +163,7 @@ export function getUpstash(): Redis {
 export type StorageBackendMode = "auto" | "unified" | "cloudflare" | "upstash";
 
 export function storageMode(): StorageBackendMode {
-  const raw = (process.env.STORAGE_BACKEND ?? "auto").trim().toLowerCase();
+  const raw = configValue("STORAGE_BACKEND").trim().toLowerCase() || "auto";
   if (raw === "unified" || raw === "shared") return "unified";
   if (raw === "cloudflare" || raw === "cf") return "cloudflare";
   if (raw === "upstash") return "upstash";
@@ -162,7 +179,10 @@ export function backendKind(): BackendKind {
 
   if (mode === "cloudflare") {
     const cfOnly = getCloudflareEnv();
-    return cfOnly && (cfOnly.KV || cfOnly.DB) ? "cloudflare" : "none";
+    return cfOnly && (pickBinding(cfOnly as unknown as Record<string, unknown>, "kv") ||
+      pickBinding(cfOnly as unknown as Record<string, unknown>, "db"))
+      ? "cloudflare"
+      : "none";
   }
 
   // auto（默认）：**Upstash 优先** —— 配了就全平台共用，保证数据互通
@@ -170,7 +190,11 @@ export function backendKind(): BackendKind {
 
   // 没配 Upstash 才用 Cloudflare 原生的 KV + D1
   const cf = getCloudflareEnv();
-  if (cf && (cf.KV || cf.DB)) return "cloudflare";
+  if (
+    cf &&
+    (pickBinding(cf as unknown as Record<string, unknown>, "kv") ||
+      pickBinding(cf as unknown as Record<string, unknown>, "db"))
+  ) return "cloudflare";
   return "none";
 }
 
@@ -200,7 +224,11 @@ export function getStore(): Store {
 
   // Cloudflare Workers → KV + D1（仅在没有 Upstash 时）
   const cf = getCloudflareEnv();
-  if (cf && (cf.KV || cf.DB)) {
+  if (
+    cf &&
+    (pickBinding(cf as unknown as Record<string, unknown>, "kv") ||
+      pickBinding(cf as unknown as Record<string, unknown>, "db"))
+  ) {
     storeSingleton = new CloudflareStore(cf);
     return storeSingleton;
   }

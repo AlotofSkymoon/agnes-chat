@@ -4,6 +4,8 @@ import { JwtError, SCOPE_D1_INIT, verifyJwt } from "@/lib/jwt";
 import { detectPlatform } from "@/lib/platform";
 import { getCloudflareEnv } from "@/lib/storage";
 import { D1_SCHEMA } from "@/lib/storage/cloudflare";
+import { configValue } from "@/lib/runtime-config";
+import { pickBinding } from "@/lib/storage/binding";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +36,7 @@ export async function GET(
     await verifyJwt(token, SCOPE_D1_INIT);
   } catch (err) {
     const msg = err instanceof JwtError ? err.message : "令牌校验失败";
-    const noSecret = process.env.JWT_SECRET?.trim() ? false : true;
+    const noSecret = configValue("JWT_SECRET") ? false : true;
     return NextResponse.json(
       {
         ok: false,
@@ -50,7 +52,20 @@ export async function GET(
   // 2) 必须跑在 Cloudflare 上才有 D1
   const platform = detectPlatform();
   const env = getCloudflareEnv();
-  const db = env?.DB;
+  const db = pickBinding(
+      env as unknown as Record<string, unknown> | null,
+      "db",
+    ) as unknown as
+      | {
+          prepare: (sql: string) => {
+            bind: (...a: unknown[]) => {
+              all: () => Promise<{ results?: unknown[] }>;
+              run: () => Promise<unknown>;
+            };
+            run: () => Promise<unknown>;
+          };
+        }
+      | undefined;
 
   if (!db) {
     return NextResponse.json(

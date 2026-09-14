@@ -94,16 +94,23 @@ export function Sidebar({
         />
       ) : null}
 
-      {/* 外层控制宽度（可收起），内层保持固定 260px，收起时内容被裁切而非挤压变形 */}
+      {/*
+        外层控制宽度（可收起），内层保持固定 260px，收起时内容被裁切而非挤压变形。
+
+        桌面端改成 **iOS 26 悬浮卡片**：不贴边、四周留白、整块圆角，
+        浮在内容之上而不是像分隔栏那样竖着切一刀。
+        移动端保持原来的全屏抽屉（屏幕窄，悬浮会浪费空间）。
+      */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 shrink-0 overflow-hidden border-r border-border bg-[hsl(var(--sidebar))] backdrop-blur-xl transition-[width,transform] duration-[420ms] ease-elegant md:relative md:w-[260px] md:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 shrink-0 overflow-hidden border-r border-border bg-[hsl(var(--sidebar))] backdrop-blur-xl transition-[width,transform] duration-[420ms] ease-elegant",
+          "md:relative md:my-2 md:ml-2 md:h-[calc(100vh-1rem)] md:w-[260px] md:translate-x-0 md:rounded-[22px] md:border md:border-border/60 md:shadow-[0_8px_30px_rgb(0_0_0/0.08)]",
           open ? "w-[260px] translate-x-0" : "w-0 -translate-x-full",
-          collapsed && "md:w-0 md:border-r-0",
+          collapsed && "md:w-0 md:my-0 md:ml-0 md:border-0 md:shadow-none",
         )}
         aria-hidden={collapsed ? true : undefined}
       >
-        <div className="flex h-full w-[260px] flex-col">
+        <div className="flex h-full w-[260px] flex-col md:overflow-hidden md:rounded-[22px]">
           {/* 顶部：Logo + 收起/关闭 */}
           <div className="flex items-center justify-between px-3 py-3">
             <Link href="/" className="flex items-center gap-2">

@@ -6,6 +6,7 @@ import {
   r2S3Keys,
 } from "@/lib/cf-credentials";
 import type { S3Config } from "@/lib/s3-presets";
+import { configValue } from "@/lib/runtime-config";
 
 /**
  * 服务端托管的对象存储配置（仅服务端导入，密钥绝不下发浏览器）。
@@ -363,7 +364,7 @@ export function getSiteS3Info(): SiteS3Info {
     endpoint: cfg?.endpoint ?? "",
     bucket: cfg?.bucket ?? "",
     publicBaseUrl: cfg?.publicBaseUrl ?? "",
-    hasPresetKey: Boolean(process.env.PRESET_AGNES_API_KEY?.trim()),
+    hasPresetKey: Boolean(configValue("PRESET_AGNES_API_KEY")),
     /** 有 binding → 前端走 /api/upload/direct，不用预签名 */
     r2Bound: bound,
   };

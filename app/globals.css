@@ -262,7 +262,8 @@
 :root {
   --font-sans: "Montserrat", "Chiron GoRound TC", -apple-system, BlinkMacSystemFont,
     "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  --font-serif: "Montserrat", "Chiron GoRound TC", system-ui, sans-serif;
+  --font-serif: "Source Serif 4", "Chiron GoRound TC", Georgia, Cambria,
+    "Times New Roman", serif;
   --font-mono: "SuperSFMonoV1", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --radius-ctrl: 1.375rem;
@@ -450,6 +451,39 @@ body {
   line-height: 1.65;
   letter-spacing: -0.003em;
 }
+
+/**
+ * 英文衬线全局生效。
+ *
+ * 之前只有 AI 回复走衬线，侧边栏、设置、顶栏全是无衬线 ——
+ * 切到 Anthropic 主题后整体观感割裂，看起来像"字体没换"。
+ *
+ * 这里对**主要文本承载元素**应用衬线，并按语言分流：
+ *   英文 / 数字 → Source Serif 4（拉丁子集）
+ *   中文        → 昭源環方（Source Serif 4 的 latin 子集没有汉字，
+ *                 会自然回退到后面的中文字体，不会变豆腐块）
+ */
+[data-theme="anthropic"] body,
+[data-theme="anthropic"] input,
+[data-theme="anthropic"] textarea,
+[data-theme="anthropic"] select,
+[data-theme="anthropic"] button,
+[data-theme="anthropic"] [class*="font-sans"] {
+  font-family: var(--font-serif);
+}
+
+/* 代码、数字徽标、图标字体保持无衬线/等宽，衬线下会显得脏 */
+[data-theme="anthropic"] code,
+[data-theme="anthropic"] pre,
+[data-theme="anthropic"] kbd,
+[data-theme="anthropic"] .tabular-nums,
+[data-theme="anthropic"] [class*="font-mono"] {
+  font-family: var(--font-mono);
+}
+[data-theme="anthropic"] .icon,
+[data-theme="anthropic"] svg {
+  font-family: inherit;
+}
 [data-theme="anthropic"] .msg-assistant .markdown-body code,
 [data-theme="anthropic"] .msg-assistant .markdown-body pre {
   font-family: var(--font-mono);
@@ -479,7 +513,8 @@ body {
 
   --font-sans: "Montserrat", "Chiron GoRound TC", -apple-system,
     BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  --font-serif: "Montserrat", "Chiron GoRound TC", system-ui, sans-serif;
+  --font-serif: "Source Serif 4", "Chiron GoRound TC", Georgia, Cambria,
+    "Times New Roman", serif;
   --font-mono: "SuperSFMonoV1", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --background: var(--hue) 20% 97%;
@@ -619,7 +654,8 @@ body {
 [data-theme="violet-rose"] {
   --font-sans: "Montserrat", "Chiron GoRound TC", -apple-system,
     BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  --font-serif: "Montserrat", "Chiron GoRound TC", system-ui, sans-serif;
+  --font-serif: "Source Serif 4", "Chiron GoRound TC", Georgia, Cambria,
+    "Times New Roman", serif;
   --font-mono: "SuperSFMonoV1", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --background: 295 45% 96%;
@@ -1122,7 +1158,14 @@ body {
    * 既不至于像药片，也不会变成直角。
    */
   .liquid-bar {
-    border-radius: 16px;
+    /*
+     * 顶栏圆角固定 22px，不跟主题变量走。
+     *
+     * 原因：顶栏用 var(--radius-ios-lg) 时，violet-rose 主题会把
+     * 所有圆角变量压成 0，顶栏就变成一条硬邦邦的直角横杠。
+     * 固定值不受主题压制，任何主题下都保持圆润。
+     */
+    border-radius: 22px;
   }
 
   /* 大容器（弹窗、面板） */
