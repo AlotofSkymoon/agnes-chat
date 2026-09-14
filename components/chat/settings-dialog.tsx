@@ -751,19 +751,37 @@ export function SettingsDialog({
                * 所以整块手填表单隐藏，只留一张说明卡。
                */}
               {siteInfo?.r2Bound ? (
-                <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+                <div className="space-y-2.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2.5">
                   <p className="text-xs font-medium text-primary">
                     ✓ 已通过 Worker 绑定直连 R2
                   </p>
                   <p className="text-[11px] leading-relaxed text-muted-foreground">
                     桶是本站自己的，Worker 通过 binding 直接读写，
                     <strong>不需要 Access Key / Secret Key，也不需要 API 令牌</strong>。
-                    上传走 <code>/api/upload/direct</code>，读取走{" "}
-                    <code>/api/r2/&lt;key&gt;</code>（桶不必开公开读）。
+                    Endpoint / Region / 桶名这些都由 binding 决定，所以不再显示。
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
-                    现在就可以直接传图，这里<strong>什么都不用填</strong>。
-                  </p>
+
+                  {/*
+                    唯一还需要用户提供的就是**访问网址**。
+                    留空也能用（走 /api/r2/<key> 回源，桶不必开公开读），
+                    但填了自己的域名/CDN 后，图片直接用外网地址，速度更快。
+                  */}
+                  <div className="space-y-1">
+                    <Label className="text-xs">公开访问域名（可选）</Label>
+                    <Input
+                      className="h-8 text-xs"
+                      placeholder="https://pub-xxxx.r2.dev 或 https://img.yourdomain.com"
+                      value={form.s3?.publicBaseUrl ?? ""}
+                      onChange={(e) =>
+                        patchS3({ enabled: true, publicBaseUrl: e.target.value })
+                      }
+                    />
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      留空 → 图片走 <code>/api/r2/&lt;key&gt;</code> 回源，桶不必开公开读。
+                      <br />
+                      填写 → 直接用你的域名访问，建议开 CDN 加速。
+                    </p>
+                  </div>
                 </div>
               ) : siteInfo?.siteManaged ? (
                 <div className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">

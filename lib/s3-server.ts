@@ -7,6 +7,7 @@ import {
 } from "@/lib/cf-credentials";
 import type { S3Config } from "@/lib/s3-presets";
 import { configValue } from "@/lib/runtime-config";
+import { pickBinding } from "@/lib/storage/binding";
 
 /**
  * 服务端托管的对象存储配置（仅服务端导入，密钥绝不下发浏览器）。
@@ -385,7 +386,16 @@ export function hasR2Binding(): boolean {
   for (const c of candidates) {
     if (!c || typeof c !== "object") continue;
     const inner = ((c as Record<string, unknown>).env ?? c) as Record<string, unknown>;
-    if (inner && typeof inner === "object" && (inner as { R2?: unknown }).R2) return true;
+    /**
+     * ⚠️ 必须走 pickBinding 做大小写不敏感匹配。
+     *
+     * 这里曾经写死 `(inner as { R2?: unknown }).R2`（只认大写），
+     * 而配置里的 binding 名已经改成小写 `r2` ——
+     * 结果是：桶明明绑好了，却检测不到，设置面板一直显示
+     * 完整的 Endpoint / AK / SK 手填表单，还引导用户去生成 Access Key。
+     * 这正是"cloudflare 能 binding 为什么还要我填这些"的根源。
+     */
+    if (inner && typeof inner === "object" && pickBinding(inner, "r2")) return true;
   }
   return false;
 }
