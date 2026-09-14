@@ -147,6 +147,55 @@
     U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+
+/* ==========================================================================
+   明暗切换：View Transitions 圆形扩散
+
+   点击切换按钮时，新主题从点击位置以圆形展开，而不是整屏硬切。
+   动画由 theme-provider.tsx 里的 applyWithTransition 驱动，
+   这里负责关掉默认的交叉淡入淡出 ——
+   不关的话两种动画会叠在一起，看起来像闪了一下。
+   ========================================================================== */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* 扩散时新画面在上层，盖住旧画面 */
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
+/**
+ * 尊重「减少动态效果」偏好。
+ * 开了这个系统设置的用户（前庭功能障碍等）不应该看到大面积扩散动画。
+ */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+}
+
+/* 主题切换期间，让颜色平滑过渡（不含 transform，避免拖慢展开动画） */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition:
+    background-color 240ms ease,
+    border-color 240ms ease,
+    color 240ms ease,
+    fill 240ms ease,
+    stroke 240ms ease !important;
+  transition-delay: 0ms !important;
+}
+
 @layer base {
   :root {
     /* DeepSeek 风格：浅色优先，品牌蓝 #4D6BFE */

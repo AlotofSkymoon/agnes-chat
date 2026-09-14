@@ -4,15 +4,36 @@ import * as React from "react";
 
 import { SITE_THEME, THEME_IDS, type ThemePreset } from "@/lib/site";
 
-type Theme = "dark" | "light";
+/**
+ * 明暗模式三态。
+ *
+ * "system" 跟随系统偏好，并实时响应系统切换；
+ * "light" / "dark" 是用户手动锁定。
+ *
+ * 为什么需要三态而不是只有亮/暗两态：
+ * 只有两态时，用户点一下就被"锁死"在某一侧 —— 之后再改系统设置，
+ * 站点不会跟着变，用户还得回来再点一次。三态保留了「跟随」这个选项。
+ */
+export type Theme = "light" | "dark" | "system";
+
+/** 实际生效的明暗（system 已解析成具体值） */
+export type ResolvedTheme = "light" | "dark";
 
 const STORAGE_KEY = "agnes:theme";
 const PRESET_KEY = "agnes:theme-preset";
 
 interface ThemeContextValue {
+  /** 用户的选择（可能是 system） */
   theme: Theme;
+  /** 实际生效值，拿去渲染用这个 */
+  resolvedTheme: ResolvedTheme;
   setTheme: (theme: Theme) => void;
-  toggleTheme: () => void;
+  /** 在 light / dark 之间切换（点了就锁定，不再跟随系统） */
+  toggleTheme: (origin?: { x: number; y: number }) => void;
+  /** 三态循环：亮 → 暗 → 跟随系统 */
+  cycleTheme: (origin?: { x: number; y: number }) => void;
+  /** 系统偏好（供 UI 显示「跟随系统（当前暗）」这类提示） */
+  systemTheme: ResolvedTheme;
   /** 配色预设：anthropic / fuwari / violet-rose */
   preset: ThemePreset;
   setPreset: (preset: ThemePreset) => void;
@@ -20,25 +41,82 @@ interface ThemeContextValue {
 
 const ThemeContext = React.createContext<ThemeContextValue | undefined>(undefined);
 
+function readSystemTheme(): ResolvedTheme {
+  if (typeof window === "undefined" || !window.matchMedia) return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+/**
+ * 用 View Transitions 做圆形扩散切换。
+ *
+ * 现代浏览器（Chrome 111+ / Safari 18+）支持时，从点击位置扩散出
+ * 一个新主题的圆，比整屏硬切自然得多。不支持时静默退回普通切换，
+ * 不会报错也不会卡顿 —— 所以可以无条件调用。
+ */
+function applyWithTransition(
+  origin: { x: number; y: number } | undefined,
+  apply: () => void,
+): void {
+  const doc = document as Document & {
+    startViewTransition?: (cb: () => void) => { ready: Promise<void> };
+  };
+
+  // 不支持 View Transitions，或没给点击位置 → 直接切换
+  if (!origin || typeof doc.startViewTransition !== "function") {
+    apply();
+    return;
+  }
+
+  try {
+    const transition = doc.startViewTransition(() => {
+      apply();
+    });
+
+    transition.ready
+      .then(() => {
+        // 从点击点到最远角的距离，保证圆能覆盖整屏
+        const endRadius = Math.hypot(
+          Math.max(origin.x, window.innerWidth - origin.x),
+          Math.max(origin.y, window.innerHeight - origin.y),
+        );
+
+        document.documentElement.animate(
+          {
+            clipPath: [
+              `circle(0px at ${origin.x}px ${origin.y}px)`,
+              `circle(${endRadius}px at ${origin.x}px ${origin.y}px)`,
+            ],
+          },
+          {
+            duration: 420,
+            easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+            // 作用在"新画面"上，让它从点击处展开盖住旧画面
+            pseudoElement: "::view-transition-new(root)",
+          },
+        );
+      })
+      .catch(() => {
+        /* 动画失败不影响切换结果 —— class 已经改完了 */
+      });
+  } catch {
+    apply();
+  }
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = React.useState<Theme>("light");
+  const [theme, setThemeState] = React.useState<Theme>("system");
+  const [systemTheme, setSystemTheme] = React.useState<ResolvedTheme>("light");
   const [preset, setPresetState] = React.useState<ThemePreset>(SITE_THEME);
 
   React.useEffect(() => {
-    const stored = (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? null;
-    /**
-     * 没手动选过时跟随系统偏好。
-     *
-     * 原来写死 stored ?? "light" —— 系统设成深色的用户第一次打开
-     * 仍然是白底，得手动点一次。现在读 prefers-color-scheme，
-     * 用户一旦手动切换过就以 localStorage 为准。
-     */
-    const systemDark =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-    const initial: Theme = stored ?? (systemDark ? "dark" : "light");
+    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
+    const valid = stored === "light" || stored === "dark" || stored === "system";
+    const initial: Theme = valid ? stored : "system";
+
+    const sys = readSystemTheme();
+    setSystemTheme(sys);
     setThemeState(initial);
-    document.documentElement.classList.toggle("dark", initial === "dark");
+    document.documentElement.classList.toggle("dark", initial === "system" ? sys === "dark" : initial === "dark");
 
     const storedPreset = localStorage.getItem(PRESET_KEY) as ThemePreset | null;
     const initialPreset: ThemePreset = THEME_IDS.includes(storedPreset as ThemePreset)
@@ -46,17 +124,62 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       : SITE_THEME;
     setPresetState(initialPreset);
     document.documentElement.dataset.theme = initialPreset;
+
+    /**
+     * 监听系统偏好变化。
+     * 只有处在 "system" 模式时才需要跟着变 —— 用户手动锁定后就不再打扰。
+     */
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+    if (!mq) return;
+    const onChange = (e: MediaQueryListEvent) => {
+      const next: ResolvedTheme = e.matches ? "dark" : "light";
+      setSystemTheme(next);
+      // 读最新值而不是闭包里的 theme，避免拿到过期状态
+      const current = localStorage.getItem(STORAGE_KEY);
+      if (current === "system" || !current) {
+        document.documentElement.classList.toggle("dark", next === "dark");
+      }
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  const setTheme = React.useCallback((next: Theme) => {
+  /** 真正写 DOM 的动作 */
+  const commit = React.useCallback((next: Theme) => {
     setThemeState(next);
     localStorage.setItem(STORAGE_KEY, next);
-    document.documentElement.classList.toggle("dark", next === "dark");
+    const resolved: ResolvedTheme =
+      next === "system" ? readSystemTheme() : (next as ResolvedTheme);
+    document.documentElement.classList.toggle("dark", resolved === "dark");
   }, []);
 
-  const toggleTheme = React.useCallback(() => {
-    setTheme(document.documentElement.classList.contains("dark") ? "light" : "dark");
-  }, [setTheme]);
+  const setTheme = React.useCallback(
+    (next: Theme) => {
+      applyWithTransition(undefined, () => commit(next));
+    },
+    [commit],
+  );
+
+  /** 两态切换：点了就锁定，从 system 切走时也锁定 */
+  const toggleTheme = React.useCallback(
+    (origin?: { x: number; y: number }) => {
+      const isDark = document.documentElement.classList.contains("dark");
+      applyWithTransition(origin, () => commit(isDark ? "light" : "dark"));
+    },
+    [commit],
+  );
+
+  /** 三态循环：亮 → 暗 → 跟随系统 */
+  const cycleTheme = React.useCallback(
+    (origin?: { x: number; y: number }) => {
+      const order: Theme[] = ["light", "dark", "system"];
+      const current = (localStorage.getItem(STORAGE_KEY) as Theme) || "system";
+      const idx = order.indexOf(current);
+      const next = order[(idx + 1) % order.length];
+      applyWithTransition(origin, () => commit(next));
+    },
+    [commit],
+  );
 
   const setPreset = React.useCallback((next: ThemePreset) => {
     setPresetState(next);
@@ -64,11 +187,24 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.dataset.theme = next;
   }, []);
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, preset, setPreset }}>
-      {children}
-    </ThemeContext.Provider>
+  const resolvedTheme: ResolvedTheme =
+    theme === "system" ? systemTheme : (theme as ResolvedTheme);
+
+  const value = React.useMemo(
+    () => ({
+      theme,
+      resolvedTheme,
+      setTheme,
+      toggleTheme,
+      cycleTheme,
+      systemTheme,
+      preset,
+      setPreset,
+    }),
+    [theme, resolvedTheme, setTheme, toggleTheme, cycleTheme, systemTheme, preset, setPreset],
   );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {
@@ -79,11 +215,16 @@ export function useTheme() {
 
 /**
  * 防止刷新时闪白/闪主题：在 <head> 中同步执行。
+ *
  * 明暗用 .dark class，配色用 data-theme 属性，两者互不干扰。
+ * 这里必须处理 "system" —— 存的是 system 时要现算一次，
+ * 否则刷新瞬间会退回浅色再跳到深色。
  */
 export const themeInitScript = `(function(){try{
 var t=localStorage.getItem('${STORAGE_KEY}');
-var d=t?t==='dark':(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+var m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)');
+var sys=m?m.matches:false;
+var d=(t==='system'||!t)?sys:(t==='dark');
 var r=document.documentElement;
 if(d)r.classList.add('dark');else r.classList.remove('dark');
 var p=localStorage.getItem('${PRESET_KEY}');

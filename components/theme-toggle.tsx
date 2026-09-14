@@ -1,6 +1,6 @@
 "use client";
 
-import { Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun } from "lucide-react";
 
 import { useTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
@@ -12,19 +12,43 @@ interface ThemeToggleProps {
 }
 
 /**
- * 液态玻璃质感主题切换。
- * 透明度 60% + 背景模糊 + 高光内阴影，保证任何背景下图标都清晰可辨。
+ * 明暗切换按钮（三态循环：亮 → 暗 → 跟随系统）。
+ *
+ * 点击时把**点击坐标**传给 provider，
+ * 新主题会从手指/鼠标按下的那一点以圆形扩散开，而不是整屏硬切。
  */
 export function ThemeToggle({ className, withLabel = false }: ThemeToggleProps) {
-  const { theme, toggleTheme } = useTheme();
-  const isDark = theme === "dark";
+  const { resolvedTheme, theme, cycleTheme, systemTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+
+  const label =
+    theme === "system"
+      ? `跟随系统（当前${systemTheme === "dark" ? "深色" : "浅色"}）`
+      : isDark
+        ? "深色（点击切换）"
+        : "浅色（点击切换）";
+
+  const nextLabel =
+    theme === "light" ? "切换到深色" : theme === "dark" ? "切换到跟随系统" : "切换到浅色";
 
   return (
     <button
       type="button"
-      onClick={toggleTheme}
-      title={isDark ? "切换到浅色模式" : "切换到深色模式"}
-      aria-label={isDark ? "切换到浅色模式" : "切换到深色模式"}
+      onClick={(e) => {
+        /**
+         * 取点击位置作为扩散原点。
+         * 用 currentTarget 的中心更稳 ——
+         * 直接取 clientX/Y 在键盘触发（Enter）时是 0,0，动画会从左上角冒出来。
+         */
+        const rect = e.currentTarget.getBoundingClientRect();
+        const origin = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        };
+        cycleTheme(origin);
+      }}
+      title={`${label} · ${nextLabel}`}
+      aria-label={`${label} · ${nextLabel}`}
       className={cn(
         "glass group relative inline-flex items-center justify-center gap-1.5 overflow-hidden rounded-full transition-all duration-300",
         "hover:scale-105 active:scale-95",
@@ -41,24 +65,37 @@ export function ThemeToggle({ className, withLabel = false }: ThemeToggleProps) 
             "linear-gradient(145deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 100%)",
         }}
       />
-      {/* 图标（切换时旋转淡入） */}
+
+      {/*
+        图标区：三态各一个图标，当前态显示、其余缩小旋转隐藏。
+        "跟随系统"用显示器图标，让用户一眼看出当前不是锁定态。
+      */}
       <span className="relative block h-4 w-4">
         <Sun
           className={cn(
             "absolute inset-0 h-4 w-4 transition-all duration-300",
-            isDark ? "rotate-90 scale-50 opacity-0" : "rotate-0 scale-100 opacity-100",
+            theme === "light"
+              ? "rotate-0 scale-100 opacity-100"
+              : "-rotate-90 scale-50 opacity-0",
           )}
         />
         <Moon
           className={cn(
             "absolute inset-0 h-4 w-4 transition-all duration-300",
-            isDark ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-50 opacity-0",
+            theme === "dark" ? "rotate-0 scale-100 opacity-100" : "rotate-90 scale-50 opacity-0",
+          )}
+        />
+        <Monitor
+          className={cn(
+            "absolute inset-0 h-4 w-4 transition-all duration-300",
+            theme === "system" ? "rotate-0 scale-100 opacity-100" : "scale-50 opacity-0",
           )}
         />
       </span>
+
       {withLabel ? (
         <span className="relative text-fg-secondary group-hover:text-fg">
-          {isDark ? "浅色" : "深色"}
+          {theme === "system" ? "跟随" : isDark ? "深色" : "浅色"}
         </span>
       ) : null}
     </button>

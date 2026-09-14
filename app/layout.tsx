@@ -40,12 +40,17 @@ export const viewport: Viewport = {
  * 深色模式下弹出的提示条会是白底深字，看着就像"文字没切换过来"。
  */
 function ThemeAwareToaster() {
-  const { theme } = useTheme();
+  /*
+   * 必须用 resolvedTheme 而不是 theme ——
+   * theme 可能是 "system"，sonner 不认识这个值会退回 light，
+   * 深色模式下提示条又变成白底深字了。
+   */
+  const { resolvedTheme } = useTheme();
   return (
     <Toaster
       position="top-center"
       richColors
-      theme={theme}
+      theme={resolvedTheme}
       toastOptions={{
         classNames: {
           toast: "rounded-xl border-border/70 backdrop-blur-xl",
