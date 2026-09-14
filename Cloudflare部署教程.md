@@ -264,5 +264,43 @@ Cloudflare 后台 → **Workers 和 Pages** → 设置子域名，随便起一�
 
 三者运行时代码相同，站点自动检测平台选后端。
 
-**多平台同步**：给所有平台填同一个 Upstash，数据就互通了。
-验证方式：各站访问 `/api/health`，比对 `storageFingerprint` 是否一致。
+### ⚠️ 重要：Cloudflare 与 Vercel 默认**不互通**
+
+这是最容易踩的坑，务必先读：
+
+| 平台 | 默认存储 | 后果 |
+|---|---|---|
+| **Cloudflare** | KV + D1（本教程默认） | 数据只在这一处 |
+| **Vercel / Netlify** | Upstash Redis | 数据在另一处 |
+
+**这两套是彼此独立的存储，账号和聊天记录不会自动同步。**
+你在 Cloudflare 端注册的账号，在 Vercel 端登录会提示用户不存在；聊天记录同理。
+
+**要打通，唯一的办法是让所有平台共用同一个 Upstash：**
+
+1. 去 [Upstash](https://upstash.com) 建一个 Redis（免费额度够用）
+2. 复制 `UPSTASH_REDIS_REST_URL` 和 `UPSTASH_REDIS_REST_TOKEN`
+3. **给每一个平台都填上这两个变量**（包括 Cloudflare）
+   - Cloudflare：Workers → 设置 → 变量和机密 → 添加（类型选「机密」）
+   - Vercel / Netlify：项目设置 → Environment Variables
+4. 改完**重新部署一次**
+
+配好后 Cloudflare 端会自动改用 Upstash（Upstash 优先级高于 KV+D1），
+两端就合并为同一份数据了。
+
+**验证**：各站访问 `/api/health`，看这两个字段：
+
+```jsonc
+{
+  "storage": {
+    "syncStatus": "shared",        // shared=已共享 / isolated=孤岛
+    "storageFingerprint": "xxxx"   // 各站比对，相同=同一份数据
+  }
+}
+```
+
+- `syncStatus: "shared"` + 各站 fingerprint 相同 → ✅ 已互通
+- `syncStatus: "isolated"` → 还在跑 KV+D1，按上面步骤配 Upstash
+
+> 如果只部署一个平台，不配 Upstash 也完全没问题 ——
+> Cloudflare 的 KV + D1 免费额度更大，是单机部署的推荐选择。
