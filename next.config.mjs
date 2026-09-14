@@ -1,4 +1,11 @@
-/** @type {import('next').NextConfig} */
+/**
+ * @type {import('next').NextConfig}
+ *
+ * ⚠️ Next 16 起 Turbopack 是默认打包器，但 @opennextjs/cloudflare 目前
+ * 只对 webpack 产物做稳定转换（Turbopack 输出会在 Workers 上报 500）。
+ * 因此 package.json 里 build 脚本显式写了 `next build --webpack`。
+ * 等 OpenNext 完整支持 Turbopack 后可以去掉这个 flag。
+ */
 const nextConfig = {
   reactStrictMode: true,
   // Vercel 构建时不再强制要求 eslint / eslint-config-next，避免 "ESLint must be installed" 中断构建
