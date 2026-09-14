@@ -103,7 +103,7 @@ export function Sidebar({
       */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 shrink-0 overflow-hidden border-r border-border bg-[hsl(var(--sidebar))] backdrop-blur-xl transition-[width,transform] duration-[420ms] ease-elegant",
+          "fixed inset-y-0 left-0 z-50 shrink-0 overflow-hidden border-r border-border bg-[hsl(var(--sidebar))] backdrop-blur-xl transition-[width,transform] [transition-duration:420ms] ease-elegant",
           "md:relative md:my-2 md:ml-2 md:h-[calc(100vh-1rem)] md:w-[260px] md:translate-x-0 md:rounded-[22px] md:border md:border-border/60 md:shadow-[0_8px_30px_rgb(0_0_0/0.08)]",
           open ? "w-[260px] translate-x-0" : "w-0 -translate-x-full",
           collapsed && "md:w-0 md:my-0 md:ml-0 md:border-0 md:shadow-none",

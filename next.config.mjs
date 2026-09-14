@@ -8,10 +8,11 @@
  */
 const nextConfig = {
   reactStrictMode: true,
-  // Vercel 构建时不再强制要求 eslint / eslint-config-next，避免 "ESLint must be installed" 中断构建
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  /*
+   * 这里原本有 eslint.ignoreDuringBuilds，Next 16 已移除该配置项
+   * （linting 从 next build 中彻底拿掉了），留着会报
+   * "Unrecognized key(s) in object: 'eslint'"，所以直接删除。
+   */
 
   /**
    * 关闭图片优化 + 不允许任何外部图片域名。

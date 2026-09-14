@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Toaster } from "sonner";
 
 import { DynamicTitle } from "@/components/dynamic-title";
 import {
@@ -8,7 +7,8 @@ import {
   SITE_TAGLINE,
   SITE_TITLE,
 } from "@/lib/site";
-import { ThemeProvider, themeInitScript, useTheme } from "@/components/theme-provider";
+import { ThemeAwareToaster } from "@/components/theme-aware-toaster";
+import { ThemeProvider, themeInitScript } from "@/components/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -31,34 +31,6 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
 };
-
-
-/**
- * 让 sonner 的 Toast 跟随站点明暗。
- *
- * sonner 的 theme 属性默认是 "light" —— 不显式传的话，
- * 深色模式下弹出的提示条会是白底深字，看着就像"文字没切换过来"。
- */
-function ThemeAwareToaster() {
-  /*
-   * 必须用 resolvedTheme 而不是 theme ——
-   * theme 可能是 "system"，sonner 不认识这个值会退回 light，
-   * 深色模式下提示条又变成白底深字了。
-   */
-  const { resolvedTheme } = useTheme();
-  return (
-    <Toaster
-      position="top-center"
-      richColors
-      theme={resolvedTheme}
-      toastOptions={{
-        classNames: {
-          toast: "rounded-xl border-border/70 backdrop-blur-xl",
-        },
-      }}
-    />
-  );
-}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
