@@ -5,7 +5,7 @@
  * 判定顺序：Cloudflare bindings → Cloudflare 环境变量 → Vercel → 本地
  */
 
-import { pickBinding } from "@/lib/storage/binding";
+import { pickBinding, scanBindingsSync } from "@/lib/storage/binding";
 
 export type Platform = "cloudflare" | "vercel" | "local";
 
@@ -27,21 +27,14 @@ export function detectPlatform(): Platform {
   if (declared === "cloudflare" || declared === "workers") return "cloudflare";
 
   // 3) 有 KV / D1 / R2 binding 对象
+  //
+  // 走统一扫描（含 globalThis[Symbol.for("__cloudflare-context__")]）——
+  // OpenNext 1.x 用的是 Symbol 键，Object.keys 扫不到，
+  // 只查几个字符串全局名会让 Workers 站被误判成 local。
   try {
-    // 延迟 require，避免客户端打包时拉入服务端模块
-    const g = globalThis as unknown as Record<string, unknown>;
-    const candidates: unknown[] = [
-      g.__env__,
-      g.__cloudflare_env__,
-      (g.__cloudflareContext__ as Record<string, unknown> | undefined)?.env,
-    ];
-    for (const c of candidates) {
-      if (c && typeof c === "object") {
-        const env = c as Record<string, unknown>;
-        if (pickBinding(env, "kv") || pickBinding(env, "db") || pickBinding(env, "r2"))
-          return "cloudflare";
-      }
-    }
+    const env = scanBindingsSync();
+    if (env && (pickBinding(env, "kv") || pickBinding(env, "db") || pickBinding(env, "r2")))
+      return "cloudflare";
   } catch {
     /* 忽略 */
   }

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getCloudflareEnv } from "@/lib/storage";
+import { getR2Bucket } from "@/lib/storage/binding";
 import { r2PublicHost } from "@/lib/s3-server";
-import { pickBinding } from "@/lib/storage/binding";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,13 +37,14 @@ function safeName(name: string): string {
 }
 
 export async function POST(request: Request) {
-  const env = getCloudflareEnv();
-  const bucket = pickBinding(
-      env as unknown as Record<string, unknown> | null,
-      "r2",
-    ) as unknown as
-      | { put: (k: string, v: unknown, o?: unknown) => Promise<unknown> }
-      | undefined;
+  /**
+   * 统一走 getR2Bucket() —— 它内部依次尝试：
+   *   OpenNext 官方 API → 注入的 override → globalThis 扫描
+   *
+   * 以前这里直接用 getCloudflareEnv() + pickBinding()，只覆盖第三条路，
+   * 于是在 Workers 上出现「设置面板显示已绑定、一上传却报没有绑定」的矛盾。
+   */
+  const bucket = await getR2Bucket();
 
   if (!bucket) {
     return bad(

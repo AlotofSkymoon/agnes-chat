@@ -7,7 +7,7 @@ import {
 } from "@/lib/cf-credentials";
 import type { S3Config } from "@/lib/s3-presets";
 import { configValue } from "@/lib/runtime-config";
-import { pickBinding } from "@/lib/storage/binding";
+import { pickBinding, scanBindingsSync } from "@/lib/storage/binding";
 
 /**
  * 服务端托管的对象存储配置（仅服务端导入，密钥绝不下发浏览器）。
@@ -394,18 +394,10 @@ export function hasR2Binding(): boolean {
   if (declared && declared !== "0" && declared.toLowerCase() !== "false") return true;
 
   // 兜底：真的探测到了 binding 对象
-  const g = globalThis as unknown as Record<string, unknown>;
-  const candidates: unknown[] = [
-    g.__env__,
-    g.__cloudflare_env__,
-    g.__cloudflareContext__,
-    g.__cf_env__,
-  ];
-  for (const c of candidates) {
-    if (!c || typeof c !== "object") continue;
-    const inner = ((c as Record<string, unknown>).env ?? c) as Record<string, unknown>;
-    if (inner && typeof inner === "object" && pickBinding(inner, "r2")) return true;
-  }
-  return false;
+  //
+  // 与 /api/upload/direct 共用 pickBinding 的大小写不敏感逻辑 ——
+  // 之前两处判定方式不同，导致"面板说已绑定、上传说没有"。
+  const scanned = scanBindingsSync();
+  return Boolean(scanned && pickBinding(scanned, "r2"));
 }
 

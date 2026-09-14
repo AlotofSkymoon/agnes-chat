@@ -25,7 +25,7 @@ let upstashClient: Redis | null = null;
 let storeSingleton: Store | null = null;
 
 /** 供应用启动时显式注入（例如从 OpenNext 的 getCloudflareContext() 拿到 env） */
-import { hasBinding, pickBinding } from "./binding";
+import { hasBinding, pickBinding, scanBindingsSync } from "./binding";
 import { configSource, configValue } from "@/lib/runtime-config";
 
 export { pickBinding, hasBinding };
@@ -60,6 +60,17 @@ function looksLikeBindings(value: unknown): CloudflareEnv | null {
 }
 
 export function probeCloudflareEnv(): CloudflareEnv | null {
+  /**
+   * 优先用 binding.ts 的统一扫描。
+   *
+   * 它比下面的字符串名兜底多一层关键能力：读
+   * globalThis[Symbol.for("__cloudflare-context__")] ——
+   * OpenNext 1.x 正是存在这个 **Symbol 键**上，而 Object.keys 枚举不到，
+   * 少了这一步就会把 Workers 环境误判成"没有 binding"。
+   */
+  const unified = scanBindingsSync();
+  if (unified) return unified as unknown as CloudflareEnv;
+
   const g = globalThis as unknown as Record<string, unknown>;
 
   // 1) 先试已知命名（OpenNext 各版本注入位置不统一）

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getCloudflareEnv } from "@/lib/storage";
-import { pickBinding } from "@/lib/storage/binding";
+import { getR2Bucket } from "@/lib/storage/binding";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,11 +24,8 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ key: string[] }> },
 ) {
-  const env = getCloudflareEnv();
-  const bucket = pickBinding(
-      env as unknown as Record<string, unknown> | null,
-      "r2",
-    ) as unknown as { get: (k: string) => Promise<unknown> } | undefined;
+  // 与上传同一套获取逻辑，避免"能传不能读"或"能读不能传"
+  const bucket = await getR2Bucket();
 
   if (!bucket) {
     return NextResponse.json({ error: "当前环境没有 R2 绑定" }, { status: 503 });
