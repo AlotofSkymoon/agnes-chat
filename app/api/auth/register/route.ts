@@ -65,7 +65,7 @@ export async function POST(request: Request) {
 
     // 4) 创建 session + cookie
     const { sessionId, maxAge } = await createSession(id);
-    setSessionCookie(sessionId, maxAge);
+    await setSessionCookie(sessionId, maxAge);
 
     return NextResponse.json({
       user: toSafeUser({ id, email, passwordHash, role: role as "admin" | "user", createdAt }),

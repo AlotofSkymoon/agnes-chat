@@ -259,6 +259,49 @@
    （都是 0,1,0），因此后出现的规则会覆盖先出现的。
    默认值必须写在主题块之前，否则会把三套主题全部盖掉。
    ========================================================================== */
+
+/* ==========================================================================
+   深色模式兜底
+
+   ⚠️ 只有 [data-theme="xxx"].dark 时，一旦 data-theme 因为任何原因
+   没写到 <html> 上（脚本没跑、SSR 与客户端不一致、用户改了 localStorage），
+   深色类还在、但主题变量没生效 —— 结果是背景黑了、文字还是深色。
+
+   这里定义一份不依赖 data-theme 的 .dark 兜底，
+   保证「只要 .dark 在，文字一定是浅的」。
+   ========================================================================== */
+.dark {
+  color-scheme: dark;
+  --background: 0 0% 9%;
+  --foreground: 0 0% 94%;
+  --card: 0 0% 13%;
+  --card-foreground: 0 0% 94%;
+  --popover: 0 0% 13%;
+  --popover-foreground: 0 0% 94%;
+  --primary: 230 99% 68%;
+  --primary-foreground: 0 0% 10%;
+  --secondary: 0 0% 17%;
+  --secondary-foreground: 0 0% 88%;
+  --muted: 0 0% 16%;
+  --muted-foreground: 0 0% 66%;
+  --accent: 0 0% 19%;
+  --accent-foreground: 0 0% 90%;
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 20%;
+  --input: 0 0% 20%;
+  --ring: 230 99% 68%;
+  --sidebar: 0 0% 8%;
+  --sidebar-foreground: 0 0% 86%;
+  --assistant-bubble: 0 0% 14%;
+  --user-bubble: 0 0% 19%;
+  --user-bubble-foreground: 0 0% 92%;
+  --text-secondary: 0 0% 78%;
+  --text-tertiary: 0 0% 62%;
+  --text-quaternary: 0 0% 48%;
+  --card-border: 0 0% 20%;
+}
+
 :root {
   --font-sans: "Montserrat", "Chiron GoRound TC", -apple-system, BlinkMacSystemFont,
     "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
@@ -396,6 +439,8 @@ body {
 
 [data-theme="anthropic"].dark {
   --background: 60 3% 8%;
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 0 0% 100%;
   --foreground: 60 12% 94%;
   --card: 60 3% 12%;
   --card-foreground: 60 12% 94%;
@@ -598,6 +643,8 @@ body {
  */
 
 [data-theme="fuwari"].dark {
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 0 0% 100%;
   --background: var(--hue) 12% 9%;
   --foreground: var(--hue) 10% 92%;
   --card: var(--hue) 10% 13%;
@@ -755,6 +802,8 @@ body {
 }
 
 [data-theme="violet-rose"].dark {
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 0 0% 100%;
   --background: 285 18% 10%;
   --foreground: 295 15% 92%;
   --card: 288 14% 14%;

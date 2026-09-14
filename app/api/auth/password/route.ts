@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     }
 
     const redis = getRedis();
-    const sessionId = readSessionIdFromCookie();
+    const sessionId = await readSessionIdFromCookie();
     if (!sessionId) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
     const userId = await getValue<string>(KEYS.session(sessionId));
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     // 改密后踢掉旧 session，重新签发，提升安全性
     await destroySession(sessionId);
     const { sessionId: newSessionId, maxAge } = await createSession(userId);
-    setSessionCookie(newSessionId, maxAge);
+    await setSessionCookie(newSessionId, maxAge);
 
     return NextResponse.json({ ok: true });
   } catch {

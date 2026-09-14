@@ -8,14 +8,14 @@ export const dynamic = "force-dynamic";
 
 export async function POST() {
   try {
-    const sessionId = readSessionIdFromCookie();
+    const sessionId = await readSessionIdFromCookie();
     if (sessionId && hasRedisConfig()) {
       await destroySession(sessionId);
     }
-    clearSessionCookie();
+    await clearSessionCookie();
     return NextResponse.json({ ok: true });
   } catch {
-    clearSessionCookie();
+    await clearSessionCookie();
     return NextResponse.json({ ok: true });
   }
 }

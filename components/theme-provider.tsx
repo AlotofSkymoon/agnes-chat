@@ -26,7 +26,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     const stored = (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? null;
-    const initial: Theme = stored ?? "light";
+    /**
+     * 没手动选过时跟随系统偏好。
+     *
+     * 原来写死 stored ?? "light" —— 系统设成深色的用户第一次打开
+     * 仍然是白底，得手动点一次。现在读 prefers-color-scheme，
+     * 用户一旦手动切换过就以 localStorage 为准。
+     */
+    const systemDark =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+    const initial: Theme = stored ?? (systemDark ? "dark" : "light");
     setThemeState(initial);
     document.documentElement.classList.toggle("dark", initial === "dark");
 
@@ -73,7 +83,7 @@ export function useTheme() {
  */
 export const themeInitScript = `(function(){try{
 var t=localStorage.getItem('${STORAGE_KEY}');
-var d=t?t==='dark':false;
+var d=t?t==='dark':(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
 var r=document.documentElement;
 if(d)r.classList.add('dark');else r.classList.remove('dark');
 var p=localStorage.getItem('${PRESET_KEY}');

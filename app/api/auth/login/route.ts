@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     }
 
     const { sessionId, maxAge } = await createSession(user.id);
-    setSessionCookie(sessionId, maxAge);
+    await setSessionCookie(sessionId, maxAge);
 
     return NextResponse.json({ user: toSafeUser(user) });
   } catch (error) {

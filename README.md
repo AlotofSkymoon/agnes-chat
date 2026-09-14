@@ -806,15 +806,19 @@ lib/storage/
 3. 已在 `next.config.mjs` 设置 `images.remotePatterns: []` + `unoptimized: true`，
    即官方推荐的白名单缓解方案
 
-**为什么没升级到 1.3.0：**
+**当前状态：已彻底修复（Next 15.5 + OpenNext ^1.3.0）**
 
-修复版 1.3.0 起强制要求 `next >= 15.5` 与 `wrangler ^4`，
-本项目停在 **Next 14.2.35**，升级会连带破坏大量代码
-（Next 15 把 `cookies()` / `headers()` 改成异步 API）。
-权衡之下，用配置缓解比强行升 Next 更稳妥。
+本项目已升级到 `next@^15.5` + `@opennextjs/cloudflare@^1.3.0` + `wrangler@^4`，
+正是官方修复版要求的组合，SSRF 面已从依赖侧消除。
 
-> 若你之后决定迁移到 Next 15，届时应同步把
-> `@opennextjs/cloudflare` 升到 `^1.3.0`、`wrangler` 升到 `^4`。
+升级时同步处理的 Next 15 破坏性改动：
+- `cookies()` / `headers()` / `draftMode()` 改为异步（本项目 3 处 `cookies()` 已加 `await`）
+- 页面与路由的 `params` / `searchParams` 改为 `Promise`（本项目 2 处本就是 Promise 写法）
+- 26 个 API 路由全部带 `export const dynamic = "force-dynamic"`，
+  因此 Next 15「`fetch` 与 GET 不再默认缓存」的变化对本站无影响
+
+`next.config.mjs` 里仍保留 `remotePatterns: []` + `unoptimized: true`，
+但这已与安全无关 —— 只是本站本就不加载外部图片，省一层运行时开销。
 
 ---
 

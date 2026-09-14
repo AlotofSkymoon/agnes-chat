@@ -93,9 +93,14 @@ export async function destroyAllSessionsOf(userId: string): Promise<void> {
   await pipeline.exec();
 }
 
-/** 写入 session cookie（httpOnly + secure + sameSite=lax） */
-export function setSessionCookie(sessionId: string, maxAge: number): void {
-  cookies().set({
+/**
+ * 写入 session cookie（httpOnly + secure + sameSite=lax）
+ *
+ * ⚠️ Next.js 15 起 `cookies()` 返回 Promise，必须 await。
+ * 这三个 cookie 辅助函数因此全部变成异步，调用方也要改成 await。
+ */
+export async function setSessionCookie(sessionId: string, maxAge: number): Promise<void> {
+  (await cookies()).set({
     name: SESSION_COOKIE_NAME,
     value: sessionId,
     httpOnly: true,
@@ -106,12 +111,12 @@ export function setSessionCookie(sessionId: string, maxAge: number): void {
   });
 }
 
-export function clearSessionCookie(): void {
-  cookies().delete(SESSION_COOKIE_NAME);
+export async function clearSessionCookie(): Promise<void> {
+  (await cookies()).delete(SESSION_COOKIE_NAME);
 }
 
-export function readSessionIdFromCookie(): string | null {
-  return cookies().get(SESSION_COOKIE_NAME)?.value ?? null;
+export async function readSessionIdFromCookie(): Promise<string | null> {
+  return (await cookies()).get(SESSION_COOKIE_NAME)?.value ?? null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -134,7 +139,7 @@ export async function getUserBySessionId(sessionId: string | null): Promise<User
 
 /** 服务端读取当前登录用户（未登录返回 null） */
 export async function getCurrentUser(): Promise<UserRecord | null> {
-  return getUserBySessionId(readSessionIdFromCookie());
+  return getUserBySessionId(await readSessionIdFromCookie());
 }
 
 /** 服务端读取当前登录用户的安全信息 */
