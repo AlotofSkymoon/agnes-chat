@@ -26,7 +26,7 @@ let storeSingleton: Store | null = null;
 
 /** 供应用启动时显式注入（例如从 OpenNext 的 getCloudflareContext() 拿到 env） */
 import { hasBinding, pickBinding } from "./binding";
-import { configValue } from "@/lib/runtime-config";
+import { configSource, configValue } from "@/lib/runtime-config";
 
 export { pickBinding, hasBinding };
 
@@ -129,6 +129,22 @@ export function upstashToken(): string {
 
 export function hasUpstashConfig(): boolean {
   return Boolean(upstashUrl() && upstashToken());
+}
+
+/**
+ * Upstash 配置来源（排查用）。
+ * 返回 from = "process.env"（Vercel / 构建期内联）或 "cf-binding"（Workers 后台机密）。
+ * 两边都查不到就是 null —— 那意味着这个平台根本没拿到 Upstash 配置。
+ */
+export function upstashSource(): { from: string; key: string } | null {
+  const url = configSource("UPSTASH_REDIS_REST_URL", "UPSTASH_REST_URL");
+  if (url) return { from: url.from, key: url.key };
+  const token = configSource(
+    "UPSTASH_REDIS_REST_TOKEN",
+    "UPSTASH_REST_TOKEN",
+    "UPSTASH_TOKEN",
+  );
+  return token ? { from: token.from, key: token.key } : null;
 }
 
 export function getUpstash(): Redis {

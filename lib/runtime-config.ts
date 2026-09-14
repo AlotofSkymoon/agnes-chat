@@ -81,6 +81,28 @@ export function configValue(...keys: string[]): string {
   return lookup(keys)?.value ?? "";
 }
 
+/** 取单个值，同时带上来源（排查"到底读没读到"用） */
+export function configSource(...keys: string[]): ConfigSource | null {
+  return lookup(keys);
+}
+
+/**
+ * 短指纹：取值的哈希前 8 位。
+ *
+ * 用途：判断两个部署是不是读到了**同一个**配置值 ——
+ * 比如 Vercel 和 Cloudflare 是否指向同一个 Upstash 库。
+ * 只输出哈希、不含原文，密钥不会泄露。
+ */
+export function valueFingerprint(value: string): string {
+  if (!value) return "";
+  let h = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    h ^= value.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0").slice(0, 8);
+}
+
 /** 布尔值：只有显式写 false/0/no 才算关 */
 export function configBool(...keys: string[]): boolean {
   const raw = configValue(...keys).toLowerCase();

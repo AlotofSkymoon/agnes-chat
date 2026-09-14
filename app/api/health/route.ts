@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 
 import { detectPlatform, platformLabel } from "@/lib/platform";
 import { getSiteS3Info } from "@/lib/s3-server";
-import { backendKind, hasUpstashConfig } from "@/lib/storage";
-import { configValue } from "@/lib/runtime-config";
+import { backendKind, hasUpstashConfig, upstashSource, upstashUrl } from "@/lib/storage";
+import { configValue, valueFingerprint } from "@/lib/runtime-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -122,6 +122,18 @@ export async function GET() {
       chatKeyPattern: "chat:{userId}:{conversationId}",
       syncStatus,
       syncHint,
+      /**
+       * Upstash 配置来源。
+       * "process.env" → Vercel / Netlify，或 Workers 上构建期内联进配置
+       * "cf-binding"  → Workers 后台「变量和机密」注入
+       * null          → **这个平台根本没拿到 Upstash 配置**（最常见的问题）
+       */
+      upstashSource: upstashSource(),
+      /**
+       * Upstash 端点指纹（URL 的短哈希，不含密钥）。
+       * 两个平台部署比对这个值：相同 = 指向同一个库，数据才会互通。
+       */
+      upstashEndpoint: upstashUrl() ? valueFingerprint(upstashUrl()) : null,
     },
     objectStorage: {
       kind: s3.kind,
