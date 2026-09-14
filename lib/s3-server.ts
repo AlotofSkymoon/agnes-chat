@@ -376,6 +376,24 @@ export function getSiteS3Info(): SiteS3Info {
  * 这里不能 import cloudflare.ts（会造成循环依赖），直接探测全局对象。
  */
 export function hasR2Binding(): boolean {
+  /**
+   * 判定顺序：显式声明 → 真实 binding 对象。
+   *
+   * ⚠️ 为什么需要「显式声明」这一层：
+   *
+   * 在 Cloudflare Workers 上，**明文变量（vars / secrets）能读到，
+   * 但 binding 对象（KV / D1 / R2）未必**。OpenNext 0.4.x 并不把
+   * bindings 挂在 globalThis 上，probeCloudflareEnv() 靠扫描全局找
+   * binding 的方式经常扑空 —— 于是出现「后台明明绑了 r2，代码却说
+   * 未找到绑定、当前不在 Workers 环境」。
+   *
+   * 部署脚本知道自己在往 Cloudflare 部署，所以由它写入
+   * CF_R2_BOUND=1 这类声明，运行时直接采信，不再猜。
+   */
+  const declared = configValue("CF_R2_BOUND", "cf_r2_bound", "R2_BOUND");
+  if (declared && declared !== "0" && declared.toLowerCase() !== "false") return true;
+
+  // 兜底：真的探测到了 binding 对象
   const g = globalThis as unknown as Record<string, unknown>;
   const candidates: unknown[] = [
     g.__env__,
@@ -386,16 +404,8 @@ export function hasR2Binding(): boolean {
   for (const c of candidates) {
     if (!c || typeof c !== "object") continue;
     const inner = ((c as Record<string, unknown>).env ?? c) as Record<string, unknown>;
-    /**
-     * ⚠️ 必须走 pickBinding 做大小写不敏感匹配。
-     *
-     * 这里曾经写死 `(inner as { R2?: unknown }).R2`（只认大写），
-     * 而配置里的 binding 名已经改成小写 `r2` ——
-     * 结果是：桶明明绑好了，却检测不到，设置面板一直显示
-     * 完整的 Endpoint / AK / SK 手填表单，还引导用户去生成 Access Key。
-     * 这正是"cloudflare 能 binding 为什么还要我填这些"的根源。
-     */
     if (inner && typeof inner === "object" && pickBinding(inner, "r2")) return true;
   }
   return false;
 }
+

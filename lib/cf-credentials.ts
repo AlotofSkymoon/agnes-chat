@@ -47,7 +47,21 @@ const ACCOUNT_KEYS = [
 ] as const;
 
 /** 桶名变量名 */
-const BUCKET_KEYS = ["R2_BUCKET_NAME", "R2_BUCKET", "CF_R2_BUCKET", "BUCKET_NAME"] as const;
+/**
+ * 桶名变量名。
+ *
+ * 兼容各种写法：GitHub Secrets 里通常写 R2_BUCKET_NAME，
+ * 但某些平台 / 导入流程会把变量名转成小写（r2_bucket），
+ * 只认大写就会"明明填了却读不到"。这里大小写一视同仁。
+ */
+const BUCKET_KEYS = [
+  "R2_BUCKET_NAME",
+  "r2_bucket",
+  "r2_bucket_name",
+  "R2_BUCKET",
+  "CF_R2_BUCKET",
+  "BUCKET_NAME",
+] as const;
 
 /** 清洗：去空白、去误粘的引号 */
 function clean(value: unknown): string {

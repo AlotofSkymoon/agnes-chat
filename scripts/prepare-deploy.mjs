@@ -59,6 +59,10 @@ const SECRET_VARS = [
   "BRAVE_API_KEY",
   "BOCHA_API_KEY",
   "EXA_API_KEY",
+  // R2 / Cloudflare 相关：GitHub 里填的变量必须注入，否则运行时读不到
+  "R2_BUCKET_NAME",
+  "CLOUDFLARE_API_TOKEN",
+  "CLOUDFLARE_ACCOUNT_ID",
 ];
 
 async function api(pathname, options = {}) {
@@ -178,6 +182,16 @@ async function ensureR2(src) {
     return src.replace(/"r2_buckets"\s*:\s*\[[\s\S]*?\]\s*,?/g, "");
   }
 
+  /**
+   * 写入「binding 已就绪」的显式声明。
+   *
+   * Workers 运行时里 binding 对象不一定探得到（OpenNext 不挂 globalThis），
+   * 但明文变量一定能读到。这里由部署脚本盖章，运行时直接采信，
+   * 避免设置面板误报"未找到 R2 绑定"。
+   */
+  src = setVar(src, "CF_R2_BOUND", "1");
+  src = setVar(src, "R2_BUCKET_NAME", NAME.r2);
+
   // 桶名以配置为准，同步成环境变量里指定的名字
   return setField(src, "bucket_name", NAME.r2);
 }
@@ -206,6 +220,8 @@ async function main() {
       const val = (process.env[key] ?? "").trim();
       if (val) src = setVar(src, key, val);
     }
+    // 平台声明：让运行时无需猜测自己跑在哪
+    src = setVar(src, "CF_PLATFORM", "cloudflare");
     console.log("✅ 站点密钥已注入配置（运行时可读）");
   } else {
     console.log("::notice::INJECT_SECRETS=false，跳过密钥注入 —— 请自行在 Cloudflare 后台配置");

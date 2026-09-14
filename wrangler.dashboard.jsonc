@@ -50,7 +50,14 @@
   // 敏感值（PRESET_AGNES_API_KEY / SESSION_SECRET）请在
   // Dashboard → 设置 → 变量和机密 里添加，类型选「机密」。
   "vars": {
-    "NEXT_PUBLIC_SITE_NAME": "Agnes AI"
+    "NEXT_PUBLIC_SITE_NAME": "Agnes AI",
+    // 界面部署没有 Actions 脚本帮忙盖章，这三个声明预置在这里：
+    // CF_PLATFORM 让运行时知道自己在 Cloudflare（否则误判成 local）；
+    // CF_R2_BOUND 声明已绑定 R2（binding 对象运行时未必探得到）；
+    // 桶名若不是 agnes-chat，改下面 R2_BUCKET_NAME 的值。
+    "CF_PLATFORM": "cloudflare",
+    "CF_R2_BOUND": "1",
+    "R2_BUCKET_NAME": "agnes-chat"
   },
 
   "observability": {

@@ -10,7 +10,23 @@ import { pickBinding } from "@/lib/storage/binding";
 export type Platform = "cloudflare" | "vercel" | "local";
 
 export function detectPlatform(): Platform {
-  // 1) 有 KV / D1 / R2 binding，一定是 Cloudflare
+  /**
+   * ⚠️ 判定顺序很重要：**先认 Vercel，再认 Cloudflare**。
+   *
+   * 反过来会踩坑：Vercel 上部署的站点如果要用 R2 存图片，
+   * 也会配 CLOUDFLARE_ACCOUNT_ID / R2_BUCKET_NAME 这类变量。
+   * 先判 Cloudflare 就会把 Vercel 站误判成 Workers，
+   * 进而把「只能用 R2」的限制套到本可以选 B2 的站点上。
+   */
+
+  // 1) Vercel 独有环境变量（最可靠，先判）
+  if (process.env.VERCEL || process.env.VERCEL_ENV) return "vercel";
+
+  // 2) 部署时显式声明（Actions 脚本 / dashboard 配置写入，100% 可靠）
+  const declared = (process.env.CF_PLATFORM ?? "").trim().toLowerCase();
+  if (declared === "cloudflare" || declared === "workers") return "cloudflare";
+
+  // 3) 有 KV / D1 / R2 binding 对象
   try {
     // 延迟 require，避免客户端打包时拉入服务端模块
     const g = globalThis as unknown as Record<string, unknown>;
@@ -30,13 +46,10 @@ export function detectPlatform(): Platform {
     /* 忽略 */
   }
 
-  // 2) Cloudflare 注入的环境变量
+  // 4) Cloudflare Pages / CI 注入的变量
   if (process.env.CF_ACCOUNT_ID || process.env.CF_PAGES || process.env.WORKERS_CI) {
     return "cloudflare";
   }
-
-  // 3) Vercel
-  if (process.env.VERCEL || process.env.VERCEL_ENV) return "vercel";
 
   return "local";
 }
