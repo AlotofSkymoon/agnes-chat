@@ -10,6 +10,7 @@ import {
   Crown,
   Eye,
   EyeOff,
+  FileText,
   KeyRound,
   Loader2,
   RefreshCw,
@@ -17,8 +18,8 @@ import {
   Server,
   Settings2,
   Shield,
-  TriangleAlert,
   Trash2,
+  TriangleAlert,
   User as UserIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -285,6 +286,11 @@ interface SiteSettings {
   defaultBaseUrl: string;
   defaultModel: string;
   cloudSaveDefault: boolean;
+  /* 页脚 / 备案 */
+  icpText: string;
+  icpUrl: string;
+  icpIconUrl: string;
+  footerExtra: string;
 }
 
 function SiteSettingsCard() {
@@ -292,6 +298,10 @@ function SiteSettingsCard() {
     defaultBaseUrl: "",
     defaultModel: "",
     cloudSaveDefault: false,
+    icpText: "",
+    icpUrl: "",
+    icpIconUrl: "",
+    footerExtra: "",
   });
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
@@ -329,7 +339,20 @@ function SiteSettingsCard() {
         return;
       }
 
-      if (data.settings) setForm(data.settings);
+      if (data.settings) {
+        /**
+         * 旧数据里没有页脚字段（服务端可能是旧版本或空配置），
+         * 逐个兜底成空串 —— 否则受控输入拿到 undefined 会报警告，
+         * 而且用户在框里一打字就崩。
+         */
+        setForm({
+          ...data.settings,
+          icpText: data.settings.icpText ?? "",
+          icpUrl: data.settings.icpUrl ?? "",
+          icpIconUrl: data.settings.icpIconUrl ?? "",
+          footerExtra: data.settings.footerExtra ?? "",
+        });
+      }
       // storage:false 表示后端没配存储，配置能读但保存会失败，提前告知
       if (data.storage === false) {
         setLoadError({
@@ -473,6 +496,61 @@ function SiteSettingsCard() {
                 checked={form.cloudSaveDefault}
                 onCheckedChange={(v) => setForm((f) => ({ ...f, cloudSaveDefault: v }))}
               />
+            </div>
+
+            {/* ---- 页脚 / 备案：在面板里填，不用改环境变量 ---- */}
+            <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-3">
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <FileText className="h-4 w-4" />
+                页脚与备案
+              </p>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="ss-icp-text">备案号</Label>
+                <Input
+                  id="ss-icp-text"
+                  placeholder="如 京ICP备12345678号-1 / 萌ICP备2026xxxxx号，留空不显示"
+                  value={form.icpText}
+                  onChange={(e) => setForm((f) => ({ ...f, icpText: e.target.value }))}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="ss-icp-url">备案链接</Label>
+                <Input
+                  id="ss-icp-url"
+                  placeholder="留空则自动指向工信部备案查询系统"
+                  value={form.icpUrl}
+                  onChange={(e) => setForm((f) => ({ ...f, icpUrl: e.target.value }))}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="ss-icp-icon">备案徽章图片地址</Label>
+                <Input
+                  id="ss-icp-icon"
+                  placeholder="icp.gov.moe / icp.sakura.ink 给的图标链接（可选）"
+                  value={form.icpIconUrl}
+                  onChange={(e) => setForm((f) => ({ ...f, icpIconUrl: e.target.value }))}
+                  autoComplete="off"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  第三方备案才需要。图片加载不出来时会自动隐藏，不会显示破图。
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="ss-footer-extra">页脚额外文字</Label>
+                <Input
+                  id="ss-footer-extra"
+                  placeholder="版权声明、联系方式等（可选）"
+                  value={form.footerExtra}
+                  onChange={(e) => setForm((f) => ({ ...f, footerExtra: e.target.value }))}
+                  autoComplete="off"
+                />
+              </div>
             </div>
 
             <Button onClick={() => void save()} disabled={saving}>

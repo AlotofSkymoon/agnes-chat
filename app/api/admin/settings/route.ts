@@ -47,6 +47,11 @@ export async function POST(request: Request) {
       typeof body.cloudSaveDefault === "boolean"
         ? body.cloudSaveDefault
         : Boolean(current.cloudSaveDefault),
+    /* 页脚 / 备案：管理员在面板里填 */
+    icpText: String(body.icpText ?? current.icpText ?? "").trim(),
+    icpUrl: String(body.icpUrl ?? current.icpUrl ?? "").trim(),
+    icpIconUrl: String(body.icpIconUrl ?? current.icpIconUrl ?? "").trim(),
+    footerExtra: String(body.footerExtra ?? current.footerExtra ?? "").trim().slice(0, 300),
   };
 
   // Base URL 做基本校验，避免管理员手滑写坏全站

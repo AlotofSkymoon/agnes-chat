@@ -650,26 +650,39 @@ NEXT_PUBLIC_SPONSOR_QR=https://你的图床/alipayhk.png
 
 ## 📜 自定义页脚与备案
 
-页脚可以放备案号，也支持 icp.gov.moe / icp.sakura.ink 这类第三方备案徽章。
+**推荐在管理员面板里填**：`/admin` → 站点配置 → 页脚与备案。
+填完保存即生效，**不用改环境变量、不用重新部署**。
 
-| 变量 | 说明 |
+| 字段 | 说明 |
 |---|---|
-| `NEXT_PUBLIC_ICP_TEXT` | 备案号文字，如 `京ICP备12345678号-1`。留空则不显示 |
-| `NEXT_PUBLIC_ICP_URL` | 备案链接。留空时自动指向工信部备案查询系统 |
-| `NEXT_PUBLIC_ICP_ICON_URL` | 备案徽章图片地址（第三方备案用它） |
-| `NEXT_PUBLIC_FOOTER_EXTRA` | 额外自定义文字，如版权声明、联系方式 |
+| 备案号 | 如 `京ICP备12345678号-1` / `萌ICP备2026xxxxx号`。留空不显示 |
+| 备案链接 | 留空时自动指向工信部备案查询系统 |
+| 备案徽章图片地址 | 第三方备案（icp.gov.moe / icp.sakura.ink）给的图标链接 |
+| 页脚额外文字 | 版权声明、联系方式、免责说明等 |
 
-四个都不填时，页脚保持原样，不多出任何空行。
+**第三方备案填法**
 
-**第三方备案示例**
-
-```bash
-NEXT_PUBLIC_ICP_TEXT=萌ICP备2026xxxxx号
-NEXT_PUBLIC_ICP_URL=https://icp.gov.moe/?id=xxxxx
-NEXT_PUBLIC_ICP_ICON_URL=https://icp.gov.moe/xxxxx/icon.png
+```
+备案号：        萌ICP备2026xxxxx号
+备案链接：      https://icp.gov.moe/?id=xxxxx
+徽章图片地址：  https://icp.gov.moe/xxxxx/icon.png
 ```
 
 > ⚠️ 徽章是外链图片，对方域名失效时**会自动隐藏**，不会留破图。
+
+### 也可以用环境变量（当初始值）
+
+想在部署时就定好、或还没建管理员账号时，可用环境变量：
+
+| 变量 | 说明 |
+|---|---|
+| `NEXT_PUBLIC_ICP_TEXT` | 备案号 |
+| `NEXT_PUBLIC_ICP_URL` | 备案链接 |
+| `NEXT_PUBLIC_ICP_ICON_URL` | 徽章图片 |
+| `NEXT_PUBLIC_FOOTER_EXTRA` | 额外文字 |
+
+**优先级**：管理员面板存的值 > 环境变量 > 空。
+面板里留空并保存，会用环境变量的值补上；想彻底清空就把环境变量也去掉。
 
 ---
 

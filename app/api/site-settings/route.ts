@@ -1,8 +1,26 @@
 import { NextResponse } from "next/server";
 
-import { REQUIRE_LOGIN } from "@/lib/site";
+import { FOOTER_EXTRA, ICP_ICON_URL, ICP_TEXT, ICP_URL, REQUIRE_LOGIN } from "@/lib/site";
 import { DEFAULT_SITE_SETTINGS, type SiteSettings } from "@/lib/types";
 import { getValue, hasRedisConfig, KEYS } from "@/lib/redis";
+
+/**
+ * 站点设置的默认值。
+ *
+ * 页脚/备案这几项优先取环境变量 —— 这样站长既可以在管理员面板里改
+ * （改完存进 Redis，覆盖这里），也可以在部署平台直接设好（当初始值）。
+ *
+ * 顺序：Redis 里管理员存的值 > 环境变量 > 空
+ */
+function fallbackSettings(): SiteSettings {
+  return {
+    ...DEFAULT_SITE_SETTINGS,
+    icpText: ICP_TEXT,
+    icpUrl: ICP_URL,
+    icpIconUrl: ICP_ICON_URL,
+    footerExtra: FOOTER_EXTRA,
+  };
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,17 +33,17 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   if (!hasRedisConfig()) {
-    return NextResponse.json({ settings: DEFAULT_SITE_SETTINGS, requireLogin: REQUIRE_LOGIN });
+    return NextResponse.json({ settings: fallbackSettings(), requireLogin: REQUIRE_LOGIN });
   }
 
   try {
     const raw = await getValue<Partial<SiteSettings>>(KEYS.siteSettings);
     const settings: SiteSettings = {
-      ...DEFAULT_SITE_SETTINGS,
+      ...fallbackSettings(),
       ...(raw ?? {}),
     };
     return NextResponse.json({ settings, requireLogin: REQUIRE_LOGIN });
   } catch {
-    return NextResponse.json({ settings: DEFAULT_SITE_SETTINGS, requireLogin: REQUIRE_LOGIN });
+    return NextResponse.json({ settings: fallbackSettings(), requireLogin: REQUIRE_LOGIN });
   }
 }
