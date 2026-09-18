@@ -80,6 +80,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     renameConversation,
     clearAllConversations,
     ensureConversation,
+    mergeFromCloud,
   } = useConversations();
 
   const [mounted, setMounted] = React.useState(false);
@@ -250,6 +251,43 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       /* 忽略 */
     }
   }, [cloudSync, mounted]);
+
+  /**
+   * 登录后把云端会话拉回来。
+   *
+   * ⚠️ 这是「同一个站、换个浏览器历史记录就不见了」的根因修复：
+   * 之前只有发送时写云端（saveToCloud），从没有人去读，
+   * 于是换设备登录后本地 localStorage 是空的，看起来像数据丢了。
+   *
+   * 只在「已登录 + 云端保存开启」时拉，避免给免登录访客发无用请求。
+   * 同一个用户+开关组合只拉一次（cloudSync 由关变开时会再拉一次）。
+   */
+  const pulledKeyRef = React.useRef<string>("");
+  React.useEffect(() => {
+    if (!mounted || !user || !cloudSync) return;
+    const key = `${user.id}:${cloudSync}`;
+    if (pulledKeyRef.current === key) return;
+    pulledKeyRef.current = key;
+
+    let alive = true;
+    fetch("/api/conversations?full=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(
+        (d: { conversations?: { conversationId: string; updatedAt: number; title?: string; messages?: unknown }[] } | null) => {
+          if (!alive || !d?.conversations) return;
+          const n = mergeFromCloud(d.conversations);
+          if (n > 0) {
+            toast.success(`已从云端恢复 ${n} 个对话`);
+          }
+        },
+      )
+      .catch(() => {
+        /* 拉取失败不影响本地使用，静默 */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [mounted, user, cloudSync, mergeFromCloud]);
 
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -426,6 +464,9 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         customProviders: settings.customProviders,
         conversationId,
         saveToCloud: Boolean(user) && cloudSync,
+        // 带上标题，否则云端拉回来时全是「新对话」
+        conversationTitle:
+          conversations.find((c) => c.id === conversationId)?.title ?? "",
         thinking: thinkingRef.current,
       };
       const bodyBytes = new TextEncoder().encode(JSON.stringify(bodyObj)).length;

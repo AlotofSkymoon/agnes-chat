@@ -210,6 +210,84 @@ export function useConversations() {
     [],
   );
 
+  /* ---------------- 从云端合并 ---------------- */
+  /**
+   * 把云端会话合并进本地。
+   *
+   * 这是「换个浏览器就没有历史记录」的修复关键：
+   * 云端一直只写不读，换设备后本地 localStorage 是空的，
+   * 历史对话看起来就像凭空消失了。
+   *
+   * 合并规则（谁的 updatedAt 新听谁的）：
+   *   本地有、云端没有  → 保留本地
+   *   云端有、本地没有  → 拉下来
+   *   两边都有          → 取较新的一份
+   *
+   * 为什么按时间而不是简单覆盖：
+   * 用户可能在离线状态下继续聊过，直接覆盖会丢掉那部分。
+   */
+  const mergeFromCloud = React.useCallback(
+    (cloud: { conversationId: string; updatedAt: number; title?: string; messages?: unknown }[]) => {
+      if (!cloud.length) return 0;
+
+      let merged = 0;
+      setConversations((prev) => {
+        const byId = new Map(prev.map((c) => [c.id, c]));
+        const next = [...prev];
+
+        for (const item of cloud) {
+          if (!item?.conversationId) continue;
+          const local = byId.get(item.conversationId);
+          const cloudAt = item.updatedAt ?? 0;
+
+          // 本地更新、或云端这份没有实际内容 → 保留本地
+          if (local && local.updatedAt >= cloudAt) continue;
+          if (!Array.isArray(item.messages) || item.messages.length === 0) {
+            // 没有消息内容，只补一个标题（列表里能看到，点进去再从本地读）
+            if (local) {
+              if (item.title && local.title === "新对话") {
+                const idx = next.findIndex((c) => c.id === item.conversationId);
+                if (idx >= 0) {
+                  next[idx] = { ...local, title: item.title, updatedAt: cloudAt };
+                  merged++;
+                }
+              }
+              continue;
+            }
+          }
+
+          // 写消息到本地
+          try {
+            safeSet(msgKey(item.conversationId), JSON.stringify(item.messages ?? []));
+          } catch {
+            continue;
+          }
+
+          const conv: Conversation = {
+            id: item.conversationId,
+            title: item.title?.trim() || local?.title || "新对话",
+            updatedAt: cloudAt || Date.now(),
+          };
+
+          if (local) {
+            const idx = next.findIndex((c) => c.id === item.conversationId);
+            if (idx >= 0) next[idx] = conv;
+          } else {
+            next.push(conv);
+          }
+          merged++;
+        }
+
+        next.sort((a, b) => b.updatedAt - a.updatedAt);
+        safeSet(LS_CONVERSATIONS, JSON.stringify(next));
+        return next;
+      });
+
+      return merged;
+    },
+    [],
+  );
+
   /* ---------------- 重命名会话 ---------------- */
   /**
    * 手动给会话起名。
@@ -268,5 +346,6 @@ export function useConversations() {
     touchConversation,
     ensureConversation,
     renameConversation,
+    mergeFromCloud,
   };
 }

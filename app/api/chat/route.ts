@@ -47,6 +47,11 @@ interface ChatRequestBody {
   /** 云端保存开关打开时才传 */
   conversationId?: string;
   saveToCloud?: boolean;
+  /**
+   * 会话标题（云端保存时用）。
+   * 之前云端只存消息不存标题，拉回本地时只能显示「新对话」。
+   */
+  conversationTitle?: string;
 }
 
 function errorResponse(status: number, code: string, message: string) {
@@ -70,6 +75,7 @@ export async function POST(request: Request) {
     customProviders,
     conversationId,
     saveToCloud,
+    conversationTitle,
     thinking,
   } = body;
 
@@ -340,6 +346,7 @@ export async function POST(request: Request) {
               const payload = JSON.stringify({
                 conversationId,
                 model,
+                title: (conversationTitle ?? "").slice(0, 60),
                 messages: [
                   // 存云端时把多模态内容压成纯文本，避免图片 base64 占满 Redis
                   ...(messages ?? []).map((m) => ({

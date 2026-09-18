@@ -1,6 +1,18 @@
 import Link from "next/link";
 
-import { AUTHOR_NAME, BY_LINE, REPO_URL, SITE_NAME, UPSTREAM_URL } from "@/lib/site";
+import { SiteFooterBadge } from "@/components/site-footer-badge";
+import {
+  AUTHOR_NAME,
+  BY_LINE,
+  FOOTER_EXTRA,
+  HAS_CUSTOM_FOOTER,
+  ICP_ICON_URL,
+  ICP_TEXT,
+  ICP_URL,
+  REPO_URL,
+  SITE_NAME,
+  UPSTREAM_URL,
+} from "@/lib/site";
 
 /**
  * 全站页脚。
@@ -38,6 +50,39 @@ export function SiteFooter({ className = "" }: { className?: string }) {
       <p className="mt-1.5 text-fg-quaternary">
         代码开源（MIT），公开部署需获作者授权 · 详见 LICENSE
       </p>
+      {/* 备案信息 + 自定义内容：站长按需配置 */}
+      {HAS_CUSTOM_FOOTER ? (
+        <div className="mt-2 flex flex-col items-center gap-1.5">
+          {/* 第三方备案徽章（图片挂了会自动隐藏） */}
+          {ICP_ICON_URL ? (
+            <SiteFooterBadge src={ICP_ICON_URL} alt="备案徽章" href={ICP_URL || undefined} />
+          ) : null}
+
+          {/* 备案号 */}
+          {ICP_TEXT ? (
+            <p className="text-fg-quaternary">
+              {ICP_URL ? (
+                <a
+                  href={ICP_URL}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="underline decoration-dotted underline-offset-2 hover:text-primary"
+                >
+                  {ICP_TEXT}
+                </a>
+              ) : (
+                ICP_TEXT
+              )}
+            </p>
+          ) : null}
+
+          {/* 额外自定义文字 */}
+          {FOOTER_EXTRA ? (
+            <p className="text-fg-quaternary">{FOOTER_EXTRA}</p>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* 署名标识：按 LICENSE 要求保留，不可移除 */}
       <p className="mt-1 font-medium tracking-wide text-fg-tertiary">{BY_LINE}</p>
     </footer>

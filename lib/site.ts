@@ -138,6 +138,48 @@ export const SPONSOR_NOTE: string =
   process.env.NEXT_PUBLIC_SPONSOR_NOTE?.trim() ||
   "服务器、域名、API 额度都用的免费额度，站长不担心这块。赞助会直接变成他的生活经费和购物基金 —— 谢谢 ☕";
 
+/* ---------------------------------------------------------------------------
+   页脚 / 备案
+   --------------------------------------------------------------------------- */
+
+/**
+ * 备案号文字，例如「京ICP备12345678号-1」。
+ * 留空则不显示备案行。
+ */
+export const ICP_TEXT: string =
+  process.env.NEXT_PUBLIC_ICP_TEXT?.trim() || "";
+
+/**
+ * 备案号点击后跳转的地址。
+ * 官方备案默认指向工信部备案查询系统；
+ * 第三方备案（icp.gov.moe / icp.sakura.ink 这类）填它们给的详情页即可。
+ */
+export const ICP_URL: string =
+  process.env.NEXT_PUBLIC_ICP_URL?.trim() ||
+  (ICP_TEXT ? "https://beian.miit.gov.cn/" : "");
+
+/**
+ * 备案徽章图片地址（可选）。
+ *
+ * 第三方备案服务（如 icp.gov.moe、icp.sakura.ink）通常会给一个图标地址，
+ * 展示在页脚表示"本站已在该处登记"。填了就显示图片。
+ *
+ * ⚠️ 图片加载失败时会自动隐藏，不会显示破图。
+ */
+export const ICP_ICON_URL: string =
+  process.env.NEXT_PUBLIC_ICP_ICON_URL?.trim() || "";
+
+/**
+ * 页脚额外自定义内容（可选）。
+ * 想放版权声明、联系方式、免责说明等都可以。
+ */
+export const FOOTER_EXTRA: string =
+  process.env.NEXT_PUBLIC_FOOTER_EXTRA?.trim() || "";
+
+/** 是否有任何自定义页脚内容 */
+export const HAS_CUSTOM_FOOTER: boolean =
+  Boolean(ICP_TEXT) || Boolean(ICP_ICON_URL) || Boolean(FOOTER_EXTRA);
+
 /**
  * 是否必须登录才能对话。
  *
