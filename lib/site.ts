@@ -136,7 +136,7 @@ export const SPONSOR_METHOD: string =
 /** 赞助说明（支持一句话说明用途） */
 export const SPONSOR_NOTE: string =
   process.env.NEXT_PUBLIC_SPONSOR_NOTE?.trim() ||
-  "本项目免费开源、无广告。赞助用于支付服务器、API 额度与域名费用。";
+  "服务器、域名、API 额度都用的免费额度，站长不担心这块。赞助会直接变成他的生活经费和购物基金 —— 谢谢 ☕";
 
 /**
  * 是否必须登录才能对话。

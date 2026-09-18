@@ -22,11 +22,16 @@ export const metadata = {
   description: "支持本项目继续维护：服务器、API 额度与域名都需要成本",
 };
 
-/** 资金去向 —— 写清楚比含糊的「请我喝杯咖啡」更有说服力 */
+/**
+ * 资金去向 —— 写清楚比含糊的「请我喝杯咖啡」更有说服力。
+ *
+ * 服务器、域名、API 额度用的都是免费额度，站长本人不担心这块。
+ * 赞助实际是拿去贴补生活经费与日常购物，所以照实说，不包装成"服务器费用"。
+ */
 const USES = [
-  { label: "服务器与存储", desc: "Cloudflare / Vercel、对象存储、数据库" },
-  { label: "API 额度", desc: "站点内置的模型额度，让访客免配置直接聊" },
-  { label: "域名", desc: "自定义域名续费" },
+  { label: "生活经费", desc: "站长是名学生，赞助用来贴补日常开销" },
+  { label: "日常购物", desc: "买点想要的东西，就这么简单" },
+  { label: "继续做下去的动力", desc: "有人愿意付钱，说明这东西真的有用" },
 ];
 
 /** 不出钱也能帮忙的方式 */
@@ -87,7 +92,9 @@ export default function SponsorPage() {
           <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-fg-secondary">
             本站永久免费、无广告、不采集隐私数据。
             <br className="hidden sm:block" />
-            如果它帮到了你，可以请站长喝杯咖啡 ☕
+            服务器、域名、API 额度用的都是免费额度，站长不担心这块 ——
+            <br className="hidden sm:block" />
+            赞助会直接变成他的生活经费和购物基金。
           </p>
         </header>
 
@@ -163,6 +170,8 @@ export default function SponsorPage() {
           赞助完全自愿，不影响任何功能使用。
           <br />
           本站不提供任何付费会员或增值服务。
+          <br />
+          站长是名学生，每一笔都会用在生活与日常开销上。
         </p>
 
         <div className="mt-8 flex justify-center">
