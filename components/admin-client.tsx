@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { SiteFooter } from "@/components/site-footer";
+import { parseIcpInput } from "@/lib/use-site-icp";
 
 interface AdminUser {
   id: string;
@@ -387,14 +388,29 @@ function SiteSettingsCard() {
         body: JSON.stringify(form),
         signal: AbortSignal.timeout(15_000),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        /** 服务端回读校验：保存的值和读回来的值是否一致 */
+        verified?: boolean;
+        settings?: SiteSettings;
+      };
       if (!res.ok) {
         // 服务端会给出中文原因（如"需要管理员权限""未配置存储"），优先展示
         toast.error(data.error ?? `保存失败（HTTP ${res.status}）`);
         return;
       }
-      toast.success("站点配置已保存，全站生效");
-      // 保存后重新拉一次，确认真的写进去了
+      /**
+       * 保存后校验回读值。
+       *
+       * 之前这里只弹一句"已保存"，实际有没有写进去完全靠猜 ——
+       * 于是出现了"保存成功但刷新还是关闭"这种无解现象。
+       * 现在服务端会回读并给出 verified，存没存进去当场能看出来。
+       */
+      if (data.verified === false) {
+        toast.error("保存后回读不一致，配置可能未真正写入存储");
+      } else {
+        toast.success("站点配置已保存，全站生效");
+      }
       await load();
     } catch (err) {
       const name = err instanceof Error ? err.name : "";
@@ -509,11 +525,31 @@ function SiteSettingsCard() {
                 <Label htmlFor="ss-icp-text">备案号</Label>
                 <Input
                   id="ss-icp-text"
-                  placeholder="如 京ICP备12345678号-1 / 萌ICP备2026xxxxx号，留空不显示"
+                  placeholder="如 京ICP备12345678号-1 / 萌ICP备20260645号，留空不显示"
                   value={form.icpText}
-                  onChange={(e) => setForm((f) => ({ ...f, icpText: e.target.value }))}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    /**
+                     * 支持直接粘贴第三方备案给的整段 <a> 标签：
+                     * 自动拆出链接和文字，不用手动分两个框填。
+                     */
+                    const parsed = parseIcpInput(v);
+                    if (parsed) {
+                      setForm((f) => ({
+                        ...f,
+                        icpText: parsed.icpText || f.icpText,
+                        icpUrl: parsed.icpUrl || f.icpUrl,
+                      }));
+                      toast.success("已识别备案链接，请确认备案号文字");
+                      return;
+                    }
+                    setForm((f) => ({ ...f, icpText: v }));
+                  }}
                   autoComplete="off"
                 />
+                <p className="text-[11px] text-muted-foreground">
+                  可直接粘贴第三方备案给的整段 &lt;a&gt; 标签，会自动拆出链接与文字。
+                </p>
               </div>
 
               <div className="space-y-1.5">
@@ -522,7 +558,19 @@ function SiteSettingsCard() {
                   id="ss-icp-url"
                   placeholder="留空则自动指向工信部备案查询系统"
                   value={form.icpUrl}
-                  onChange={(e) => setForm((f) => ({ ...f, icpUrl: e.target.value }))}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const parsed = parseIcpInput(v);
+                    if (parsed) {
+                      setForm((f) => ({
+                        ...f,
+                        icpUrl: parsed.icpUrl || f.icpUrl,
+                        icpText: parsed.icpText || f.icpText,
+                      }));
+                      return;
+                    }
+                    setForm((f) => ({ ...f, icpUrl: v }));
+                  }}
                   autoComplete="off"
                 />
               </div>

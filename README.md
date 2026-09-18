@@ -660,13 +660,22 @@ NEXT_PUBLIC_SPONSOR_QR=https://你的图床/alipayhk.png
 | 备案徽章图片地址 | 第三方备案（icp.gov.moe / icp.sakura.ink）给的图标链接 |
 | 页脚额外文字 | 版权声明、联系方式、免责说明等 |
 
-**第三方备案填法**
+**第三方备案填法（以萌备案为例）**
 
+萌备案给你的是一整段 `<a>` 标签，**直接粘进「备案号」输入框即可**，会自动拆出链接和文字：
+
+```html
+<a href="https://icp.gov.moe/?keyword=20260645" target="_blank">萌ICP备20260645号</a>
 ```
-备案号：        萌ICP备2026xxxxx号
-备案链接：      https://icp.gov.moe/?id=xxxxx
-徽章图片地址：  https://icp.gov.moe/xxxxx/icon.png
-```
+
+粘贴后自动变成：
+
+| 字段 | 值 |
+|---|---|
+| 备案号 | `萌ICP备20260645号` |
+| 备案链接 | `https://icp.gov.moe/?keyword=20260645` |
+
+> 粘裸链接（只有 URL）也能识别，会自动填进链接框、文字留给你自己补。
 
 > ⚠️ 徽章是外链图片，对方域名失效时**会自动隐藏**，不会留破图。
 

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { ChatFooter } from "@/components/chat/chat-footer";
 import { ChatInput } from "@/components/chat/chat-input";
 import { EmptyState } from "@/components/chat/empty-state";
 import { MessageBubble } from "@/components/chat/message-bubble";
@@ -1325,6 +1326,9 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
           </div>
         </div>
       </div>
+
+      {/* 备案条：管理员配了才显示，主界面也要能看见 */}
+      <ChatFooter />
 
       {/* 拖拽文件时的全屏提示 */}
       {dragging ? (

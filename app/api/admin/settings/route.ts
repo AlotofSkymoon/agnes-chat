@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { requireAdmin } from "@/lib/auth";
-import { getRedis, getValue, hasRedisConfig, KEYS, storageErrorMessage } from "@/lib/redis";
+import { hasRedisConfig, storageErrorMessage } from "@/lib/redis";
+import { readSiteSettings, writeSiteSettings } from "@/lib/site-settings-store";
 import { DEFAULT_SITE_SETTINGS, type SiteSettings } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -16,9 +17,8 @@ export async function GET() {
     return NextResponse.json({ settings: DEFAULT_SITE_SETTINGS, storage: false });
   }
 
-  const raw = await getValue<Partial<SiteSettings>>(KEYS.siteSettings);
   return NextResponse.json({
-    settings: { ...DEFAULT_SITE_SETTINGS, ...(raw ?? {}) },
+    settings: await readSiteSettings(),
     storage: true,
   });
 }
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "请求格式错误" }, { status: 400 });
   }
 
-  const current = (await getValue<Partial<SiteSettings>>(KEYS.siteSettings)) ?? {};
+  const current = await readSiteSettings();
   const next: SiteSettings = {
     defaultBaseUrl: String(body.defaultBaseUrl ?? current.defaultBaseUrl ?? "").trim(),
     defaultModel: String(body.defaultModel ?? current.defaultModel ?? "").trim(),
@@ -59,6 +59,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Base URL 必须以 http:// 或 https:// 开头" }, { status: 400 });
   }
 
-  await getRedis().set(KEYS.siteSettings, JSON.stringify(next));
-  return NextResponse.json({ ok: true, settings: next });
+  await writeSiteSettings(next);
+
+  /**
+   * 写回后立即读一次并一起返回。
+   *
+   * 之前这里直接返回内存里的 next，所以"看起来保存成功"，
+   * 实际根本没写进去（或读回来是默认值）也无法发现。
+   * 现在前端可以把回读值直接填进表单，存没存进去一眼能看出来。
+   */
+  const saved = await readSiteSettings();
+  return NextResponse.json({ ok: true, settings: saved, verified: saved.cloudSaveDefault === next.cloudSaveDefault });
 }
