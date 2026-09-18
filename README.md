@@ -606,6 +606,45 @@ npm run cf:build && npx wrangler dev
 
 ---
 
+## 💛 赞助与支持
+
+本项目永久免费、无广告、不采集隐私。但服务器、API 额度、域名都是真金白银，
+如果你愿意请站长喝杯咖啡，可以访问 `/sponsor`。
+
+### 放上你自己的收款码
+
+**方式一：替换文件（最简单）**
+
+把你的收款码图片存成 `public/sponsor-qr.png`，覆盖仓库里的占位图即可。
+
+**方式二：用外链**
+
+```bash
+NEXT_PUBLIC_SPONSOR_QR=https://你的图床/alipayhk.png
+```
+
+> ⚠️ 别用会过期的临时链接，二维码一旦失效赞助入口就废了。
+
+### 可配置的项
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `NEXT_PUBLIC_SPONSOR_ENABLED` | `true` | 设 `false` 关闭赞助页（页面返回 404，侧边栏入口也隐藏） |
+| `NEXT_PUBLIC_SPONSOR_QR` | `/sponsor-qr.png` | 二维码图片地址，也支持外链 |
+| `NEXT_PUBLIC_SPONSOR_METHOD` | `AlipayHK` | 显示在二维码上方的收款方式名 |
+| `NEXT_PUBLIC_SPONSOR_NOTE` | 一句说明 | 二维码下方的说明文字 |
+
+### 没放图片会怎样
+
+页面**不会显示破图**。加载失败时会切成一张说明卡：
+
+- 访客看到：「收款码暂未配置」
+- 站长看到：该把图片放哪、该配哪个环境变量
+
+所以即使先部署、后补图，页面也不会难看。
+
+---
+
 ## 路由一览
 
 | 路由 | 说明 |
@@ -616,6 +655,7 @@ npm run cf:build && npx wrangler dev
 | `/account` | 改密码、登出、清空云端记录 |
 | `/admin` | 管理员：用户列表、切角色、删用户、查看内置 Key |
 | `/nav` | 导航站（20 个栏目 / 112 个免费资源） |
+| `/sponsor` | 赞助页（收款码 + 支持方式，可关） |
 | `/api/chat` | 聊天代理（SSE 流式，避免 CORS） |
 | `/api/auth/register` | 注册 |
 | `/api/auth/login` | 登录（限流 1 分钟 10 次） |

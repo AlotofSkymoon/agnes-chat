@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import {
+  HeartHandshake,
   LogIn,
   MessageSquare,
   PanelLeftClose,
@@ -16,7 +17,7 @@ import {
 } from "lucide-react";
 
 import { AgnesIcon } from "@/components/agnes-logo";
-import { BY_LINE, SITE_NAME } from "@/lib/site";
+import { BY_LINE, SITE_NAME, SPONSOR_ENABLED } from "@/lib/site";
 import { Button } from "@/components/ui/button";
 import type { Conversation } from "@/lib/use-conversations";
 import { cn } from "@/lib/utils";
@@ -265,6 +266,16 @@ export function Sidebar({
                 登录 / 注册
               </Link>
             )}
+            {/* 赞助入口：站长可在环境变量里关掉（NEXT_PUBLIC_SPONSOR_ENABLED=false） */}
+            {SPONSOR_ENABLED ? (
+              <Link
+                href="/sponsor"
+                className="liquid-item flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]"
+              >
+                <HeartHandshake className="h-4 w-4" />
+                赞助支持
+              </Link>
+            ) : null}
             {/* 署名标识：按 LICENSE 要求保留 */}
             <p className="px-2.5 pt-1.5 text-[10px] text-fg-quaternary">{BY_LINE}</p>
           </div>

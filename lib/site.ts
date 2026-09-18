@@ -106,6 +106,38 @@ export const ALLOW_CUSTOM_BASE_URL =
 export const ALLOW_WEB_SEARCH =
   process.env.NEXT_PUBLIC_ALLOW_WEB_SEARCH?.trim() !== "false";
 
+/* ---------------------------------------------------------------------------
+   赞助 / 支持
+   --------------------------------------------------------------------------- */
+
+/**
+ * 是否展示赞助页面。
+ * 默认开启；不想放收款码就设 NEXT_PUBLIC_SPONSOR_ENABLED=false，
+ * 页面会返回 404，侧边栏入口也会隐藏。
+ */
+export const SPONSOR_ENABLED =
+  process.env.NEXT_PUBLIC_SPONSOR_ENABLED?.trim() !== "false";
+
+/**
+ * 收款二维码图片地址。
+ *
+ * 默认放 public/sponsor-qr.png（把你的收款码存成这个文件名即可）。
+ * 也可以直接给一个外链，例如图床地址。
+ *
+ * ⚠️ 不建议用会过期的临时链接 —— 二维码一旦失效，赞助入口就废了。
+ */
+export const SPONSOR_QR: string =
+  process.env.NEXT_PUBLIC_SPONSOR_QR?.trim() || "/sponsor-qr.png";
+
+/** 收款方式名称，展示在二维码下方 */
+export const SPONSOR_METHOD: string =
+  process.env.NEXT_PUBLIC_SPONSOR_METHOD?.trim() || "AlipayHK";
+
+/** 赞助说明（支持一句话说明用途） */
+export const SPONSOR_NOTE: string =
+  process.env.NEXT_PUBLIC_SPONSOR_NOTE?.trim() ||
+  "本项目免费开源、无广告。赞助用于支付服务器、API 额度与域名费用。";
+
 /**
  * 是否必须登录才能对话。
  *
