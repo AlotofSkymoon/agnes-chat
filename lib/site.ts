@@ -1,9 +1,9 @@
 /**
  * 站点品牌配置。
  *
- * 本站定位：**中转 API 的官方演示站**。
- * 站长（可能是 Agnes / 任意中转服务商）把自己的 Key 和 Base URL 配进环境变量，
- * 用户打开就能直接聊，不用自己申请 Key。
+ * 本站定位：**免费 AI 聊天站**（独立的开源项目，不隶属于任何 API 服务商）。
+ * 站长把自己的 Key 和 Base URL 配进环境变量，
+ * 访客打开就能直接聊，不用自己申请 Key、也不用填 Base URL。
  *
  * 所以品牌名、上游地址、模型列表全部可配置，默认给 Agnes AI 一套。
  */
@@ -27,7 +27,7 @@ export function pageTitle(page: string): string {
 /** 站点简介（README / SEO / 页脚共用） */
 export const SITE_DESCRIPTION: string =
   process.env.NEXT_PUBLIC_SITE_DESCRIPTION?.trim() ||
-  `${SITE_NAME} 官方演示站。开箱即用的纯文本 AI 聊天，支持自带 API Key 与中转 Base URL。`;
+  `${SITE_NAME} 免费 AI 聊天站。开箱即用，支持自带 API Key 与自定义 Base URL。`;
 
 /**
  * 主题预设。
@@ -84,7 +84,7 @@ export const UPSTREAM_URL: string =
 
 /**
  * 是否允许访客自带 Key / Base URL。
- * 演示站一般开着（用户想用自己的额度也行）；
+ * 免费聊天站一般开着（访客想用自己的额度也行）；
  * 想锁死成"只能用站长的"就设 NEXT_PUBLIC_ALLOW_CUSTOM_KEY=false。
  */
 export const ALLOW_CUSTOM_KEY =
