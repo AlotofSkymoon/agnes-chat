@@ -32,6 +32,8 @@ export const KEYS = {
   tlds: "tlds:list",
   announcement: "site:announcement",
   siteSettings: "site:settings",
+  /** 用户个人设置（含自带 API Key，服务端加密后存储） */
+  userSettings: (userId: string) => `user:${userId}:settings`,
   statMessages: "stat:messages",
 } as const;
 

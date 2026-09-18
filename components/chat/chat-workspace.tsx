@@ -289,6 +289,105 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     };
   }, [mounted, user, cloudSync, mergeFromCloud]);
 
+  /**
+   * 登录后把云端设置拉回来（API Key / Base URL / 自定义供应商 / 模型 / 对象存储）。
+   *
+   * 解决的问题：在 A 站填的 Key，换到 B 站要重填一遍。
+   * 这些配置以前只存在浏览器 localStorage，换设备就丢。
+   *
+   * 只在「已登录 + 云端保存开启」时拉，且同一组合只拉一次。
+   * 拉取后直接采用云端值 —— 用户要的就是"配置跟着账号走"。
+   */
+  const settingsPulledRef = React.useRef<string>("");
+  React.useEffect(() => {
+    if (!mounted || !user || !cloudSync) return;
+    const key = `${user.id}:${cloudSync}`;
+    if (settingsPulledRef.current === key) return;
+
+    let alive = true;
+    fetch("/api/user/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { settings?: Record<string, unknown> | null } | null) => {
+        if (!alive) return;
+        settingsPulledRef.current = key;
+        if (!d?.settings) return;
+
+        setSettings((prev) => {
+          /**
+           * 只合并云端确实带了的字段。
+           * 云端没存 thinking / webSearch，保持本设备的值，
+           * 否则多设备之间会互相打架。
+           */
+          const next: ChatSettings = { ...prev };
+          if (d.settings!.keys && typeof d.settings!.keys === "object") {
+            next.keys = { ...prev.keys, ...(d.settings!.keys as Record<string, string>) };
+          }
+          if (d.settings!.baseUrls && typeof d.settings!.baseUrls === "object") {
+            next.baseUrls = {
+              ...prev.baseUrls,
+              ...(d.settings!.baseUrls as Record<string, string>),
+            };
+          }
+          if (Array.isArray(d.settings!.customProviders)) {
+            next.customProviders = d.settings!.customProviders as typeof prev.customProviders;
+          }
+          if (typeof d.settings!.model === "string" && d.settings!.model) {
+            next.model = d.settings!.model;
+          }
+          if (d.settings!.s3 && typeof d.settings!.s3 === "object") {
+            next.s3 = d.settings!.s3 as typeof prev.s3;
+          }
+          return next;
+        });
+      })
+      .catch(() => {
+        /* 拉取失败就用本地的，不影响使用 */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [mounted, user, cloudSync]);
+
+  /**
+   * 设置变更后写回云端（防抖 1.2 秒）。
+   *
+   * 为什么防抖：用户在设置框里每敲一个键都会触发 setSettings，
+   * 不做防抖会把一串请求打到服务端。
+   *
+   * 拉取完成前不上传 —— 否则会用本地的旧值把云端刚拉下来的覆盖掉。
+   */
+  React.useEffect(() => {
+    if (!mounted || !user || !cloudSync) return;
+    if (settingsPulledRef.current === "") return;
+
+    const timer = setTimeout(() => {
+      fetch("/api/user/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keys: settings.keys,
+          baseUrls: settings.baseUrls,
+          customProviders: settings.customProviders,
+          model: settings.model,
+          s3: settings.s3 ?? null,
+        }),
+      }).catch(() => {
+        /* 上传失败不影响本地使用 */
+      });
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [
+    mounted,
+    user,
+    cloudSync,
+    settings.keys,
+    settings.baseUrls,
+    settings.customProviders,
+    settings.model,
+    settings.s3,
+  ]);
+
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, status]);

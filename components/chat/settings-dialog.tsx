@@ -3,13 +3,14 @@
 import * as React from "react";
 import {
   CloudUpload,
+  ExternalLink,
   Eye,
   EyeOff,
-  ExternalLink,
   KeyRound,
   Palette,
   Server,
   Trash2,
+  TriangleAlert,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -611,6 +612,38 @@ export function SettingsDialog({
               <p className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-[11px] text-fg-secondary">
                 本站已配置好 API Key，打开即可直接聊天。
               </p>
+            ) : null}
+
+            {/*
+              免责声明：自带的 Key 一旦泄露，损失的是用户自己的额度。
+              必须说清楚三件事 —— 存哪儿、怎么用、出事谁负责。
+            */}
+            {ALLOW_CUSTOM_KEY ? (
+              <div className="space-y-1.5 rounded-lg border border-amber-500/35 bg-amber-500/5 px-3 py-2.5">
+                <p className="flex items-start gap-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                  <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
+                  关于自带的 API Key
+                </p>
+                <ul className="list-disc space-y-1 pl-5 text-[11px] leading-relaxed text-fg-tertiary">
+                  <li>
+                    Key 仅用于代你向对应服务商发起请求，本站不做其他用途。
+                  </li>
+                  <li>
+                    开启云端保存后，Key 会<strong className="font-medium">加密后</strong>
+                    存到服务端，用于跨设备同步；明文不落库。
+                  </li>
+                  <li>
+                    Key 由你自己保管。若因分享账号、使用公共设备等原因导致泄露或被盗用，
+                    <strong className="font-medium">产生的费用由你自行承担</strong>，本站不承担责任。
+                  </li>
+                  <li>
+                    建议使用额度受限的子密钥，并定期轮换。
+                  </li>
+                </ul>
+                <p className="pt-0.5 text-[10px] text-fg-quaternary">
+                  继续填写即表示你已理解并同意上述内容。
+                </p>
+              </div>
             ) : null}
 
             <div className={ALLOW_CUSTOM_KEY ? "space-y-4" : "hidden"}>
