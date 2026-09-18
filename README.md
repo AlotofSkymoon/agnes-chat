@@ -431,6 +431,16 @@ Claude 从不用粗体标题，全部衬线 + 500，像同一个作者写下来�
 | `UPSTASH_REDIS_REST_URL` | Upstash REST URL（**多平台同步必须**） |
 | `UPSTASH_REDIS_REST_TOKEN` | Upstash REST TOKEN |
 
+### 📦 对象存储教程
+
+| 部署平台 | 看这份 |
+|---|---|
+| **Cloudflare Workers** | [R2对象存储配置教程.md](./R2对象存储配置教程.md)（推荐 binding，零密钥） |
+| **Vercel / Netlify** | [S3对象存储配置教程.md](./S3对象存储配置教程.md)（Backblaze B2 为主） |
+
+`S3_*` 那组通用变量支持任何 S3 兼容服务：
+AWS S3、MinIO 自建、阿里云 OSS、腾讯云 COS、七牛。
+
 **R2 对象存储 —— 推荐走 binding，零密钥**
 
 `wrangler.jsonc` 里已经绑好了：

@@ -289,14 +289,43 @@ function fromB2(): S3Config | null {
   };
 }
 
+/**
+ * 通用 S3 兼容配置（S3_* 环境变量）。
+ *
+ * ⚠️ 之前 .env.example 里列了这一组变量，但服务端从来没读过 ——
+ * 配了也完全不生效，只能靠用户在浏览器设置里手填。
+ * 现在补上，任何 S3 兼容服务都能靠环境变量配好。
+ */
+function fromGenericS3(): S3Config | null {
+  const bucket = process.env.S3_BUCKET?.trim();
+  const endpoint = process.env.S3_ENDPOINT?.trim();
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY?.trim();
+  if (!bucket || !endpoint || !accessKeyId || !secretAccessKey) return null;
+
+  return {
+    enabled: true,
+    endpoint,
+    region: process.env.S3_REGION?.trim() || "auto",
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+    publicBaseUrl: process.env.S3_PUBLIC_BASE_URL?.trim() || "",
+    prefix: "agnes-chat",
+  };
+}
+
 /** 读取完整配置（含密钥），只在 API Route 里用 */
 export function getSiteS3Config(): S3Config | null {
   const platform = detectPlatform();
 
-  // Workers 上优先 R2；本地开发两者都试
-  if (platform === "cloudflare") return fromR2();
-  if (platform === "vercel") return fromB2();
-  return fromR2() ?? fromB2();
+  /**
+   * 顺序：平台专属（R2 / B2）→ 通用 S3_*。
+   * 平台专属优先，因为它们能自动拼 endpoint，配置量最少。
+   */
+  if (platform === "cloudflare") return fromR2() ?? fromGenericS3();
+  if (platform === "vercel") return fromB2() ?? fromGenericS3();
+  return fromR2() ?? fromB2() ?? fromGenericS3();
 }
 
 /**
