@@ -29,6 +29,7 @@
  */
 
 import { buildQueryCandidates, filterRelevant } from "@/lib/search-query";
+import { timeoutSignal } from "@/lib/fetch-timeout";
 
 export interface SearchResult {
   title: string;
@@ -94,7 +95,7 @@ async function fetchText(url: string, init?: RequestInit): Promise<string> {
   const res = await fetch(url, {
     ...init,
     redirect: "follow",
-    signal: AbortSignal.timeout(TIMEOUT),
+    signal: timeoutSignal(TIMEOUT),
     headers: {
       "User-Agent": UA,
       "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
@@ -250,7 +251,7 @@ const runTavily: KeyedRunner = async (query, limit, key) => {
       max_results: Math.min(limit, 50),
       search_depth: "basic",
     }),
-    signal: AbortSignal.timeout(TIMEOUT),
+    signal: timeoutSignal(TIMEOUT),
   });
   if (!res.ok) throw new Error(`Tavily HTTP ${res.status}`);
   const d = (await res.json()) as { results?: { title?: string; url?: string; content?: string }[] };
@@ -266,7 +267,7 @@ const runBrave: KeyedRunner = async (query, limit, key) => {
   const u = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${Math.min(limit, 20)}`;
   const res = await fetch(u, {
     headers: { Accept: "application/json", "X-Subscription-Token": key },
-    signal: AbortSignal.timeout(TIMEOUT),
+    signal: timeoutSignal(TIMEOUT),
   });
   if (!res.ok) throw new Error(`Brave HTTP ${res.status}`);
   const d = (await res.json()) as {
@@ -285,7 +286,7 @@ const runSerper: KeyedRunner = async (query, limit, key) => {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-API-KEY": key },
     body: JSON.stringify({ q: query, num: Math.min(limit, 20) }),
-    signal: AbortSignal.timeout(TIMEOUT),
+    signal: timeoutSignal(TIMEOUT),
   });
   if (!res.ok) throw new Error(`Serper HTTP ${res.status}`);
   const d = (await res.json()) as {
@@ -308,7 +309,7 @@ const runExa: KeyedRunner = async (query, limit, key) => {
       numResults: Math.min(limit, 20),
       contents: { text: { maxCharacters: 400 } },
     }),
-    signal: AbortSignal.timeout(TIMEOUT),
+    signal: timeoutSignal(TIMEOUT),
   });
   if (!res.ok) throw new Error(`Exa HTTP ${res.status}`);
   const d = (await res.json()) as {
@@ -327,7 +328,7 @@ const runBocha: KeyedRunner = async (query, limit, key) => {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
     body: JSON.stringify({ query, count: Math.min(limit, 20), summary: true }),
-    signal: AbortSignal.timeout(TIMEOUT),
+    signal: timeoutSignal(TIMEOUT),
   });
   if (!res.ok) throw new Error(`博查 HTTP ${res.status}`);
   const d = (await res.json()) as {

@@ -132,7 +132,7 @@ export default function CloudPcPage() {
   return (
     <div
       ref={desktopRef}
-      className="relative h-[100dvh] overflow-hidden bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--background))] to-[hsl(var(--primary)/0.10)]"
+      className="relative h-screen-safe overflow-hidden bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--background))] to-[hsl(var(--primary)/0.10)]"
     >
       {/* 顶栏 */}
       <header className="ios-glass absolute inset-x-3 top-3 z-[60] flex items-center justify-between rounded-[var(--radius-ios-lg)] px-4 py-2">

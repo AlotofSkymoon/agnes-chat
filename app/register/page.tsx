@@ -10,7 +10,7 @@ export const metadata = { title: pageTitle("注册") };
 
 export default function RegisterPage() {
   return (
-    <main className="relative flex min-h-[100dvh] flex-col items-center justify-center px-4 py-10">
+    <main className="relative flex min-h-screen-safe flex-col items-center justify-center px-4 py-10">
       <div className="pointer-events-none absolute inset-0 aurora" />
       <div className="relative w-full max-w-md">
         <Link

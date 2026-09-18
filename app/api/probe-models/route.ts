@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isBlockedBaseUrl } from "@/lib/config";
+import { isTimeoutError, timeoutSignal } from "@/lib/fetch-timeout";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
     const res = await fetch(`${base}/models`, {
       headers,
       // 探测不该拖太久，超时就当探测失败
-      signal: AbortSignal.timeout(10_000),
+      signal: timeoutSignal(10_000),
     });
 
     if (!res.ok) {
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     // 超时单独说明，比笼统的"失败"更好定位
-    const timedOut = err instanceof Error && err.name === "TimeoutError";
+    const timedOut = isTimeoutError(err);
     return NextResponse.json({
       ok: false,
       error: timedOut

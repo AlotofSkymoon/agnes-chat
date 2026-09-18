@@ -2133,3 +2133,67 @@ body {
 .hljs-strong {
   font-weight: 600;
 }
+
+/* ==========================================================================
+   Safari 兼容
+   --------------------------------------------------------------------------
+   Safari 对部分新特性的支持比 Chrome 晚一个大版本，这里统一兜底。
+   ========================================================================== */
+
+@layer utilities {
+  /**
+   * 视口高度：dvh 优先，vh 兜底。
+   *
+   * ⚠️ 为什么必须写两条：
+   * dvh（动态视口高度）在 Safari 15.4+ 才支持。老版本遇到不认识的单位会
+   * **整条声明丢弃** —— 元素高度直接塌成 auto，整个页面布局错乱，
+   * 比"高度差一点"严重得多。
+   *
+   * 两条声明的经典写法：不认识的浏览器忽略第二条，保留第一条。
+   *
+   * 另外 iOS Safari 的 100vh 会把地址栏算进去，导致底部内容被裁掉，
+   * dvh 正是为解决这个问题而生的 —— 支持的浏览器必须用上它。
+   */
+  .h-screen-safe {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .min-h-screen-safe {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .max-h-screen-safe {
+    max-height: 100vh;
+    max-height: 100dvh;
+  }
+}
+
+@supports not (height: 100dvh) {
+  /**
+   * 老 Safari 的毛玻璃兜底：
+   * backdrop-filter 若整体不支持（或在该上下文失效），
+   * 半透明背景会糊成一团看不清文字，所以退成不透明底色。
+   */
+  .glass,
+  .aurora-glass,
+  .liquid-item {
+    background-color: hsl(var(--card));
+  }
+}
+
+/**
+ * iOS Safari 输入框聚焦自动放大。
+ *
+ * 字号小于 16px 时，iOS 会自动缩放页面让用户看清输入内容，
+ * 松手后却不缩回去 —— 在聊天输入框上体感非常糟糕。
+ * 这里保证移动端字号不小于 16px。
+ */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

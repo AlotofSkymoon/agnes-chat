@@ -97,7 +97,7 @@ export function AccountClient({ user }: { user: AccountUser }) {
   }
 
   return (
-    <main className="relative min-h-[100dvh] px-4 py-10">
+    <main className="relative min-h-screen-safe px-4 py-10">
       <div className="pointer-events-none absolute inset-0 aurora" />
       <div className="relative mx-auto w-full max-w-2xl space-y-6">
         <Link

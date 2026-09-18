@@ -32,6 +32,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { SiteFooter } from "@/components/site-footer";
 import { parseIcpInput } from "@/lib/use-site-icp";
+import { timeoutSignal } from "@/lib/fetch-timeout";
 
 interface AdminUser {
   id: string;
@@ -144,7 +145,7 @@ export function AdminClient({ me }: { me: AdminUser }) {
   }
 
   return (
-    <main className="relative min-h-[100dvh] px-4 py-10">
+    <main className="relative min-h-screen-safe px-4 py-10">
       <div className="pointer-events-none absolute inset-0 aurora" />
       <div className="relative mx-auto w-full max-w-4xl space-y-6">
         <Link
@@ -325,7 +326,7 @@ function SiteSettingsCard() {
        * 看起来像整个页面坏了，实际只是这一个请求没回来。
        */
       const res = await fetch("/api/admin/settings", {
-        signal: AbortSignal.timeout(10_000),
+        signal: timeoutSignal(10_000),
       });
 
       // 403 / 500 也带 JSON，尽量读出服务端给的中文原因
@@ -386,7 +387,7 @@ function SiteSettingsCard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
-        signal: AbortSignal.timeout(15_000),
+        signal: timeoutSignal(15_000),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;

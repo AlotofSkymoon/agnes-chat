@@ -14,7 +14,7 @@ export const metadata = {
 
 export default function NavPage() {
   return (
-    <main className="relative min-h-[100dvh]">
+    <main className="relative min-h-screen-safe">
       {/* Aceternity 风格背景：极光 + 网格 + 落下的光束 + 流星 */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-96 aurora" />
       <GridBackground className="h-96" />

@@ -19,7 +19,7 @@ export default async function AdminPage() {
   const me = user as NonNullable<typeof user>;
   if (me.role !== "admin") {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center px-4">
+      <main className="flex min-h-screen-safe items-center justify-center px-4">
         <div className="rounded-2xl border border-destructive/40 bg-destructive/10 px-6 py-5 text-center">
           <h1 className="text-lg font-semibold text-destructive">403 无访问权限</h1>
           <p className="mt-2 text-sm text-muted-foreground">该页面仅管理员可见。</p>

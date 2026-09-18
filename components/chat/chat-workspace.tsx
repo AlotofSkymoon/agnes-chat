@@ -1161,7 +1161,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
 
   return (
     <div
-      className="relative flex h-[100dvh] overflow-hidden bg-background"
+      className="relative flex h-screen-safe overflow-hidden bg-background"
       onDragEnter={onDragEnter}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
@@ -1324,11 +1324,15 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
               </>
             )}
           </div>
+
+          {/*
+            备案条：放在主列内部、输入区之后。
+            ⚠️ 之前放在根容器（flex-row + overflow-hidden）下，
+            会变成主列右侧的一个窄条并被裁掉 —— 主界面根本看不到。
+          */}
+          <ChatFooter />
         </div>
       </div>
-
-      {/* 备案条：管理员配了才显示，主界面也要能看见 */}
-      <ChatFooter />
 
       {/* 拖拽文件时的全屏提示 */}
       {dragging ? (

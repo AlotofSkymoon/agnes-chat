@@ -63,7 +63,7 @@ export default function SponsorPage() {
   if (!SPONSOR_ENABLED) notFound();
 
   return (
-    <main className="relative min-h-[100dvh]">
+    <main className="relative min-h-screen-safe">
       {/* 与导航站一致的 Aceternity 风格背景 */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] aurora" />
       <GridBackground className="h-[420px]" />
