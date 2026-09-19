@@ -8,6 +8,7 @@ import {
   AUTHOR_NAME,
   BY_LINE,
   REPO_URL,
+  SHOW_SOURCE_LINKS,
   SITE_NAME,
   UPSTREAM_URL,
 } from "@/lib/site";
@@ -74,29 +75,39 @@ export function SiteFooter({ className = "" }: { className?: string }) {
         <span className="font-medium text-fg-secondary">{SITE_NAME}</span> 免费聊天站 · 由{" "}
         <span className="font-medium text-fg-secondary">{AUTHOR_NAME}</span> 创作
       </p>
-      <p className="mt-1">
-        上游项目迁移自{" "}
-        <Link
-          href={UPSTREAM_URL}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="underline decoration-dotted underline-offset-2 hover:text-primary"
-        >
-          AlotofSkymoon/agnes-chat
-        </Link>
-        {" · "}
-        <Link
-          href={REPO_URL}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="underline decoration-dotted underline-offset-2 hover:text-primary"
-        >
-          本项目源码
-        </Link>
-      </p>
-      <p className="mt-1.5 text-fg-quaternary">
-        代码开源（MIT），公开部署需获作者授权 · 详见 LICENSE
-      </p>
+      {/*
+        源码 / 上游仓库链接：默认**不显示**。
+        对访客没用（他们不会去部署），对站长却是隐私暴露 ——
+        仓库地址会连带暴露 GitHub 账号与部署来源。
+        想展示就设 NEXT_PUBLIC_SHOW_SOURCE_LINKS=true。
+      */}
+      {SHOW_SOURCE_LINKS ? (
+        <>
+          <p className="mt-1">
+            上游项目迁移自{" "}
+            <Link
+              href={UPSTREAM_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline decoration-dotted underline-offset-2 hover:text-primary"
+            >
+              AlotofSkymoon/agnes-chat
+            </Link>
+            {" · "}
+            <Link
+              href={REPO_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline decoration-dotted underline-offset-2 hover:text-primary"
+            >
+              本项目源码
+            </Link>
+          </p>
+          <p className="mt-1.5 text-fg-quaternary">
+            代码开源（MIT），公开部署需获作者授权 · 详见 LICENSE
+          </p>
+        </>
+      ) : null}
 
       {/* 备案信息 + 自定义内容：管理员在面板里填，改完即生效 */}
       {hasCustom ? (

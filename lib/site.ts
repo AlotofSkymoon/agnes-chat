@@ -71,12 +71,25 @@ export const PROJECT_LINK: string =
   "https://github.com/wcvjk8tnz8-create/agnes-chat";
 
 /**
- * 署名标识：默认指向项目主页。
+ * 是否在页面上展示源码 / 上游仓库链接。
+ *
+ * ⚠️ 为什么默认关：
+ * 这些链接对访客没有任何用处 —— 他们只是来聊天的，不会想去部署一份。
+ * 但对站长是实打实的隐私暴露：仓库地址等于把 GitHub 账号、
+ * 部署来源、甚至 commit 记录一起公开，被人顺着摸到别的信息并不难。
+ *
+ * 想开源宣传就设 NEXT_PUBLIC_SHOW_SOURCE_LINKS=true。
+ */
+export const SHOW_SOURCE_LINKS: boolean =
+  process.env.NEXT_PUBLIC_SHOW_SOURCE_LINKS?.trim() === "true";
+
+/**
+ * 署名标识：默认只显示站长名字，不带任何链接。
  * 页面会显式展示（页脚 + 侧边栏底部），按 LICENSE 要求不可移除。
- * 换自己的地址时改 NEXT_PUBLIC_BY_LINE 即可。
+ * 想换成自己的地址就改 NEXT_PUBLIC_BY_LINE。
  */
 export const BY_LINE: string =
-  process.env.NEXT_PUBLIC_BY_LINE?.trim() || `by ${PROJECT_LINK}`;
+  process.env.NEXT_PUBLIC_BY_LINE?.trim() || `by ${AUTHOR_NAME}`;
 
 /** 上游项目地址（迁移来源，页脚标注） */
 export const UPSTREAM_URL: string =

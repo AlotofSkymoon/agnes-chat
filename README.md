@@ -578,6 +578,7 @@ R2 桶是你自己的，Worker 通过 binding 读写时，权限来自 binding �
 | `NEXT_PUBLIC_SITE_DESCRIPTION` | 自动拼接 | SEO 描述 |
 | `NEXT_PUBLIC_THEME` | `anthropic` | 界面风格：`anthropic` / `fuwari` / `violet-rose` |
 | `NEXT_PUBLIC_AUTHOR_NAME` | `wcvjk8tnz8` | 页脚创作者署名 |
+| `NEXT_PUBLIC_SHOW_SOURCE_LINKS` | `false` | 设 `true` 才在页脚/赞助页显示源码与上游仓库链接（**默认不显示，避免暴露 GitHub 账号**） |
 | `NEXT_PUBLIC_REPO_URL` | 本仓库 | 页脚源码链接 |
 | `NEXT_PUBLIC_UPSTREAM_URL` | 上游仓库 | 页脚上游标注 |
 

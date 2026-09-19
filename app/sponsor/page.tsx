@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/site-footer";
 import {
   PROJECT_LINK,
   REPO_URL,
+  SHOW_SOURCE_LINKS,
   SITE_NAME,
   SPONSOR_ENABLED,
   SPONSOR_CHANNELS,
@@ -60,6 +61,14 @@ const OTHER_WAYS = [
 
 export default function SponsorPage() {
   if (!SPONSOR_ENABLED) notFound();
+
+  /*
+   * Star / 提 Issue 都指向仓库地址 —— 与页脚同理，默认不暴露。
+   * 关掉后只剩「分享给朋友」这条不依赖外链的方式。
+   */
+  const otherWays = SHOW_SOURCE_LINKS
+    ? OTHER_WAYS
+    : OTHER_WAYS.filter((w) => !w.href);
 
   return (
     <main className="relative min-h-screen-safe">
@@ -126,7 +135,7 @@ export default function SponsorPage() {
             不出钱也能帮忙
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
-            {OTHER_WAYS.map((w) => {
+            {otherWays.map((w) => {
               const Icon = w.icon;
               const body = (
                 <>
@@ -173,16 +182,18 @@ export default function SponsorPage() {
           站长是名学生，每一笔都会用在生活与日常开销上。
         </p>
 
-        <div className="mt-8 flex justify-center">
-          <Link
-            href={PROJECT_LINK}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="text-xs text-fg-quaternary underline decoration-dotted underline-offset-2 hover:text-fg-secondary"
-          >
-            项目主页
-          </Link>
-        </div>
+        {SHOW_SOURCE_LINKS ? (
+          <div className="mt-8 flex justify-center">
+            <Link
+              href={PROJECT_LINK}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-xs text-fg-quaternary underline decoration-dotted underline-offset-2 hover:text-fg-secondary"
+            >
+              项目主页
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <SiteFooter />
