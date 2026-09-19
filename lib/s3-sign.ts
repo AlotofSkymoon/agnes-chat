@@ -104,6 +104,7 @@ export interface S3PresignParams {
  * |----------|----------------|
  * | R2       | path-style ✅  |
  * | MinIO    | path-style ✅  |
+ * | Supabase | path-style ✅  |
  * | 内网/本机 | path-style ✅  |
  * | AWS S3   | virtual-host   |
  * | B2       | virtual-host   |
@@ -125,6 +126,19 @@ export function inferPathStyle(endpoint: string): boolean {
   if (/r2\.cloudflarestorage\.com$/i.test(host)) return true;
   if (/r2\.dev$/i.test(host)) return true;
   if (/^minio/i.test(host)) return true;
+
+  /**
+   * Supabase Storage 的 S3 兼容层**只接受 path-style**。
+   *
+   * ⚠️ 它的 host 是 <ref>.supabase.co / <ref>.storage.supabase.co，
+   * 不匹配上面任何一条规则，会掉到最后的 virtual-host ——
+   * 结果签名出来的 URL 是 https://bucket.ref.supabase.co/... 这种形式，
+   * Supabase 根本解析不了，上传直接失败。
+   *
+   * 官方文档和多方实践都要求客户端设 forcePathStyle: true。
+   */
+  if (/supabase\.co$/i.test(host)) return true;
+  if (/supabase\.(in|net|org)$/i.test(host)) return true;
 
   // IP 地址或 localhost 无法做 virtual-host（证书和 DNS 都不支持）
   if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return true;

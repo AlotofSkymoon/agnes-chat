@@ -315,6 +315,43 @@ function fromGenericS3(): S3Config | null {
   };
 }
 
+/**
+ * Supabase Storage 配置。
+ *
+ * 用 SUPABASE_* 变量比通用 S3_* 省事：
+ * 只需填 project ref、region、bucket 和密钥，
+ * endpoint 和公开域名都自动拼 —— 这两个格式特殊且容易写错：
+ *
+ *   S3 上传端点：  https://<ref>.storage.supabase.co/storage/v1/s3
+ *   公开访问前缀：https://<ref>.supabase.co/storage/v1/object/public
+ *
+ * 尤其公开域名那段 object/public/<bucket>/<path> 是 Supabase 独有的，
+ * 手写很容易漏掉 `public`。
+ */
+function fromSupabase(): S3Config | null {
+  const ref = process.env.SUPABASE_PROJECT_REF?.trim();
+  const accessKeyId = process.env.SUPABASE_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = process.env.SUPABASE_SECRET_ACCESS_KEY?.trim();
+  const bucket = process.env.SUPABASE_BUCKET?.trim();
+  if (!ref || !accessKeyId || !secretAccessKey || !bucket) return null;
+
+  const region = process.env.SUPABASE_REGION?.trim() || "us-east-1";
+
+  return {
+    enabled: true,
+    // 直连存储主机名，大文件上传性能更好（官方文档推荐）
+    endpoint: `https://${ref}.storage.supabase.co/storage/v1/s3`,
+    region,
+    bucket,
+    accessKeyId,
+    secretAccessKey,
+    publicBaseUrl:
+      process.env.SUPABASE_PUBLIC_BASE_URL?.trim() ||
+      `https://${ref}.supabase.co/storage/v1/object/public/${bucket}`,
+    prefix: "agnes-chat",
+  };
+}
+
 /** 读取完整配置（含密钥），只在 API Route 里用 */
 export function getSiteS3Config(): S3Config | null {
   const platform = detectPlatform();
@@ -323,9 +360,13 @@ export function getSiteS3Config(): S3Config | null {
    * 顺序：平台专属（R2 / B2）→ 通用 S3_*。
    * 平台专属优先，因为它们能自动拼 endpoint，配置量最少。
    */
-  if (platform === "cloudflare") return fromR2() ?? fromGenericS3();
-  if (platform === "vercel") return fromB2() ?? fromGenericS3();
-  return fromR2() ?? fromB2() ?? fromGenericS3();
+  /**
+   * 顺序：平台专属（R2 / B2）→ Supabase → 通用 S3_*。
+   * 平台专属优先，因为它们能自动拼 endpoint，配置量最少。
+   */
+  if (platform === "cloudflare") return fromR2() ?? fromSupabase() ?? fromGenericS3();
+  if (platform === "vercel") return fromB2() ?? fromSupabase() ?? fromGenericS3();
+  return fromR2() ?? fromB2() ?? fromSupabase() ?? fromGenericS3();
 }
 
 /**

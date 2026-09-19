@@ -48,6 +48,17 @@ export const S3_PRESETS: S3Preset[] = [
     limited: true,
   },
   {
+    id: "supabase",
+    label: "Supabase Storage",
+    endpointHint: "https://<project-ref>.storage.supabase.co/storage/v1/s3",
+    regionHint: "us-east-1",
+    note: "1GB 免费存储、自带 CDN；S3 兼容层只接受 path-style（已自动处理）",
+    docs: "https://supabase.com/docs/guides/storage/s3/authentication",
+    recommended: true,
+    platform: "vercel",
+    limited: true,
+  },
+  {
     id: "minio",
     label: "MinIO 自建",
     endpointHint: "https://minio.example.com:9000",
@@ -85,7 +96,10 @@ export const S3_PRESETS: S3Preset[] = [
 export function presetsForPlatform(platform: "cloudflare" | "vercel" | "local"): S3Preset[] {
   if (platform === "local") return S3_PRESETS;
   if (platform === "cloudflare") {
-    return [...S3_PRESETS.filter((p) => p.platform === "cloudflare"), ...S3_PRESETS.filter((p) => p.id === "generic" || p.id === "minio")];
+    return [
+      ...S3_PRESETS.filter((p) => p.platform === "cloudflare"),
+      ...S3_PRESETS.filter((p) => p.id === "supabase" || p.id === "generic" || p.id === "minio"),
+    ];
   }
   return S3_PRESETS.filter((p) => p.platform === "vercel");
 }

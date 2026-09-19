@@ -64,7 +64,7 @@
 | | ⭐ Cloudflare Workers（推荐） | Netlify（拖 ZIP） | Vercel（不推荐） |
 |---|---|---|---|
 | 数据库 | KV + D1，**自带免费额度，不用额外注册** | 需另注册 Upstash Redis | 需另注册 Upstash Redis |
-| 对象存储 | R2，**零出站流量费**（图片视频外链不花钱） | 只能 Backblaze B2 | 只能 Backblaze B2 |
+| 对象存储 | R2，**零出站流量费**（图片视频外链不花钱） | Backblaze B2 / Supabase | Backblaze B2 / Supabase |
 | 上手难度 | 中（要配三件套） | **低**（拖文件夹即可） | 低 |
 | 连 Git 仓库 | 需要 | 可选（拖 zip 则无需） | 需要 |
 | 费用 | 免费额度充裕 | 免费额度够用 | 免费额度较紧 |
@@ -440,6 +440,10 @@ Claude 从不用粗体标题，全部衬线 + 500，像同一个作者写下来�
 
 `S3_*` 那组通用变量支持任何 S3 兼容服务：
 AWS S3、MinIO 自建、阿里云 OSS、腾讯云 COS、七牛。
+
+**Supabase** 有专用变量 `SUPABASE_*`，只填项目 ref + 密钥即可，
+endpoint 和公开域名自动拼（它的公开域名格式特殊，手写容易漏 `public`）。
+注意免费版单文件上限 50MB，且 S3 兼容层只接受 path-style（已自动处理）。
 
 **R2 对象存储 —— 推荐走 binding，零密钥**
 
