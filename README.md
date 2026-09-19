@@ -979,7 +979,10 @@ lib/storage/
 
 ## 🛡️ 代理访问拦截（可选）
 
-检测到访问者使用代理/VPN 时弹窗提示，并**放行 iCloud Private Relay 这类系统中继**。
+行为就两条：
+
+- **检测到代理 → 服务端直接返回 403 拦截页**，不是前端提示，绕过不了
+- **检测到 iCloud Private Relay（中继）→ 放行**
 
 ### 先说清楚：ipip.la 做不到这件事
 
@@ -991,22 +994,31 @@ lib/storage/
 | `ipapi.ipip.net/v2/risk/portrait/`（ipip.net） | 风险分、风险行为 | ✅ 有「代理」「秒拨」「机房」标记 |
 
 真正能识别代理的是 **ipip.net 的 IP 风险画像接口**（同一家公司的付费产品），
-需要 token。**没填 token 时本功能自动关闭**，站点完全不受影响 ——
-接口会返回 `detected=false`，弹窗不渲染。
+需要 token。**没填 token 时功能自动关闭**，站点完全不受影响。
 
 ### 配置
 
 ```bash
 IPIP_RISK_TOKEN=你的ipip.net风险画像token
+IP_GUARD_ALLOWLIST=1.2.3.4/32,203.0.113.0/24   # 强烈建议填
 ```
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `IPIP_RISK_TOKEN` | 空 | **不填 = 功能关闭**。填了才真正检测 |
+| `IP_GUARD_ALLOWLIST` | 空 | **建议填**。永久放行的 CIDR，逗号分隔 |
 | `IP_GUARD_ENABLED` | `true` | 设 `false` 整体关闭 |
 | `IP_GUARD_RISK_THRESHOLD` | `90` | 风险分阈值。ipip 官方建议 90 分以上才限制 |
 | `IP_GUARD_BLOCK_BEHAVIORS` | `代理,秒拨` | 命中的风险行为即拦截。加 `机房` 更严但误伤更多 |
-| `IP_GUARD_ADMIN_BYPASS` | `true` | 管理员豁免，避免站长把自己锁在门外 |
+
+### ⚠️ 一定要先填白名单
+
+真拦截之后，**误判的代价从"多点一下"变成"彻底打不开"**。
+而企业网络、国内 CGNAT 移动网络被判成代理非常常见 ——
+站长自己很可能就在这种网络里。
+
+一旦被拦，你**已经没法登录后台去关掉这个功能了**。
+`IP_GUARD_ALLOWLIST` 是唯一不依赖站点自身的逃生通道。
 
 ### iCloud Private Relay 为什么放行
 
@@ -1020,41 +1032,50 @@ Private Relay 技术上确实"换了 IP"，但它不是用户主动开的代理�
 https://mask-api.icloud.com/egress-ip-ranges.csv
 ```
 
-每 24 小时刷新一次，拉取失败时保留上一份可用清单。
-清单里的 IP 一律放行。
+每 24 小时刷新一次，拉取失败时保留上一份可用清单。清单里的 IP 一律放行。
 
-### 三个刻意的设计取舍
+### 实现上的两个坑
 
-**① fail-open：拿不到结论就放行**
+**① 用的是 `middleware.ts`，不是 Next 16 的 `proxy.ts`**
 
-IP 情报接口会超时、会限流、token 会失效。这些情况一律放行 ——
-否则一次接口抽风就等于自己把站点搞挂，而且访客分不清是自己网络坏了还是站点挂了。
+proxy.ts 默认跑 Node.js runtime，而 OpenNext（Cloudflare 适配器）
+**不支持 Node.js middleware**，构建时会直接抛错导致部署失败，
+而 proxy.ts 又不允许改回 Edge。所以只能用已标记 deprecated、
+但默认 Edge runtime 且被 OpenNext 支持的 `middleware.ts`。
 
-**② 弹窗而非 403**
+**② token 必须在构建时就存在**
 
-判定依赖第三方数据，而**企业网络和 CGNAT 移动网络常被误判成代理**
-（国内移动网络尤其普遍）。直接返回 403 会让误判变得不可挽回，
-弹窗保留了「仍然继续访问」的余地。
+Edge bundle 里的 `process.env` 是**构建时内联**的。
+构建环境里没有 `IPIP_RISK_TOKEN`，打包出来就是 `undefined`，
+之后在后台补配也读不到 —— 功能静默失效（不报错，但也不拦）。
 
-**③ 前端提示不等于安全边界**
+用 Actions 部署的话，脚本已把相关变量加入注入列表，构建时可用。
 
-`/api/ip-guard` 只是给前端看的判定依据，可以被绕过。
-要真正拦住流量，得在服务端渲染或接口层判定 —— 但那样误判代价极高，
-所以默认只做提示。
+### 依然 fail-open
+
+token 没配、接口超时、Apple 清单拉不到、判定逻辑自身抛错 —— **全部放行**。
+
+真拦截的代价太高，任何拿不到结论的情况都必须让站点照常可用。
+想临时关掉：`IP_GUARD_ENABLED=false`。
 
 ### 自检
 
-`IP_GUARD_RISK_THRESHOLD` 之外，还可以看 `/api/ip-guard` 的返回：
+`/api/ip-guard` 返回当前判定（不拦截，只报告）：
 
 ```jsonc
 {
   "allowed": true,
-  "reason": "relay",        // ok / relay / proxy / error / no-ip / disabled
-  "detected": true,         // false = 没真检测（接口没配或失败）
-  "relay": true,            // 是否 iCloud Private Relay
-  "score": null,
-  "behaviors": []
+  "reason": "relay",   // ok / relay / allowlist / proxy / error / no-ip / disabled
+  "detected": true,    // false = 没真检测（token 没配或接口失败）
+  "relay": true,
+  "ip": "172.225.0.9"
 }
+```
+
+被拦时页面返回 403；`/api/*` 请求返回 JSON：
+
+```jsonc
+{ "error": "PROXY_BLOCKED", "reason": "proxy" }
 ```
 
 ## 🔐 依赖安全说明（构建日志里的警告要不要管）

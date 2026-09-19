@@ -7,14 +7,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/ip-guard —— 判断当前访问者是否疑似代理工具。
+ * GET /api/ip-guard —— 自检接口：报告当前访问者会被判定成什么。
  *
- * 返回给前端的字段刻意做了收敛：
- * 不下发完整风险画像（那是付费数据），只给"是否放行 + 原因 + 少量判定依据"。
- * IP 本身会回显，因为用户需要知道自己被识别成了什么。
+ * ⚠️ 它只"报告"，不拦截 —— 真正的拦截在 middleware.ts 里完成
+ * （代理直接返回 403，绕过不了）。这个接口存在的意义是：
+ * 被 403 拦住时人看不到原因，而这里能看出是没配 token、
+ * 接口失败、还是真的被判成代理。
  *
- * ⚠️ 前端拿到 allowed=false 只用于展示提示，不构成真正的安全边界 ——
- * 纯前端拦截可以被绕过。要真正拦住，得在服务端渲染/接口层判定。
+ * 字段刻意收敛：不下发完整风险画像（付费数据），只给判定结论与少量依据。
+ * IP 会回显，因为排查时需要知道被识别成了哪个地址。
  */
 export async function GET(request: Request) {
   const ip = clientIpFromHeaders(request.headers);

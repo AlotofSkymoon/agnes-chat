@@ -1,3 +1,5 @@
+/* 已废弃：代理拦截改由 middleware.ts 在服务端直接返回 403 拦截页。
+   这个文件保留仅为历史参考，不再被任何地方 import。 */
 "use client";
 
 import * as React from "react";

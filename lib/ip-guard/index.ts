@@ -1,4 +1,5 @@
 import { isIcloudRelay, relayCacheInfo } from "./relay";
+import { matchesAny, parseCidr, parseIp, type Cidr } from "./cidr";
 import { timeoutSignal } from "@/lib/fetch-timeout";
 
 /**
@@ -47,6 +48,40 @@ function blockedBehaviors(): string[] {
 /** 是否放行已登录管理员（避免站长把自己锁在门外） */
 function adminBypass(): boolean {
   return (process.env.IP_GUARD_ADMIN_BYPASS ?? "").trim() !== "false";
+}
+
+/**
+ * 永久放行的 IP 白名单（CIDR，逗号分隔）。
+ *
+ * ⚠️ 为什么必须有这个：
+ * 一旦真拦截（返回 403 而不是弹提示），误判的代价就从"多点一下"
+ * 变成"彻底打不开"。而企业网络和国内 CGNAT 移动网络被判成代理非常常见 ——
+ * 站长自己很可能就在这种网络里，一开功能就把自己锁在门外，
+ * 且此时他已经没法登录后台去关掉它了。
+ *
+ * 白名单是唯一不依赖站点自身的逃生通道。
+ */
+/**
+ * 不做缓存：环境变量在 Worker 里的就绪时机不完全确定，
+ * 一旦在首次请求时固化成空值，之后即使配置到位也永远读不到 ——
+ * 白名单会静默失效，而它恰恰是误判时唯一的逃生通道。
+ * CIDR 解析本身很轻，白名单条目通常只有几条，每次重新解析的开销可忽略。
+ */
+function allowlist(): Cidr[] {
+  const raw = (process.env.IP_GUARD_ALLOWLIST ?? "").trim();
+  const out: Cidr[] = [];
+  if (raw) {
+    for (const part of raw.split(",")) {
+      const c = parseCidr(part.trim());
+      if (c) out.push(c);
+    }
+  }
+  return out;
+}
+
+/** 供自检接口展示白名单条数 */
+export function allowlistSize(): number {
+  return allowlist().length;
 }
 
 /* --------------------------- 取客户端 IP --------------------------- */
@@ -159,8 +194,12 @@ const resultCache: Record<string, { at: number; verdict: IpVerdict }> = Object.c
 
 export type IpVerdict = {
   allowed: boolean;
-  /** 拦截原因：ok=放行、relay=中继放行、proxy=代理、error=检测失败放行 */
-  reason: "ok" | "relay" | "proxy" | "error" | "no-ip" | "disabled";
+  /**
+   * 判定原因：
+   * ok=正常放行、relay=中继放行、allowlist=白名单放行、
+   * proxy=代理已拦截、error=检测失败放行、no-ip=取不到IP放行、disabled=功能关闭
+   */
+  reason: "ok" | "relay" | "allowlist" | "proxy" | "error" | "no-ip" | "disabled";
   ip: string | null;
   relay: boolean;
   score: number | null;
@@ -211,6 +250,16 @@ export async function checkIp(ip: string | null, isAdmin = false): Promise<IpVer
     // 拿不到 IP 就放行 —— 宁可漏过也不能把全站拦死
     return {
       allowed: true, reason: "no-ip", ip: null, relay: false,
+      score: null, behaviors: [], usageType: null,
+      provider: "none", detected: false, cached: false,
+    };
+  }
+
+  // 白名单优先于一切判定：它是误判时的逃生通道
+  const parsed = parseIp(ip);
+  if (parsed && allowlist().length > 0 && matchesAny(allowlist(), parsed)) {
+    return {
+      allowed: true, reason: "allowlist", ip, relay: false,
       score: null, behaviors: [], usageType: null,
       provider: "none", detected: false, cached: false,
     };
@@ -286,6 +335,7 @@ export function ipGuardStatus(): {
   configured: boolean;
   threshold: number;
   blockBehaviors: string[];
+  allowlist: number;
   relayRanges: number;
   relayFetchedAt: number | null;
 } {
@@ -294,6 +344,7 @@ export function ipGuardStatus(): {
     configured: token().length > 0,
     threshold: threshold(),
     blockBehaviors: blockedBehaviors(),
+    allowlist: allowlistSize(),
     relayRanges: relayCacheInfo().count,
     relayFetchedAt: relayCacheInfo().fetchedAt,
   };

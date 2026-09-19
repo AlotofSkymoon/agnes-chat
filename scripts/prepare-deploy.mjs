@@ -63,6 +63,21 @@ const SECRET_VARS = [
   "R2_BUCKET_NAME",
   "CLOUDFLARE_API_TOKEN",
   "CLOUDFLARE_ACCOUNT_ID",
+  /**
+   * 代理拦截相关。
+   *
+   * ⚠️ 为什么这几个必须注入：拦截逻辑跑在 middleware（Edge runtime），
+   * 而 Edge bundle 里的 process.env 是**构建时**内联的 ——
+   * 构建环境里没有这个变量，打包出来就是 undefined，
+   * 之后即使在后台配了也读不到，功能静默失效（fail-open，站点不报错但也不拦）。
+   *
+   * 所以既要写进运行时配置，也要让它出现在构建环境里。
+   */
+  "IPIP_RISK_TOKEN",
+  "IP_GUARD_ENABLED",
+  "IP_GUARD_RISK_THRESHOLD",
+  "IP_GUARD_BLOCK_BEHAVIORS",
+  "IP_GUARD_ALLOWLIST",
 ];
 
 async function api(pathname, options = {}) {
