@@ -47,10 +47,12 @@ Actions 由脚本自动查找创建。以前那份教程让你抄 3 个 ID，是
 | 项目名称 | `agnes-chat` |
 | 生产分支 | `main` |
 | **构建命令** | `npm run cf:build` |
-| **部署命令** | `npx wrangler deploy -c wrangler.dashboard.jsonc` |
+| **部署命令** | `npx wrangler deploy`（默认就是这个，不用改） |
 
-> ⚠️ 部署命令要加 `-c wrangler.dashboard.jsonc`。
-> 那份配置**不含 KV / D1 / R2 的 ID**（ID 不用你抄 —— 下一步在后台绑定）。
+> ✅ **仓库里所有 wrangler 配置文件都不用你改**，一个字都不用动。
+>
+> `wrangler.jsonc` 里**没有**任何 KV / D1 / R2 的 ID 或占位符 ——
+> ID 不用抄，绑定在下一步后台点两下就完成。
 
 4. 点 **保存并部署**
 
@@ -95,19 +97,17 @@ Worker → **设置** → **变量和机密** → **添加**：
 
 > ⚠️ 改完环境变量**必须重新部署一次**才生效（Deployments → 重新部署）。
 
-## 第 5 步：初始化数据库
-
-浏览器访问（把 `你的jwt_secret` 换成上一步填的 `JWT_SECRET`）：
-
-```
-https://你的域名/api/d1/cshsjk/你的jwt_secret
-```
-
-看到 `{"ok":true,...}` 就成了。建表语句幂等，多访问几次无害。
-
-## 第 6 步：注册管理员
+## 第 5 步：注册管理员（直接就能用）
 
 打开站点 → 注册 → **第一个注册的账号自动成为管理员**。
+
+> 💡 **不用手动建表。** 首次访问时会自动执行
+> `CREATE TABLE IF NOT EXISTS`（幂等，重复无害），
+> 建 5 张表：users、meta、conversations、messages、site_settings。
+>
+> 想手动触发或排查，可以访问
+> `https://你的域名/api/d1/cshsjk/你的jwt_secret`——
+> 但正常情况**不需要**这一步。
 
 ---
 

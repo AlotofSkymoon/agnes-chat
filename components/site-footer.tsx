@@ -101,11 +101,17 @@ export function SiteFooter({ className = "" }: { className?: string }) {
       {/* 备案信息 + 自定义内容：管理员在面板里填，改完即生效 */}
       {hasCustom ? (
         <div className="mt-2 flex flex-col items-center gap-1.5">
-          {/* 第三方备案徽章（图片挂了会自动隐藏） */}
-          {footer.icpIconUrl ? (
+          {/*
+            备案徽章。
+            ⚠️ 以前只在填了 icpIconUrl 时才渲染 ——
+            但萌备案官方给的接入代码只有文字链接、不带图片，
+            于是"配了备案号却看不到徽章"，看着像没生效。
+            现在只要有备案号或备案链接就渲染，缺图标时用内联 SVG 兜底。
+          */}
+          {footer.icpText || footer.icpUrl || footer.icpIconUrl ? (
             <SiteFooterBadge
-              src={footer.icpIconUrl}
-              alt="备案徽章"
+              src={footer.icpIconUrl || undefined}
+              alt={footer.icpText || "备案徽章"}
               href={footer.icpUrl || undefined}
             />
           ) : null}

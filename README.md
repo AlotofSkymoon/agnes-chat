@@ -136,7 +136,7 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 工作流已经在 `.github/workflows/deploy-cloudflare.yml`，推到 `main` 即自动触发：
 
 1. 校验必需 Secrets（缺哪个会直接告诉你，不用等构建完）
-2. 把 KV / D1 ID 填进 `wrangler.jsonc` 占位符
+2. 自动查找/创建 KV、D1、R2，并把 ID 写回配置（**你不用手填**）
 3. 执行 `schema.sql` 建表（幂等，已存在不会重复建）
 4. 确保 R2 桶存在（未开通则跳过，不影响其余功能）
 5. OpenNext 构建 + `wrangler deploy`
@@ -155,18 +155,32 @@ Dashboard → 我的个人资料 → API 令牌 → 创建令牌 → 使用「�
 **不用创建 API 令牌** —— Cloudflare 会自动为你的账户生成凭证，
 绕开方式一里最容易踩的「令牌权限不足」坑。
 
-1. 打开仓库的 `wrangler.jsonc`，把 `__KV_ID__` / `__D1_ID__`
-   两个占位符替换成**真实 ID**（不是密钥，提交到仓库无妨）
-2. 建一次 D1 表（只需一次）：
-   `npx wrangler d1 execute agnes-chat-db --file=./schema.sql --remote`
-3. Cloudflare 后台 → **Workers 和 Pages** → **创建** → **连接到 Git**
-   → 选本仓库 → 构建命令填 **`npm run cf:build`** → 保存并部署
-4. 部署完成后，Worker → **设置 → 变量和机密**，添加两个加密变量：
+1. Cloudflare 后台先建好三个资源（各点几下就行，**不用复制任何 ID**）：
+   - **Workers 和 Pages → KV** → 创建命名空间 → 名字随便（如 `agnes-chat-kv`）
+   - **Workers 和 Pages → D1** → 创建数据库 → 名字随便（如 `agnes-chat-db`）
+   - **存储和数据库 → R2** → 创建存储桶 → 名字随便（如 `agnes-chat`）
+2. Cloudflare 后台 → **Workers 和 Pages** → **创建** → **连接到 Git**
+   → 选本仓库 → 构建命令填 **`npm run cf:build`**
+   → 部署命令填 **`npx wrangler deploy -c wrangler.dashboard.jsonc`** → 保存并部署
+3. 部署完成后，Worker → **设置 → 绑定 → 添加**，把三个资源挂上去：
+
+   | 类型 | 变量名 |
+   |---|---|
+   | KV 命名空间 | `KV` |
+   | D1 数据库 | `DB` |
+   | R2 存储桶 | `R2` |
+
+   （小写 `kv` / `db` / `r2` 也能识别）
+4. 同页切到 **变量和机密**，添加两个加密变量：
    - `PRESET_AGNES_API_KEY` = 站点内置 Key
    - `SESSION_SECRET` = `openssl rand -base64 32` 生成的随机串
-5. **重新部署一次**让密钥生效
+5. **重新部署一次**让绑定和密钥生效
 
 之后每次推 `main` 都会自动重新部署。
+
+> 💡 **全程不用改任何配置文件。** KV / D1 / R2 的 ID 一律在后台绑定页点选，
+> 不用手抄 32 位十六进制串；**D1 表也不用手动建** ——
+> 首次访问时会自动执行 `CREATE TABLE IF NOT EXISTS`（幂等，重复无害）。
 
 > ⚠️ 不要同时启用方式一的自动部署和方式二，否则一次推送会部署两遍。
 > 详细图解见 [Cloudflare部署教程.md](./Cloudflare部署教程.md) 的「方式二」。

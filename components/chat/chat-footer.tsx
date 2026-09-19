@@ -24,8 +24,16 @@ export function ChatFooter({ className = "" }: { className?: string }) {
     <div
       className={`flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 pb-1 text-center text-[11px] text-fg-quaternary ${className}`}
     >
-      {icpIconUrl ? (
-        <SiteFooterBadge src={icpIconUrl} alt="备案徽章" href={icpUrl || undefined} />
+      {/*
+        有备案信息就显示徽章（不要求填图标地址）。
+        萌备案官方只给文字链接，没填图标时会自动用内联 SVG 兜底。
+      */}
+      {icpText || icpUrl || icpIconUrl ? (
+        <SiteFooterBadge
+          src={icpIconUrl || undefined}
+          alt={icpText || "备案徽章"}
+          href={icpUrl || undefined}
+        />
       ) : null}
 
       {icpText ? (

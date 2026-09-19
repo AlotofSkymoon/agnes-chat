@@ -4,8 +4,6 @@
   // OpenNext 构建产物入口，不要手改
   "main": ".open-next/worker.js",
   // 兼容日期：必须是「今天或更早」，不能是未来日期（否则报尚未发布）。
-  // 也不要设得太旧——Next.js 14 依赖较新的 nodejs_compat 行为。
-  // 这里取当月初，既已发布又足够新。
   "compatibility_date": "2026-09-01",
   // Next.js 需要 Node 兼容层
   "compatibility_flags": ["nodejs_compat"],
@@ -16,44 +14,37 @@
     "binding": "ASSETS"
   },
 
-  // ---------- Cloudflare 三件套 ----------
-  // 占位符 __KV_ID__ / __D1_ID__ 会由 GitHub Actions 用 Secrets 自动替换，
-  // 手动部署时把这里改成你自己的 ID 即可。
-  "kv_namespaces": [
-    {
-      "binding": "kv",
-      "id": "__KV_ID__"
-    }
-  ],
-  "d1_databases": [
-    {
-      "binding": "db",
-      "database_name": "agnes-chat-db",
-      "database_id": "__D1_ID__"
-    }
-  ],
-
   // ---------------------------------------------------------------------------
-  // R2 对象存储（图片 / 视频等文件）
+  // KV / D1 / R2：本文件里**故意不写**，一个字都不用你改
   //
-  // ⚠️ 部署前必须先建桶，否则 wrangler deploy 会报 "bucket not found"：
-  //      npx wrangler r2 bucket create agnes-chat
+  // 以前这里放的是 __KV_ID__ / __D1_ID__ 占位符，界面部署时若不替换，
+  // wrangler deploy 会直接失败，而小白根本不知道要去哪复制那串 32 位 ID。
   //
-  // 上传走「预签名直传」：浏览器从 /api/upload/presign 拿到签名链接后
-  // 直接 PUT 到 R2，文件不经过 Worker —— 所以能传大文件，
-  // 不受 Workers 请求体大小限制。
-  // 这个 binding 供服务端直接读写（删除、列举、生成临时链接）使用。
+  // 现在统一改成后台点选绑定：
+  //   Workers → 你的项目 → 设置 → 绑定 → 添加
+  //   KV 命名空间 → 变量名 KV
+  //   D1 数据库   → 变量名 DB
+  //   R2 存储桶   → 变量名 R2
+  //（小写 kv / db / r2 也能识别）
+  //
+  // 走 GitHub Actions 的话，脚本会自动把 ID 写进 wrangler.action.jsonc，
+  // 也不需要你碰这个文件。
   // ---------------------------------------------------------------------------
-  "r2_buckets": [
-    {
-      "binding": "r2",
-      "bucket_name": "agnes-chat"
-    }
-  ],
 
-  // 非敏感配置；密钥一律用 wrangler secret put（见部署教程）
+  // 非敏感配置。
+  // 敏感值（PRESET_AGNES_API_KEY / SESSION_SECRET / JWT_SECRET）请在
+  // Dashboard → 设置 → 变量和机密 里添加，类型选「机密」，
+  // 或在 Actions 里配同名 Secrets（脚本会注入）。
+  //
+  // CF_PLATFORM / CF_R2_BOUND 是「平台声明」：
+  // Workers 运行时里 binding 对象不一定探得到（OpenNext 不挂 globalThis），
+  // 但明文变量一定能读到。这里预置，避免设置面板误报"未找到 R2 绑定"。
+  // 桶名若不是 agnes-chat，改下面 R2_BUCKET_NAME 的值。
   "vars": {
-    "NEXT_PUBLIC_SITE_NAME": "Agnes AI"
+    "NEXT_PUBLIC_SITE_NAME": "Agnes AI",
+    "CF_PLATFORM": "cloudflare",
+    "CF_R2_BOUND": "1",
+    "R2_BUCKET_NAME": "agnes-chat"
   },
 
   "observability": {

@@ -104,6 +104,41 @@ function splitChatKey(key: string): { userId: string; conversationId: string } |
 export class CloudflareStore implements Store {
   constructor(private env: CloudflareEnv) {}
 
+  /**
+   * 建表 Promise 缓存。
+   *
+   * ⚠️ 为什么要运行时自动建表：
+   * 以前建表只能靠人工访问一次 /api/d1/cshsjk/<token>——
+   * GitHub Actions 部署会顺带执行 schema.sql，但**界面部署不会**，
+   * 于是走界面部署的人注册时直接报"表不存在"，而且完全不知道该做什么。
+   *
+   * 建表语句全是 CREATE TABLE / INDEX IF NOT EXISTS，天然幂等，
+   * 每次冷启动跑一遍也无害。
+   */
+  private schemaReady: Promise<void> | null = null;
+
+  private async ensureSchema(): Promise<void> {
+    if (!this.schemaReady) {
+      this.schemaReady = (async () => {
+        try {
+          const statements = D1_SCHEMA.split(";")
+            .map((x) => x.trim())
+            .filter(Boolean);
+          for (const sql of statements) {
+            await this.dbBinding.prepare(sql).run();
+          }
+        } catch {
+          /*
+           * 建表失败不阻断主流程。
+           * 常见原因：库已建好但当前令牌没有 DDL 权限、
+           * 或绑定的是只读副本。这时表大概率已存在，硬失败反而更糟。
+           */
+        }
+      })();
+    }
+    return this.schemaReady;
+  }
+
   private get kv(): KVLike {
     const kv = pickBinding(this.env as unknown as Record<string, unknown>, "kv") as
       | NonNullable<CloudflareEnv["KV"]>
@@ -112,7 +147,7 @@ export class CloudflareStore implements Store {
     return kv;
   }
 
-  private get db(): D1Like {
+  private get dbBinding(): D1Like {
     const db = pickBinding(this.env as unknown as Record<string, unknown>, "db") as
       | NonNullable<CloudflareEnv["DB"]>
       | undefined;
@@ -120,12 +155,18 @@ export class CloudflareStore implements Store {
     return db;
   }
 
+  /** 取 D1 句柄，顺带确保表已建好（首次调用时才真正执行建表） */
+  private async db(): Promise<D1Like> {
+    await this.ensureSchema();
+    return this.dbBinding;
+  }
+
   /* ------------------------------ get ------------------------------ */
   async get<T = unknown>(key: string): Promise<T | null> {
     // 邮箱反查：直接查 users 表（email 已经是 UNIQUE 索引）
     if (isUserEmailKey(key)) {
       const email = key.slice(P_USER_EMAIL.length);
-      const row = await this.db
+      const row = await (await this.db())
         .prepare("SELECT id FROM users WHERE email = ?")
         .bind(email)
         .first<{ id: string }>();
@@ -136,7 +177,7 @@ export class CloudflareStore implements Store {
     if (isChatKey(key)) {
       const parts = splitChatKey(key);
       if (!parts) return null;
-      const conv = await this.db
+      const conv = await (await this.db())
         .prepare(
           "SELECT id, title, model, created_at, updated_at FROM conversations WHERE id = ? AND user_id = ?",
         )
@@ -150,7 +191,7 @@ export class CloudflareStore implements Store {
         }>();
       if (!conv) return null;
 
-      const { results } = await this.db
+      const { results } = await (await this.db())
         .prepare("SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY id ASC")
         .bind(parts.conversationId)
         .all<{ role: string; content: string; created_at: number }>();
@@ -209,7 +250,7 @@ export class CloudflareStore implements Store {
       const title = String(data?.title ?? "").slice(0, 200);
       const model = String(data?.model ?? "");
 
-      await this.db
+      await (await this.db())
         .prepare(
           `INSERT INTO conversations (id, user_id, title, model, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?)
@@ -223,11 +264,12 @@ export class CloudflareStore implements Store {
 
       // 整段替换：先清该会话旧消息，再批量写入。
       // 聊天记录是「整体覆盖式保存」，不是增量追加，这样最简单也最不容易不一致。
-      await this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").bind(parts.conversationId).run();
+      const db = await this.db();
+      await db.prepare("DELETE FROM messages WHERE conversation_id = ?").bind(parts.conversationId).run();
 
       if (list.length > 0) {
         const stmts = list.map((m) =>
-          this.db
+          db
             .prepare("INSERT INTO messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)")
             .bind(
               parts.conversationId,
@@ -238,7 +280,7 @@ export class CloudflareStore implements Store {
         );
         // D1 每次 batch 有语句数上限，分片提交
         for (let i = 0; i < stmts.length; i += 50) {
-          await this.db.batch(stmts.slice(i, i + 50));
+          await db.batch(stmts.slice(i, i + 50));
         }
       }
       return;
@@ -253,21 +295,21 @@ export class CloudflareStore implements Store {
     for (const key of keys) {
       if (isUserKey(key)) {
         const id = key.slice(P_USER.length);
-        const res = await this.db.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
+        const res = await (await this.db()).prepare("DELETE FROM users WHERE id = ?").bind(id).run();
         if (res.success) count += 1;
         continue;
       }
       if (isUserEmailKey(key)) {
         const email = key.slice(P_USER_EMAIL.length);
-        const res = await this.db.prepare("DELETE FROM users WHERE email = ?").bind(email).run();
+        const res = await (await this.db()).prepare("DELETE FROM users WHERE email = ?").bind(email).run();
         if (res.success) count += 1;
         continue;
       }
       if (isChatKey(key)) {
         const parts = splitChatKey(key);
         if (parts) {
-          await this.db.prepare("DELETE FROM messages WHERE conversation_id = ?").bind(parts.conversationId).run();
-          await this.db
+          await (await this.db()).prepare("DELETE FROM messages WHERE conversation_id = ?").bind(parts.conversationId).run();
+          await (await this.db())
             .prepare("DELETE FROM conversations WHERE id = ? AND user_id = ?")
             .bind(parts.conversationId, parts.userId)
             .run();
@@ -278,13 +320,13 @@ export class CloudflareStore implements Store {
       if (isChatIndexKey(key)) {
         // 清空该用户全部会话：先删消息，再删会话
         const userId = key.slice(P_CHAT_INDEX.length);
-        await this.db
+        await (await this.db())
           .prepare(
             "DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = ?)",
           )
           .bind(userId)
           .run();
-        await this.db.prepare("DELETE FROM conversations WHERE user_id = ?").bind(userId).run();
+        await (await this.db()).prepare("DELETE FROM conversations WHERE user_id = ?").bind(userId).run();
         count += 1;
         continue;
       }
@@ -298,7 +340,7 @@ export class CloudflareStore implements Store {
   async exists(key: string): Promise<number> {
     if (isUserEmailKey(key)) {
       const email = key.slice(P_USER_EMAIL.length);
-      const row = await this.db
+      const row = await (await this.db())
         .prepare("SELECT 1 AS ok FROM users WHERE email = ?")
         .bind(email)
         .first<{ ok: number }>();
@@ -306,7 +348,7 @@ export class CloudflareStore implements Store {
     }
     if (isUserKey(key)) {
       const id = key.slice(P_USER.length);
-      const row = await this.db
+      const row = await (await this.db())
         .prepare("SELECT 1 AS ok FROM users WHERE id = ?")
         .bind(id)
         .first<{ ok: number }>();
@@ -329,10 +371,10 @@ export class CloudflareStore implements Store {
   async incr(key: string): Promise<number> {
     // users:count 必须原子 —— 用 D1 的 UPDATE ... RETURNING（SQLite 写事务串行化）
     if (key === KEY_USERS_COUNT) {
-      await this.db
+      await (await this.db())
         .prepare("INSERT INTO meta (k, v) VALUES ('users_count', 0) ON CONFLICT(k) DO NOTHING")
         .run();
-      const row = await this.db
+      const row = await (await this.db())
         .prepare("UPDATE meta SET v = v + 1 WHERE k = 'users_count' RETURNING v")
         .first<{ v: number }>();
       if (!row) throw new Error("自增 users:count 失败");
@@ -355,7 +397,7 @@ export class CloudflareStore implements Store {
       // 拒绝创建「没有邮箱的用户」：会产生脏行，且多个空邮箱会撞 UNIQUE 约束。
       // 正常注册一定会带 email；只更新密码 / 角色时用户必然已存在。
       if (!email) {
-        const existing = await this.db
+        const existing = await (await this.db())
           .prepare("SELECT id FROM users WHERE id = ?")
           .bind(id)
           .first<{ id: string }>();
@@ -372,7 +414,7 @@ export class CloudflareStore implements Store {
 
       // 局部更新要保留未提供的字段：
       // 「改密码」只传 passwordHash，不能把 email / role 冲成空字符串
-      await this.db
+      await (await this.db())
         .prepare(
           `INSERT INTO users (id, email, password_hash, role, created_at)
            VALUES (?, ?, ?, ?, ?)
@@ -396,7 +438,7 @@ export class CloudflareStore implements Store {
   async hgetall<T = Record<string, unknown>>(key: string): Promise<T | null> {
     if (isUserKey(key)) {
       const id = key.slice(P_USER.length);
-      const row = await this.db
+      const row = await (await this.db())
         .prepare("SELECT id, email, password_hash, role, created_at FROM users WHERE id = ?")
         .bind(id)
         .first<{
@@ -423,11 +465,11 @@ export class CloudflareStore implements Store {
   async keys(pattern: string): Promise<string[]> {
     // user:* → 直接查 D1 全表
     if (pattern.startsWith(P_USER) && !pattern.startsWith(P_USER_EMAIL)) {
-      const { results } = await this.db.prepare("SELECT id FROM users").all<{ id: string }>();
+      const { results } = await (await this.db()).prepare("SELECT id FROM users").all<{ id: string }>();
       return (results ?? []).map((r) => `${P_USER}${r.id}`);
     }
     if (pattern.startsWith(P_USER_EMAIL)) {
-      const { results } = await this.db.prepare("SELECT email FROM users").all<{ email: string }>();
+      const { results } = await (await this.db()).prepare("SELECT email FROM users").all<{ email: string }>();
       return (results ?? []).map((r) => `${P_USER_EMAIL}${r.email}`);
     }
 
@@ -465,7 +507,7 @@ export class CloudflareStore implements Store {
     // 会话索引：直接查 conversations 表，按更新时间倒序
     if (isChatIndexKey(key)) {
       const userId = key.slice(P_CHAT_INDEX.length);
-      const { results } = await this.db
+      const { results } = await (await this.db())
         .prepare("SELECT id FROM conversations WHERE user_id = ? ORDER BY updated_at DESC")
         .bind(userId)
         .all<{ id: string }>();

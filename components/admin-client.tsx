@@ -33,6 +33,7 @@ import { Switch } from "@/components/ui/switch";
 import { SiteFooter } from "@/components/site-footer";
 import { parseIcpInput } from "@/lib/use-site-icp";
 import { timeoutSignal } from "@/lib/fetch-timeout";
+import { SiteFooterBadge } from "@/components/site-footer-badge";
 
 interface AdminUser {
   id: string;
@@ -586,9 +587,26 @@ function SiteSettingsCard() {
                   autoComplete="off"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  第三方备案才需要。图片加载不出来时会自动隐藏，不会显示破图。
+                  可选。留空会根据备案链接自动生成徽章（萌备案显示「萌」、
+                  工信部显示「ICP」）。填了自己的图片就以图片为准，
+                  加载失败会自动退回生成的徽章，不会显示破图。
                 </p>
               </div>
+
+              {/* 实时预览：填完立刻能看出效果，不用去前台刷新 */}
+              {form.icpUrl || form.icpText ? (
+                <div className="space-y-1.5">
+                  <Label>徽章预览</Label>
+                  <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-[11px] text-fg-tertiary">
+                    <SiteFooterBadge
+                      src={form.icpIconUrl || undefined}
+                      alt={form.icpText || "备案徽章"}
+                      href={form.icpUrl || undefined}
+                    />
+                    <span>{form.icpText || "（未填备案号）"}</span>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="space-y-1.5">
                 <Label htmlFor="ss-footer-extra">页脚额外文字</Label>
