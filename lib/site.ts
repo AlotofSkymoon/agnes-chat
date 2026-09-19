@@ -138,6 +138,79 @@ export const SPONSOR_NOTE: string =
   process.env.NEXT_PUBLIC_SPONSOR_NOTE?.trim() ||
   "服务器、域名、API 额度都用的免费额度，站长不担心这块。赞助会直接变成他的生活经费和购物基金 —— 谢谢 ☕";
 
+/* ------------------------------------------------------------------ *
+ * 收款渠道
+ *
+ * ⚠️ 为什么支持多个：
+ * 访客所在地不同，能用的支付方式也不同 —— 只放 AlipayHK 内地用户扫不了，
+ * 只放支付宝香港用户也扫不了。两个都摆出来，各自挑方便的那个。
+ *
+ * 默认读仓库里自带的两张图：
+ *   public/sponsor-alipay.png   内地支付宝
+ *   public/sponsor-qr.png       AlipayHK
+ * 想改渠道就设 NEXT_PUBLIC_SPONSOR_CHANNELS（JSON 数组）。
+ * ------------------------------------------------------------------ */
+
+export interface SponsorChannel {
+  id: string;
+  name: string;
+  /** 图片地址：本地路径或外链 */
+  qr: string;
+  note: string;
+}
+
+const DEFAULT_SPONSOR_CHANNELS: SponsorChannel[] = [
+  {
+    id: "alipay",
+    name: "支付宝",
+    qr: "/sponsor-alipay.png",
+    note: "内地用户：打开支付宝「扫一扫」",
+  },
+  {
+    id: "alipayhk",
+    name: "AlipayHK",
+    qr: "/sponsor-qr.png",
+    note: "香港用户：用 AlipayHK App 扫码",
+  },
+];
+
+function resolveSponsorChannels(): SponsorChannel[] {
+  // 完全自定义：NEXT_PUBLIC_SPONSOR_CHANNELS='[{"name":"微信支付","qr":"https://..."}]'
+  const raw = process.env.NEXT_PUBLIC_SPONSOR_CHANNELS?.trim();
+  if (raw) {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const list = parsed
+          .filter(
+            (c): c is Record<string, unknown> =>
+              typeof c === "object" && c !== null && typeof (c as { qr?: unknown }).qr === "string" && Boolean((c as { qr?: string }).qr),
+          )
+          .map((c, i) => ({
+            id: String(c.id ?? `channel-${i}`),
+            name: String(c.name ?? "收款码"),
+            qr: String(c.qr),
+            note: String(c.note ?? ""),
+          }));
+        // JSON 写错或数组为空时退回默认，不至于让赞助页整个消失
+        if (list.length > 0) return list;
+      }
+    } catch {
+      /* JSON 解析失败就用默认渠道 */
+    }
+  }
+
+  // 兼容旧的单码配置：只填了 NEXT_PUBLIC_SPONSOR_QR 时当成唯一渠道
+  const legacy = process.env.NEXT_PUBLIC_SPONSOR_QR?.trim();
+  if (legacy) {
+    return [{ id: "custom", name: SPONSOR_METHOD, qr: legacy, note: SPONSOR_NOTE }];
+  }
+
+  return DEFAULT_SPONSOR_CHANNELS;
+}
+
+export const SPONSOR_CHANNELS: SponsorChannel[] = resolveSponsorChannels();
+
 /* ---------------------------------------------------------------------------
    页脚 / 备案
    --------------------------------------------------------------------------- */

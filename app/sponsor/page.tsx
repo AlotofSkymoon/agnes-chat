@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Coffee, Github, HeartHandshake, Share2 } from "lucide-react";
 
-import { SponsorQr } from "@/components/sponsor/sponsor-qr";
+import { SponsorChannels } from "@/components/sponsor/sponsor-qr";
 import { Beams, GridBackground, Meteors, Noise } from "@/components/ui/aceternity";
 import { SiteFooter } from "@/components/site-footer";
 import {
@@ -10,8 +10,7 @@ import {
   REPO_URL,
   SITE_NAME,
   SPONSOR_ENABLED,
-  SPONSOR_METHOD,
-  SPONSOR_NOTE,
+  SPONSOR_CHANNELS,
   pageTitle,
 } from "@/lib/site";
 
@@ -99,7 +98,7 @@ export default function SponsorPage() {
         </header>
 
         {/* 收款码 —— 客户端组件，图片加载失败时优雅降级 */}
-        <SponsorQr method={SPONSOR_METHOD} note={SPONSOR_NOTE} />
+        <SponsorChannels channels={SPONSOR_CHANNELS} />
 
         {/* 资金去向 */}
         <section className="mt-10">

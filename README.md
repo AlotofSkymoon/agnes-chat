@@ -644,9 +644,19 @@ npm run cf:build && npx wrangler dev
 
 ### 放上你自己的收款码
 
+**默认已经内置两个渠道**，访客按所在地挑一个扫：
+
+| 渠道 | 图片文件 | 适用 |
+|---|---|---|
+| 支付宝 | `public/sponsor-alipay.png` | 内地用户 |
+| AlipayHK | `public/sponsor-qr.png` | 香港用户 |
+
+> 只放一个的话，另一边的用户根本扫不了 —— 所以建议两个都留着。
+
 **方式一：替换文件（最简单）**
 
-把你的收款码图片存成 `public/sponsor-qr.png`，覆盖仓库里的占位图即可。
+把你的收款码图片存成上面两个文件名，覆盖仓库里的图即可。
+只想放一个渠道，就只替换其中一个 —— 另一个会自动隐藏（图片加载不出来时不显示破图）。
 
 **方式二：用外链**
 
@@ -661,7 +671,8 @@ NEXT_PUBLIC_SPONSOR_QR=https://你的图床/alipayhk.png
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `NEXT_PUBLIC_SPONSOR_ENABLED` | `true` | 设 `false` 关闭赞助页（页面返回 404，侧边栏入口也隐藏） |
-| `NEXT_PUBLIC_SPONSOR_QR` | `/sponsor-qr.png` | 二维码图片地址，也支持外链 |
+| `NEXT_PUBLIC_SPONSOR_QR` | `/sponsor-qr.png` | 二维码图片地址，也支持外链（填了就只显示这一个渠道） |
+| `NEXT_PUBLIC_SPONSOR_CHANNELS` | 内置两个 | JSON 数组，完全自定义渠道，如 `[{"name":"微信支付","qr":"https://...","note":"..."}]` |
 | `NEXT_PUBLIC_SPONSOR_METHOD` | `AlipayHK` | 显示在二维码上方的收款方式名 |
 | `NEXT_PUBLIC_SPONSOR_NOTE` | 一句说明 | 二维码下方的说明文字 |
 
