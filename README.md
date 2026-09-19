@@ -977,6 +977,86 @@ lib/storage/
 
 ---
 
+## 🛡️ 代理访问拦截（可选）
+
+检测到访问者使用代理/VPN 时弹窗提示，并**放行 iCloud Private Relay 这类系统中继**。
+
+### 先说清楚：ipip.la 做不到这件事
+
+很多人以为 `ipip.la` 能查代理，其实**不能**：
+
+| 接口 | 能查什么 | 能判断代理吗 |
+|---|---|---|
+| `api.myip.la`（ipip.la） | IP、归属地、运营商 | ❌ 只有地理位置 |
+| `ipapi.ipip.net/v2/risk/portrait/`（ipip.net） | 风险分、风险行为 | ✅ 有「代理」「秒拨」「机房」标记 |
+
+真正能识别代理的是 **ipip.net 的 IP 风险画像接口**（同一家公司的付费产品），
+需要 token。**没填 token 时本功能自动关闭**，站点完全不受影响 ——
+接口会返回 `detected=false`，弹窗不渲染。
+
+### 配置
+
+```bash
+IPIP_RISK_TOKEN=你的ipip.net风险画像token
+```
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `IPIP_RISK_TOKEN` | 空 | **不填 = 功能关闭**。填了才真正检测 |
+| `IP_GUARD_ENABLED` | `true` | 设 `false` 整体关闭 |
+| `IP_GUARD_RISK_THRESHOLD` | `90` | 风险分阈值。ipip 官方建议 90 分以上才限制 |
+| `IP_GUARD_BLOCK_BEHAVIORS` | `代理,秒拨` | 命中的风险行为即拦截。加 `机房` 更严但误伤更多 |
+| `IP_GUARD_ADMIN_BYPASS` | `true` | 管理员豁免，避免站长把自己锁在门外 |
+
+### iCloud Private Relay 为什么放行
+
+Private Relay 技术上确实"换了 IP"，但它不是用户主动开的代理工具 ——
+它是 Apple 系统级隐私功能，很多人根本不知道自己开着。
+一律拦截会把大批正常 iPhone / Mac 用户挡在门外，而且他们不知道该怎么修。
+
+判定用 **Apple 官方发布的出口段清单**（免费、权威、无需 token）：
+
+```
+https://mask-api.icloud.com/egress-ip-ranges.csv
+```
+
+每 24 小时刷新一次，拉取失败时保留上一份可用清单。
+清单里的 IP 一律放行。
+
+### 三个刻意的设计取舍
+
+**① fail-open：拿不到结论就放行**
+
+IP 情报接口会超时、会限流、token 会失效。这些情况一律放行 ——
+否则一次接口抽风就等于自己把站点搞挂，而且访客分不清是自己网络坏了还是站点挂了。
+
+**② 弹窗而非 403**
+
+判定依赖第三方数据，而**企业网络和 CGNAT 移动网络常被误判成代理**
+（国内移动网络尤其普遍）。直接返回 403 会让误判变得不可挽回，
+弹窗保留了「仍然继续访问」的余地。
+
+**③ 前端提示不等于安全边界**
+
+`/api/ip-guard` 只是给前端看的判定依据，可以被绕过。
+要真正拦住流量，得在服务端渲染或接口层判定 —— 但那样误判代价极高，
+所以默认只做提示。
+
+### 自检
+
+`IP_GUARD_RISK_THRESHOLD` 之外，还可以看 `/api/ip-guard` 的返回：
+
+```jsonc
+{
+  "allowed": true,
+  "reason": "relay",        // ok / relay / proxy / error / no-ip / disabled
+  "detected": true,         // false = 没真检测（接口没配或失败）
+  "relay": true,            // 是否 iCloud Private Relay
+  "score": null,
+  "behaviors": []
+}
+```
+
 ## 🔐 依赖安全说明（构建日志里的警告要不要管）
 
 `npm install` 时你可能会看到几条黄字，逐个说明：

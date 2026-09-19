@@ -7,6 +7,7 @@ import {
   SITE_TAGLINE,
   SITE_TITLE,
 } from "@/lib/site";
+import { IpGuardGate } from "@/components/ip-guard-gate";
 import { ThemeAwareToaster } from "@/components/theme-aware-toaster";
 import { ThemeProvider, themeInitScript } from "@/components/theme-provider";
 import "./globals.css";
@@ -56,6 +57,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             这里由 ThemeAwareToaster 读取当前 theme 再传给 Toaster。
           */}
           <ThemeAwareToaster />
+          {/*
+            代理访问拦截：检测由客户端发起（/api/ip-guard），
+            放在这里保证全站生效。未配置 IPIP_RISK_TOKEN 时接口返回
+            detected=false，组件不渲染，等于自动关闭。
+          */}
+          <IpGuardGate />
         </ThemeProvider>
       </body>
     </html>
