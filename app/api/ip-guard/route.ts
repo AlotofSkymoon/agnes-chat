@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth";
-import { checkIp, clientIpFromHeaders } from "@/lib/ip-guard";
+import { checkIp, clientIpFromHeaders, ipGuardStatus } from "@/lib/ip-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +41,8 @@ export async function GET(request: Request) {
       behaviors: verdict.behaviors,
       usageType: verdict.usageType,
       provider: verdict.provider,
+      // 没真检测 = 没配数据源，此时一切访问都会放行
+      status: ipGuardStatus(),
       detected: verdict.detected,
       cached: verdict.cached,
     },

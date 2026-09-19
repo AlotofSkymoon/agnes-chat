@@ -17,32 +17,51 @@ import { checkIp, clientIpFromHeaders } from "@/lib/ip-guard";
  *   是 OpenNext 唯一支持的拦截方式。权衡下来只能选它。
  *
  * ⚠️ 依然保持 fail-open：
- * token 没配、接口超时、Apple 清单拉不到 —— 全都放行。
+ * 接口超时、Apple 清单拉不到 —— 全都放行。
  * 真拦截的代价太高（误判 = 访客彻底打不开），出错时必须让站点照常可用。
  */
 
+/**
+ * 诊断响应头。
+ *
+ * 存在的意义很实际："我开了开关，VPN 却能进" 这种问题
+ * 光看页面完全无从下手 —— 不知道是 middleware 压根没跑、
+ * 还是跑了但没配置数据源、还是数据源说这不是代理。
+ *
+ * 有了这个头，一条 curl 就能分清这几种情况：
+ *   curl -I https://你的域名/
+ * 看不到 X-IP-Guard      → middleware 没运行
+ * 看到 allowed(error)    → 跑了，但两个数据源都没给出结论（多半没配 token）
+ * 看到 allowed(ok)       → 数据源判定这不是代理
+ * 看到 blocked(proxy)    → 判定为代理，已拦截
+ */
+function guardHeaders(verdict: { allowed: boolean; reason: string; provider?: string }): Headers {
+  const h = new Headers();
+  const state = verdict.allowed ? "allowed" : "blocked";
+  h.set("X-IP-Guard", `${state}(${verdict.reason})`);
+  if (verdict.provider) h.set("X-IP-Guard-Provider", verdict.provider);
+  h.set("Cache-Control", "no-store");
+  return h;
+}
+
 export function middleware(request: NextRequest) {
-  // 只拦页面与 API；静态资源由 matcher 排除，这里再兜一层
   const { pathname } = request.nextUrl;
 
   const ip = clientIpFromHeaders(request.headers);
-  if (!ip) return NextResponse.next();
+  if (!ip) return NextResponse.next({ headers: guardHeaders({ allowed: true, reason: "no-ip" }) });
 
-  /**
-   * middleware 不能是 async 阻塞太久，但判定本身是 await 的 ——
-   * 用 NextResponse.next() 先行返回，再在背景判定是无效的（响应已发出）。
-   * 所以这里必须 await，代价是首次判定会增加一点延迟（有 10 分钟缓存）。
-   */
   return (async () => {
     let verdict;
     try {
       verdict = await checkIp(ip, false);
     } catch {
       // 判定逻辑自身抛错也不能影响访问
-      return NextResponse.next();
+      return NextResponse.next({ headers: guardHeaders({ allowed: true, reason: "error" }) });
     }
 
-    if (verdict.allowed) return NextResponse.next();
+    if (verdict.allowed) {
+      return NextResponse.next({ headers: guardHeaders(verdict) });
+    }
 
     const opts = {
       reason: verdict.reason,
@@ -56,11 +75,11 @@ export function middleware(request: NextRequest) {
 
     return new NextResponse(isApi ? blockedJson(opts) : blockedPageHtml(opts), {
       status: 403,
-      headers: {
-        "Content-Type": isApi ? "application/json; charset=utf-8" : "text/html; charset=utf-8",
-        "Cache-Control": "no-store",
-        "X-IP-Guard": "blocked",
-      },
+      headers: (() => {
+        const h = guardHeaders(verdict);
+        h.set("Content-Type", isApi ? "application/json; charset=utf-8" : "text/html; charset=utf-8");
+        return h;
+      })(),
     });
   })();
 }
@@ -68,7 +87,7 @@ export function middleware(request: NextRequest) {
 /**
  * 排除静态资源与 Next 内部路径。
  * 不排除的话每个图片/CSS 请求都要跑一次判定，
- * 既浪费 IP 接口额度（按次计费）又拖慢加载。
+ * 既浪费额度（免费源有速率限制）又拖慢加载。
  */
 export const config = {
   matcher: [

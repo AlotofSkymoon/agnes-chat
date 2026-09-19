@@ -1,6 +1,7 @@
 import { isIcloudRelay, relayCacheInfo } from "./relay";
 import { matchesAny, parseCidr, parseIp, type Cidr } from "./cidr";
 import { timeoutSignal } from "@/lib/fetch-timeout";
+import { configValue } from "@/lib/runtime-config";
 
 /**
  * 访问来源检测：拦代理工具，放行 iCloud Private Relay 这类系统中继。
@@ -14,9 +15,17 @@ import { timeoutSignal } from "@/lib/fetch-timeout";
 
 /* --------------------------- 配置 --------------------------- */
 
-/** ipip 风险画像接口 token（付费接口，必填才能检测代理） */
+/**
+ * ipip 风险画像接口 token（付费接口）。
+ *
+ * ⚠️ 必须走 configValue 而不是裸 process.env：
+ * middleware 跑在 Edge runtime，那里的 process.env 是**构建时内联**的 ——
+ * 构建环境里没有这个变量，打包出来就是 undefined，
+ * 之后在后台补配也读不到，功能静默失效。
+ * configValue 会同时查 Worker binding，至少在 Node runtime 侧能拿到。
+ */
 function token(): string {
-  return (process.env.IPIP_RISK_TOKEN ?? "").trim();
+  return configValue("IPIP_RISK_TOKEN", "IPIP_TOKEN");
 }
 
 export function ipGuardEnabled(): boolean {
@@ -117,6 +126,55 @@ export function clientIpFromHeaders(headers: Headers): string | null {
   return null;
 }
 
+/* --------------------------- ip-api.com 免费源 --------------------------- */
+
+/**
+ * 是否启用免费源（默认启用）。
+ *
+ * ⚠️ 为什么必须有它：
+ * ipip 的风险画像是**付费**接口。大多数站长不会为了一个小站去买，
+ * 结果就是：开关开了、文档看了、VPN 照样能进 —— 因为检测从头到尾没跑过。
+ * 免费源让这个功能在零配置下也能真正工作。
+ *
+ * ip-api.com 免费端点只限**非商业用途**且有速率限制（约 45 次/分钟）。
+ * 站点有商业性质或流量较大时请关掉它、改用付费源：
+ *   IP_GUARD_FREE_SOURCE=false
+ */
+function freeSourceEnabled(): boolean {
+  const raw = configValue("IP_GUARD_FREE_SOURCE");
+  if (!raw) return true;
+  return raw.toLowerCase() !== "false";
+}
+
+interface FreeResult {
+  proxy: boolean;
+  hosting: boolean;
+  ok: boolean;
+}
+
+const EMPTY_FREE: FreeResult = { proxy: false, hosting: false, ok: false };
+
+async function queryFree(ip: string): Promise<FreeResult> {
+  if (!freeSourceEnabled()) return EMPTY_FREE;
+
+  // 免费端点不支持 https，只能 http（服务端 fetch 无混合内容问题）
+  const url = `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,proxy,hosting`;
+  try {
+    const res = await fetch(url, { signal: timeoutSignal(4000) });
+    if (!res.ok) return EMPTY_FREE;
+    const data: unknown = await res.json();
+    if (typeof data !== "object" || data === null) return EMPTY_FREE;
+
+    const d = data as { status?: unknown; proxy?: unknown; hosting?: unknown };
+    // 接口用 status 字段表示成败（HTTP 始终是 200）
+    if (d.status !== "success") return EMPTY_FREE;
+
+    return { proxy: d.proxy === true, hosting: d.hosting === true, ok: true };
+  } catch {
+    return EMPTY_FREE;
+  }
+}
+
 /* --------------------------- ipip 风险画像 --------------------------- */
 
 /** 免费但只能查归属地的接口（不能判断代理），仅用于兜底展示 */
@@ -206,7 +264,7 @@ export type IpVerdict = {
   behaviors: string[];
   usageType: string | null;
   /** 实际生效的判定来源 */
-  provider: "ipip-risk" | "relay-list" | "none";
+  provider: "ipip-risk" | "ip-api" | "relay-list" | "none";
   /** ipip 接口是否真的返回了结论（没配 token 时为 false） */
   detected: boolean;
   cached: boolean;
@@ -296,11 +354,30 @@ export async function checkIp(ip: string | null, isAdmin = false): Promise<IpVer
 
   const risk = await queryRisk(ip);
 
-  // 接口没给结论（没 token / 超时 / 报错）→ fail-open 放行
+  let behaviors = risk.behaviors;
+  let score = risk.score;
+  let usageType = risk.usageType;
+  let provider: IpVerdict["provider"] = "ipip-risk";
+  let detected = risk.ok;
+
+  // ipip 没给结论（没配 token / 超时 / 报错）→ 回落到免费源
   if (!risk.ok) {
+    const free = await queryFree(ip);
+    if (free.ok) {
+      behaviors = [];
+      if (free.proxy) behaviors.push("代理");
+      if (free.hosting) behaviors.push("机房");
+      usageType = free.hosting ? "机房" : "住宅";
+      provider = "ip-api";
+      detected = true;
+    }
+  }
+
+  // 两个源都没拿到结论 → fail-open 放行
+  if (!detected) {
     const verdict: IpVerdict = {
       allowed: true, reason: "error", ip, relay: false,
-      score: null, behaviors: [], usageType: risk.usageType,
+      score: null, behaviors: [], usageType,
       provider: "none", detected: false, cached: false,
     };
     // 失败结果也缓存，但时间短一些，避免接口恢复后迟迟不生效
@@ -309,8 +386,8 @@ export async function checkIp(ip: string | null, isAdmin = false): Promise<IpVer
   }
 
   const blockList = blockedBehaviors();
-  const hitBehavior = risk.behaviors.filter((b) => blockList.some((x) => b.includes(x)));
-  const overScore = risk.score !== null && risk.score >= threshold();
+  const hitBehavior = behaviors.filter((b) => blockList.some((x) => b.includes(x)));
+  const overScore = score !== null && score >= threshold();
   const blocked = hitBehavior.length > 0 || overScore;
 
   const verdict: IpVerdict = {
@@ -318,10 +395,10 @@ export async function checkIp(ip: string | null, isAdmin = false): Promise<IpVer
     reason: blocked ? "proxy" : "ok",
     ip,
     relay: false,
-    score: risk.score,
-    behaviors: risk.behaviors,
-    usageType: risk.usageType,
-    provider: "ipip-risk",
+    score,
+    behaviors,
+    usageType,
+    provider,
     detected: true,
     cached: false,
   };
@@ -333,15 +410,26 @@ export async function checkIp(ip: string | null, isAdmin = false): Promise<IpVer
 export function ipGuardStatus(): {
   enabled: boolean;
   configured: boolean;
+  freeSource: boolean;
+  /**
+   * 实际能用的数据源。
+   * ⚠️ 这是排查"开关开了却拦不住"的关键字段：
+   * 两个源都不可用时，检测从头到尾没跑过，一切访问都会被放行。
+   */
+  activeSource: "ipip-risk" | "ip-api" | "none";
   threshold: number;
   blockBehaviors: string[];
   allowlist: number;
   relayRanges: number;
   relayFetchedAt: number | null;
 } {
+  const hasToken = token().length > 0;
+  const free = freeSourceEnabled();
   return {
     enabled: ipGuardEnabled(),
-    configured: token().length > 0,
+    configured: hasToken,
+    freeSource: free,
+    activeSource: hasToken ? "ipip-risk" : free ? "ip-api" : "none",
     threshold: threshold(),
     blockBehaviors: blockedBehaviors(),
     allowlist: allowlistSize(),

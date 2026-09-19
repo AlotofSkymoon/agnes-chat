@@ -984,17 +984,23 @@ lib/storage/
 - **检测到代理 → 服务端直接返回 403 拦截页**，不是前端提示，绕过不了
 - **检测到 iCloud Private Relay（中继）→ 放行**
 
-### 先说清楚：ipip.la 做不到这件事
+### 数据源：付费优先，免费兜底
 
-很多人以为 `ipip.la` 能查代理，其实**不能**：
+**先说清楚：ipip.la 做不到这件事。**
+`api.myip.la` 只能查 IP 归属地，**不能判断是不是代理**。
+真正能识别代理的是 ipip.net 的「IP 风险画像」（同一家公司，付费）。
 
-| 接口 | 能查什么 | 能判断代理吗 |
-|---|---|---|
-| `api.myip.la`（ipip.la） | IP、归属地、运营商 | ❌ 只有地理位置 |
-| `ipapi.ipip.net/v2/risk/portrait/`（ipip.net） | 风险分、风险行为 | ✅ 有「代理」「秒拨」「机房」标记 |
+| 源 | 需要 token | 判定能力 | 默认 |
+|---|---|---|---|
+| ipip.net 风险画像 | ✅ 付费 | 风险分 + 代理/秒拨/机房标记 | 配了就用它 |
+| ip-api.com | ❌ 免费 | `proxy` / `hosting` 布尔值 | **没配 token 时自动启用** |
 
-真正能识别代理的是 **ipip.net 的 IP 风险画像接口**（同一家公司的付费产品），
-需要 token。**没填 token 时功能自动关闭**，站点完全不受影响。
+免费源是**默认兜底**，因为付费接口多数站长不会买 —— 不兜底的话，
+开关开了、文档看了，VPN 照样能进，因为检测从头到尾没跑过。
+
+> ⚠️ ip-api.com 免费端点**仅限非商业用途**，且约 45 次/分钟。
+> 站点商业运营或流量大时请改用付费源，或关掉它：
+> `IP_GUARD_FREE_SOURCE=false`
 
 ### 配置
 
@@ -1008,6 +1014,7 @@ IP_GUARD_ALLOWLIST=1.2.3.4/32,203.0.113.0/24   # 强烈建议填
 | `IPIP_RISK_TOKEN` | 空 | **不填 = 功能关闭**。填了才真正检测 |
 | `IP_GUARD_ALLOWLIST` | 空 | **建议填**。永久放行的 CIDR，逗号分隔 |
 | `IP_GUARD_ENABLED` | `true` | 设 `false` 整体关闭 |
+| `IP_GUARD_FREE_SOURCE` | `true` | 设 `false` 关闭 ip-api.com 免费兜底 |
 | `IP_GUARD_RISK_THRESHOLD` | `90` | 风险分阈值。ipip 官方建议 90 分以上才限制 |
 | `IP_GUARD_BLOCK_BEHAVIORS` | `代理,秒拨` | 命中的风险行为即拦截。加 `机房` 更严但误伤更多 |
 
@@ -1058,6 +1065,24 @@ token 没配、接口超时、Apple 清单拉不到、判定逻辑自身抛错 �
 真拦截的代价太高，任何拿不到结论的情况都必须让站点照常可用。
 想临时关掉：`IP_GUARD_ENABLED=false`。
 
+### 排查：开关开了，VPN 却能进
+
+一眼分清是哪种情况：
+
+```bash
+curl -I https://你的域名/
+```
+
+看 `X-IP-Guard` 响应头：
+
+| 看到 | 说明 |
+|---|---|
+| **没有这个头** | middleware 没运行（多半是适配器/构建问题） |
+| `allowed(error)` | 跑了，但**两个数据源都没给出结论** —— 最常是没配 token 且免费源被关 |
+| `allowed(ok)` | 数据源判定这不是代理（VPN 未被识别） |
+| `allowed(relay)` | 判定为 iCloud Private Relay，按设计放行 |
+| `blocked(proxy)` | 已拦截 ✅ |
+
 ### 自检
 
 `/api/ip-guard` 返回当前判定（不拦截，只报告）：
@@ -1066,9 +1091,15 @@ token 没配、接口超时、Apple 清单拉不到、判定逻辑自身抛错 �
 {
   "allowed": true,
   "reason": "relay",   // ok / relay / allowlist / proxy / error / no-ip / disabled
-  "detected": true,    // false = 没真检测（token 没配或接口失败）
+  "detected": true,    // false = 没真检测，一切访问都会放行
   "relay": true,
-  "ip": "172.225.0.9"
+  "provider": "relay-list",
+  "ip": "172.225.0.9",
+  "status": {
+    "enabled": true,
+    "activeSource": "ip-api",   // ipip-risk / ip-api / none ← 关键
+    "allowlist": 2
+  }
 }
 ```
 
