@@ -7,6 +7,7 @@ import {
   SITE_TAGLINE,
   SITE_TITLE,
 } from "@/lib/site";
+import { PageTransition } from "@/components/page-transition";
 import { ThemeAwareToaster } from "@/components/theme-aware-toaster";
 import { ThemeProvider, themeInitScript } from "@/components/theme-provider";
 import "./globals.css";
@@ -56,6 +57,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             这里由 ThemeAwareToaster 读取当前 theme 再传给 Toaster。
           */}
           <ThemeAwareToaster />
+          {/* 页面切换过渡：挂在最外层，全站生效 */}
+          <PageTransition />
         </ThemeProvider>
       </body>
     </html>
