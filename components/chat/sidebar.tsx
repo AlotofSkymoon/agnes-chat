@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 
+import { useI18n } from "@/components/i18n-provider";
 import { AgnesIcon } from "@/components/agnes-logo";
 import { BY_LINE, SITE_NAME, SPONSOR_ENABLED } from "@/lib/site";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ export function Sidebar({
   onToggleCollapse,
 }: SidebarProps) {
   /** 正在重命名的会话 id；null 表示没在编辑 */
+  const { t } = useI18n();
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [draft, setDraft] = React.useState("");
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -248,7 +250,7 @@ export function Sidebar({
             >
               <span className={GLOW_BAR} aria-hidden />
               <Settings2 className="h-4 w-4" />
-              设置
+              {t("sidebar.settings")}
             </button>
             {user ? (
               <>
@@ -259,7 +261,7 @@ export function Sidebar({
                   >
                     <span className={GLOW_BAR} aria-hidden />
                     <Shield className="h-4 w-4" />
-                    管理员面板
+                    {t("sidebar.admin")}
                   </Link>
                 ) : null}
                 <Link
@@ -278,7 +280,7 @@ export function Sidebar({
               >
                 <span className={GLOW_BAR} aria-hidden />
                 <LogIn className="h-4 w-4" />
-                登录 / 注册
+                {t("sidebar.login")}
               </Link>
             )}
             {/* 赞助入口：站长可在环境变量里关掉（NEXT_PUBLIC_SPONSOR_ENABLED=false） */}
@@ -289,7 +291,7 @@ export function Sidebar({
               >
                 <span className={GLOW_BAR} aria-hidden />
                 <HeartHandshake className="h-4 w-4" />
-                赞助支持
+                {t("sidebar.sponsor")}
               </Link>
             ) : null}
             {/* 署名标识：按 LICENSE 要求保留 */}

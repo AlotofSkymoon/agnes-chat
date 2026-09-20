@@ -35,7 +35,7 @@ function ChannelCard({ channel }: { channel: SponsorChannel }) {
    * 放在深色卡片上几乎看不见。所以统一用浅色，不跟主题走。
    */
   return (
-    <GlareCard className="w-full">
+    <GlareCard className="glare-surface w-full">
       <div className="w-full p-5">
         {failed ? (
           <div className="flex flex-col items-center gap-2.5 py-6 text-center">

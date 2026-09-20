@@ -10,8 +10,11 @@ import { cn } from "@/lib/utils";
  * 用原生 WebGL 而不是 three.js —— three 有 600KB+，
  * 会显著拖慢构建并逼近 Workers 的体积上限，而这里只需要一个全屏 fragment shader。
  *
- * ⚠️ 关于配色：这是**紫黑色的夜云**，不是照片里那种蓝天白云。
- * 赞助页整体是暗色调，蓝天白云会跟二维码卡片和文字打架。
+ * 配色是**蓝天白云**（蔚蓝天空 + 白色云团），三层不同速度叠加产生视差，
+ * 飘动速度调快了 —— 初版几乎看不出在动，像是张静止的图。
+ *
+ * ⚠️ 白云会飘到文字下面：亮云上的白字会糊成一片，
+ * 所以赞助页的文字统一加了投影，见 globals.css 的 .on-sky。
  *
  * ⚠️ 三个必须处理的现实问题：
  * 1. WebGL 可能不可用（老设备、禁用硬件加速、部分 iOS 环境）
@@ -67,27 +70,42 @@ void main() {
   // 修正宽高比，否则云会被拉扁
   vec2 p = uv * vec2(u_res.x / u_res.y, 1.0) * 2.4;
 
-  float t = u_time * 0.035;
+  // 速度比之前快不少 —— 原先几乎看不出在动，像是张静止的图
+  float t = u_time * 0.14;
 
-  // 两层不同速度的云叠加，产生视差
-  float n1 = fbm(p + vec2(t, t * 0.35));
-  float n2 = fbm(p * 1.7 + vec2(-t * 0.6, t * 0.2) + n1 * 0.6);
-  float cloud = mix(n1, n2, 0.45);
+  /*
+   * 三层不同速度、不同缩放的云叠加，产生视差：
+   * 近处的云走得快、远处的慢，才有"飘"的感觉而不是整块平移。
+   */
+  float n1 = fbm(p * 1.0 + vec2(t * 1.0, t * 0.18));
+  float n2 = fbm(p * 1.8 + vec2(t * 0.62, -t * 0.12) + n1 * 0.5);
+  float n3 = fbm(p * 3.1 + vec2(-t * 0.38, t * 0.08));
+  float cloud = mix(mix(n1, n2, 0.45), n3, 0.22);
 
-  // 顶部更亮，像有光从上方打下来
-  float depth = pow(1.0 - uv.y, 1.35);
+  /*
+   * 云量：把噪声推成明显的团块（smoothstep 收窄过渡带），
+   * 之前对比太弱，看起来只是颜色在缓慢变化，不像云。
+   */
+  float mass = smoothstep(0.34, 0.78, cloud);
 
-  vec3 deep = vec3(0.043, 0.055, 0.114);   // 近黑蓝
-  vec3 mid = vec3(0.145, 0.129, 0.318);    // 紫
-  vec3 glow = vec3(0.451, 0.318, 0.651);   // 亮紫
+  // 蓝天：顶部更深邃的蔚蓝，地平线附近偏浅
+  vec3 skyTop = vec3(0.055, 0.290, 0.694);   // 深蔚蓝
+  vec3 skyLow = vec3(0.478, 0.741, 0.953);   // 浅天蓝
+  vec3 sky = mix(skyLow, skyTop, pow(1.0 - uv.y, 0.85));
 
-  vec3 col = mix(deep, mid, smoothstep(0.18, 0.72, cloud));
-  col = mix(col, glow, smoothstep(0.62, 1.02, cloud) * 0.55);
-  col += glow * depth * 0.16;
+  // 云：纯白，边缘带一点冷色阴影才不显得像贴纸
+  vec3 cloudShadow = vec3(0.647, 0.769, 0.925);
+  vec3 cloudLit = vec3(1.0, 1.0, 1.0);
+  vec3 cloudCol = mix(cloudShadow, cloudLit, smoothstep(0.30, 0.72, cloud));
+
+  // 阳光从上方来：云顶更亮
+  cloudCol += vec3(0.10, 0.09, 0.05) * pow(1.0 - uv.y, 1.2);
+
+  vec3 col = mix(sky, cloudCol, mass);
 
   // 轻微暗角，让中间更聚焦
-  float vig = smoothstep(1.25, 0.28, length(uv - 0.5) * 1.6);
-  col *= mix(0.82, 1.0, vig);
+  float vig = smoothstep(1.30, 0.30, length(uv - 0.5) * 1.6);
+  col *= mix(0.84, 1.0, vig);
 
   gl_FragColor = vec4(col, 1.0);
 }

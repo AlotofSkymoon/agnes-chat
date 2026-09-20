@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { LocalePicker } from "@/components/locale-picker";
 import {
   Dialog,
   DialogContent,
@@ -594,6 +595,11 @@ export function SettingsDialog({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 界面语言：简体 → 繁体 → 英文 → 法文 */}
+          <div className="rounded-xl border border-border/70 bg-card/40 p-3">
+            <LocalePicker />
           </div>
 
           {/* API Keys（按服务商）—— 站长可锁死为「仅用内置 Key」 */}
