@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/components/i18n-provider";
 import { LocalePicker } from "@/components/locale-picker";
 import {
   Dialog,
@@ -96,6 +97,7 @@ function CustomProviderEditor({
   existingIds: string[];
   onAdd: (provider: CustomProviderConfig, key: string) => void;
 }) {
+  const { t } = useI18n();
   const [editing, setEditing] = React.useState(false);
   const [label, setLabel] = React.useState("");
   const [url, setUrl] = React.useState("");
@@ -127,7 +129,7 @@ function CustomProviderEditor({
   /** 自动发现：问上游 /models 上有哪些模型 */
   async function probe() {
     const base = url.trim().replace(/\/+$/, "");
-    if (!base) return setErr("请先填写 Base URL");
+    if (!base) return setErr(t("settings.fillBaseUrl"));
 
     setProbing(true);
     setProbeMsg("");
@@ -149,13 +151,13 @@ function CustomProviderEditor({
         setFound(data.models);
         // 默认全选：一般中转站也就十几个模型，全勾上最省事
         setSelected(new Set(data.models));
-        setProbeMsg(`发现 ${data.total ?? data.models.length} 个模型，可取消勾选不需要的`);
+        setProbeMsg(`${t("settings.probeFound")} ${data.total ?? data.models.length} ${t("settings.modelsUnit")}`);
       } else {
         setFound([]);
-        setProbeMsg(data.error ?? "没探测到模型，请手动填写模型 id");
+        setProbeMsg(data.error ?? t("settings.probeNone"));
       }
     } catch {
-      setProbeMsg("探测失败，请手动填写模型 id");
+      setProbeMsg(t("settings.probeFailed"));
     } finally {
       setProbing(false);
     }
@@ -184,14 +186,14 @@ function CustomProviderEditor({
     const base = url.trim().replace(/\/+$/, "");
     const models = resolveModels();
 
-    if (!name) return setErr("请填写名称");
-    if (!base) return setErr("请填写 Base URL");
-    if (!/^https?:\/\//i.test(base)) return setErr("Base URL 必须以 http:// 或 https:// 开头");
-    if (isBlockedBaseUrl(base)) return setErr("不允许填写内网 / 本机地址");
-    if (models.length === 0) return setErr("至少选择一个或手填一个模型 id");
+    if (!name) return setErr(t("settings.fillName"));
+    if (!base) return setErr(t("settings.fillBaseUrl"));
+    if (!/^https?:\/\//i.test(base)) return setErr(t("settings.baseUrlProtocol"));
+    if (isBlockedBaseUrl(base)) return setErr(t("settings.baseUrlLocal"));
+    if (models.length === 0) return setErr(t("settings.needOneModel"));
 
     const id = `${CUSTOM_PROVIDER_PREFIX}${name.toLowerCase().replace(/[^a-z0-9_-]/g, "") || Date.now()}`;
-    if (existingIds.includes(id)) return setErr("已存在同名供应商");
+    if (existingIds.includes(id)) return setErr(t("settings.duplicateProvider"));
 
     onAdd(
       { id, label: name, baseUrl: base, models, vision, thinking },
@@ -208,7 +210,7 @@ function CustomProviderEditor({
         className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border px-3 py-2.5 text-xs text-fg-secondary hover:border-primary/50 hover:text-primary"
       >
         <Plus className="h-4 w-4" />
-        添加自定义 API 供应商（兼容 OpenAI 接口）
+        {t("settings.addProvider")}
       </button>
     );
   }
@@ -221,9 +223,9 @@ function CustomProviderEditor({
       </Label>
 
       <div className="space-y-1">
-        <Label className="text-[11px] text-fg-tertiary">名称</Label>
+        <Label className="text-[11px] text-fg-tertiary">{t("settings.providerName")}</Label>
         <Input
-          placeholder="例如：我的中转站"
+          placeholder={t("settings.namePlaceholder")}
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           autoComplete="off"
@@ -233,7 +235,7 @@ function CustomProviderEditor({
       <div className="space-y-1">
         <Label className="text-[11px] text-fg-tertiary">Base URL</Label>
         <Input
-          placeholder="例如：https://api.example.com/v1"
+          placeholder={t("settings.baseUrlPlaceholder")}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           autoComplete="off"
@@ -242,11 +244,11 @@ function CustomProviderEditor({
 
       <div className="space-y-1">
         <Label className="text-[11px] text-fg-tertiary">
-          API Key（选填，部分服务的 /models 需要）
+          {t("settings.apiKeyOptional")}
         </Label>
         <Input
           type="password"
-          placeholder="sk-...（留空也可探测）"
+          placeholder={t("settings.keyPlaceholder")}
           value={key}
           onChange={(e) => setKey(e.target.value)}
           autoComplete="off"
@@ -266,7 +268,7 @@ function CustomProviderEditor({
         ) : (
           <Search className="h-3.5 w-3.5" />
         )}
-        {probing ? "正在探测…" : "自动发现可用模型"}
+        {probing ? t("settings.probing") : t("settings.probe")}
       </Button>
 
       {probeMsg ? (
@@ -301,10 +303,10 @@ function CustomProviderEditor({
 
       <div className="space-y-1">
         <Label className="text-[11px] text-fg-tertiary">
-          模型 id（自动发现失败时手填，逗号或换行分隔）
+          {t("settings.modelIds")}
         </Label>
         <Input
-          placeholder="例如：gpt-5.6-terra"
+          placeholder={t("settings.modelIdPlaceholder")}
           value={modelsRaw}
           onChange={(e) => setModelsRaw(e.target.value)}
           autoComplete="off"
@@ -322,7 +324,7 @@ function CustomProviderEditor({
             onChange={(e) => setVision(e.target.checked)}
             className="h-3.5 w-3.5 rounded border-border"
           />
-          支持识图
+          {t("settings.supportsVision")}
         </label>
         <label className="flex items-center gap-2 text-xs text-fg-secondary">
           <input
@@ -331,7 +333,7 @@ function CustomProviderEditor({
             onChange={(e) => setThinking(e.target.checked)}
             className="h-3.5 w-3.5 rounded border-border"
           />
-          支持思考模式
+          {t("settings.supportsThinking")}
         </label>
       </div>
 
@@ -340,10 +342,10 @@ function CustomProviderEditor({
       <div className="flex gap-2">
         <Button type="button" size="sm" onClick={add}>
           <CheckIcon className="h-4 w-4" />
-          添加
+          {t("settings.add")}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={reset}>
-          取消
+          {t("common.cancel")}
         </Button>
       </div>
     </div>
@@ -360,6 +362,7 @@ export function SettingsDialog({
   onCloudSyncChange,
   onClearAll,
 }: SettingsDialogProps) {
+  const { t } = useI18n();
   const [form, setForm] = React.useState<ChatSettings>(settings);
   const [showKey, setShowKey] = React.useState<Record<string, boolean>>({});
   const [showSecret, setShowSecret] = React.useState(false);
@@ -442,7 +445,7 @@ export function SettingsDialog({
           bucket: data.bucket ?? "agnes-chat",
           publicBaseUrl: data.publicBaseUrl ?? "",
         });
-        setDiscoverMsg(data.message ?? "已直连 R2 绑定，无需任何密钥");
+        setDiscoverMsg(data.message ?? t("settings.r2Direct"));
         return;
       }
 
@@ -454,16 +457,16 @@ export function SettingsDialog({
           bucket: data.bucket,
           publicBaseUrl: data.publicBaseUrl ?? "",
         });
-        setDiscoverMsg(`已找到桶「${data.bucket}」，端点已自动填入`);
+        setDiscoverMsg(`${t("settings.bucketFound")}「${data.bucket}」，${t("settings.endpointFilled")}`);
       } else {
         setDiscoverMsg(
           data.available?.length
-            ? `${data.error ?? "未找到"}（可选：${data.available.join("、")}）`
-            : data.error ?? "未找到该桶",
+            ? `${data.error ?? t("settings.notFound")}（${t("settings.optional_")}${data.available.join("、")}）`
+            : data.error ?? t("settings.bucketNotFound"),
         );
       }
     } catch {
-      setDiscoverMsg("查找失败，请稍后重试");
+      setDiscoverMsg(t("settings.lookupFailed"));
     } finally {
       setDiscovering(false);
     }
@@ -566,7 +569,7 @@ export function SettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>设置</DialogTitle>
+          <DialogTitle>{t("settings.title")}</DialogTitle>
           <DialogDescription>{AGENT_TIP}</DialogDescription>
         </DialogHeader>
 
@@ -575,7 +578,7 @@ export function SettingsDialog({
           <div className="space-y-2 rounded-xl border border-border/70 bg-card/40 p-3">
             <Label className="flex items-center gap-2">
               <Palette className="h-4 w-4" />
-              配色主题
+              {t("settings.colorTheme")}
             </Label>
             <div className="grid grid-cols-2 gap-2">
               {THEME_PRESETS.map((t) => (
@@ -609,14 +612,14 @@ export function SettingsDialog({
               API Key
               {!ALLOW_CUSTOM_KEY ? (
                 <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] text-fg-tertiary">
-                  本站点已内置，无需填写
+                  {t("settings.builtInNote")}
                 </span>
               ) : null}
             </Label>
 
             {!ALLOW_CUSTOM_KEY ? (
               <p className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-[11px] text-fg-secondary">
-                本站已配置好 API Key，打开即可直接聊天。
+                {t("settings.presetReady")}
               </p>
             ) : null}
 
@@ -628,23 +631,21 @@ export function SettingsDialog({
               <div className="space-y-1.5 rounded-lg border border-amber-500/35 bg-amber-500/5 px-3 py-2.5">
                 <p className="flex items-start gap-1.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
                   <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" />
-                  关于自带的 API Key
+                  {t("settings.aboutPresetKey")}
                 </p>
                 <ul className="list-disc space-y-1 pl-5 text-[11px] leading-relaxed text-fg-tertiary">
+                  <li>{t("settings.disclaimer1")}</li>
                   <li>
-                    Key 仅用于代你向对应服务商发起请求，本站不做其他用途。
+                    {t("settings.disclaimer2a")}
+                    <strong className="font-medium">{t("settings.encrypted")}</strong>
+                    {t("settings.disclaimer2b")}
                   </li>
                   <li>
-                    开启云端保存后，Key 会<strong className="font-medium">加密后</strong>
-                    存到服务端，用于跨设备同步；明文不落库。
+                    {t("settings.disclaimer3a")}
+                    <strong className="font-medium">{t("settings.disclaimer3b")}</strong>
+                    {t("settings.disclaimer3c")}
                   </li>
-                  <li>
-                    Key 由你自己保管。若因分享账号、使用公共设备等原因导致泄露或被盗用，
-                    <strong className="font-medium">产生的费用由你自行承担</strong>，本站不承担责任。
-                  </li>
-                  <li>
-                    建议使用额度受限的子密钥，并定期轮换。
-                  </li>
+                  <li>{t("settings.disclaimer4")}</li>
                 </ul>
                 <p className="pt-0.5 text-[10px] text-fg-quaternary">
                   继续填写即表示你已理解并同意上述内容。
@@ -664,7 +665,7 @@ export function SettingsDialog({
                       {p.label}
                       {isCustom ? (
                         <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
-                          自定义
+                          {t("settings.custom")}
                         </span>
                       ) : null}
                     </span>
@@ -684,7 +685,7 @@ export function SettingsDialog({
                         rel="noreferrer noopener"
                         className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                       >
-                        去申请
+                        {t("settings.apply")}
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     )}
@@ -706,7 +707,7 @@ export function SettingsDialog({
                       type="button"
                       onClick={() => setShowKey((s) => ({ ...s, [pid]: !s[pid] }))}
                       className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground hover:bg-muted"
-                      aria-label="显示/隐藏 Key"
+                      aria-label={t("settings.toggleKey")}
                     >
                       {showKey[pid] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -727,7 +728,7 @@ export function SettingsDialog({
                         className="flex items-center gap-1.5 text-[11px] text-fg-tertiary"
                       >
                         <Server className="h-3 w-3" />
-                        {p.label} 的 Base URL（仅影响本服务商）
+                        {p.label} {t("settings.baseUrlSuffix")}
                       </Label>
                       <Input
                         id={`bu-${pid}`}

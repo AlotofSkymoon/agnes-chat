@@ -78,6 +78,19 @@ const SECRET_VARS = [
   "IP_GUARD_RISK_THRESHOLD",
   "IP_GUARD_BLOCK_BEHAVIORS",
   "IP_GUARD_ALLOWLIST",
+  /**
+   * 邮箱验证（Resend）。
+   *
+   * ⚠️ 为什么必须注入：发信走的是 API 路由（Node runtime），读的是运行时
+   * process.env。填在 GitHub Secrets 但没列进这里的话，脚本不会写进
+   * wrangler.action.jsonc，Worker 里就读不到 ——
+   * `isEmailConfigured()` 返回 false，注册会**静默跳过验证**
+   * （fail-open 设计），站长以为配好了邮箱验证，实际上新用户根本没收到邮件。
+   *
+   * 不填时保持跳过验证的行为，站点照常可用。
+   */
+  "RESEND_API_KEY",
+  "RESEND_FROM",
 ];
 
 async function api(pathname, options = {}) {
@@ -250,7 +263,7 @@ async function main() {
   console.log(`D1   ${NAME.d1.padEnd(16)} ${d1.id || "(失败)"}  [${d1.how}]`);
   console.log(`R2   ${NAME.r2}`);
   console.log("密钥：");
-  for (const k of ["SESSION_SECRET", "PRESET_AGNES_API_KEY", "JWT_SECRET"]) {
+  for (const k of ["SESSION_SECRET", "PRESET_AGNES_API_KEY", "JWT_SECRET", "RESEND_API_KEY", "RESEND_FROM"]) {
     console.log(`  ${k.padEnd(22)} ${mask((process.env[k] ?? "").trim())}`);
   }
   console.log("==========================================\n");

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { PageTitle } from "@/components/page-i18n";
 import { SiteFooter } from "@/components/site-footer";
 import { SponsorContent } from "@/components/sponsor/sponsor-content";
 import { CloudShader } from "@/components/ui/cloud-shader";
@@ -22,6 +23,7 @@ export default function SponsorPage() {
    */
   return (
     <main className="relative min-h-screen-safe">
+      <PageTitle titleKey="route.sponsor" />
       {/*
         整页背景：WebGL 云层（fbm noise），蓝天白云，三层不同速度产生视差。
         WebGL 不可用时由组件内部的 CSS 云团兜底，一样是蓝天白云且会飘。

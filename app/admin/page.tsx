@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AdminClient } from "@/components/admin-client";
+import { I18nText, PageTitle } from "@/components/page-i18n";
 import { getCurrentSafeUser } from "@/lib/auth";
 import { hasRedisConfig } from "@/lib/redis";
 import { pageTitle } from "@/lib/site";
@@ -21,16 +22,23 @@ export default async function AdminPage() {
     return (
       <main className="flex min-h-screen-safe items-center justify-center px-4">
         <div className="rounded-2xl border border-destructive/40 bg-destructive/10 px-6 py-5 text-center">
-          <h1 className="text-lg font-semibold text-destructive">403 无访问权限</h1>
-          <p className="mt-2 text-sm text-muted-foreground">该页面仅管理员可见。</p>
+          <h1 className="text-lg font-semibold text-destructive">
+            <I18nText k="admin.denied" />
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            <I18nText k="admin.deniedDesc" />
+          </p>
         </div>
       </main>
     );
   }
 
   return (
-    <AdminClient
-      me={{ id: me.id, email: me.email, role: me.role, createdAt: me.createdAt }}
-    />
+    <>
+      <PageTitle titleKey="route.admin" />
+      <AdminClient
+        me={{ id: me.id, email: me.email, role: me.role, createdAt: me.createdAt }}
+      />
+    </>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { useI18n } from "@/components/i18n-provider";
 import { ChatFooter } from "@/components/chat/chat-footer";
 import { ChatInput } from "@/components/chat/chat-input";
 import { EmptyState } from "@/components/chat/empty-state";
@@ -69,6 +70,7 @@ const DEFAULT_SETTINGS: ChatSettings = {
 };
 
 export function ChatWorkspace({ user }: { user: SafeUser | null }) {
+  const { t } = useI18n();
   const {
     conversations,
     currentId,
@@ -278,7 +280,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
           if (!alive || !d?.conversations) return;
           const n = mergeFromCloud(d.conversations);
           if (n > 0) {
-            toast.success(`已从云端恢复 ${n} 个对话`);
+            toast.success(`${t("chat.restored")} ${n} ${t("chat.convsUnit")}`);
           }
         },
       )
@@ -430,7 +432,9 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
           if (!isLastUser) {
             const past =
               atts.length > 0
-                ? `${m.content}\n（此前附带的附件：${atts.map((a) => a.name).join("、")}）`
+                ? `${m.content}\n${t("chat.prevAttachments", {
+                  names: atts.map((a) => a.name).join("、"),
+                })}`
                 : m.content;
             return { role: m.role, content: past };
           }
@@ -445,14 +449,18 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
 
           const textBlocks = [
             m.content,
-            ...textAtts.map((a) => `\n---\n【附件：${a.name}】\n${a.content}`),
+            ...textAtts.map(
+                (a) => `\n---\n${t("chat.attachmentNamed", { name: a.name })}\n${a.content}`,
+              ),
             ...otherAtts.map((a) =>
               a.content && /^https?:\/\//.test(a.content)
-                ? `\n【${a.kind === "video" ? "视频" : "附件"}：${a.name}】${a.content}`
-                : `\n【附件：${a.name}】${a.note ?? "（内容不可用）"}`,
+                ? `\n【${a.kind === "video" ? t("chat.video") : t("chat.attachment")}：${a.name}】${a.content}`
+                : `\n${t("chat.attachmentNamed", { name: a.name })}${
+                    a.note ?? t("chat.contentUnavailable")
+                  }`,
             ),
             ...(atts.length > 0 && !visionOkNow && atts.some((a) => a.kind === "image")
-              ? ["\n（当前模型不支持识图，图片未发送）"]
+              ? [`\n${t("chat.noVision")}`]
               : []),
           ]
             .filter(Boolean)
@@ -514,12 +522,12 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
               // 来源先挂上，这样即使后面流式失败也能看到引用
               if (searchSources.length) patchAssistant({ sources: searchSources });
             } else if (sd.error) {
-              toast.info(`联网搜索未成功：${sd.error}。将按常规方式回答。`);
+              toast.info(t("chat.webSearchFailed", { err: sd.error }));
             }
           }
         } catch (err) {
           if ((err as Error)?.name !== "AbortError") {
-            toast.info("联网搜索失败，将按常规方式回答。");
+            toast.info(t("chat.webFailed"));
           }
         }
       }
@@ -581,8 +589,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         );
         toast.error(
           hasImage
-            ? `内容共 ${formatBytes(bodyBytes)}，超出发送上限。图片请配置对象存储后以链接发送，或减少附件数量`
-            : `内容共 ${formatBytes(bodyBytes)}，超出发送上限。请精简文本或减少附件后重试`,
+            ? t("chat.bodyTooLargeImages", { size: formatBytes(bodyBytes) })
+            : t("chat.bodyTooLarge", { size: formatBytes(bodyBytes) }),
           { duration: 6000 },
         );
         setStatus("idle");
@@ -598,7 +606,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
         });
 
         if (!res.ok || !res.body) {
-          let message = "请求失败，请稍后重试";
+          let message = t("chat.requestFailed");
           // 优先用服务端给的文案（429 时会带上原因、上游原文与排查方向）
           let fromServer = false;
           try {
@@ -610,17 +618,20 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
               message = data.error;
               fromServer = true;
               // 上游原文单独一行，便于一眼看清到底是谁在限流
-              if (data.upstreamMessage && data.upstreamMessage !== "（上游未给出具体说明）") {
-                message += `\n上游原文：${data.upstreamMessage}`;
+              if (
+                data.upstreamMessage &&
+                data.upstreamMessage !== t("chat.upstreamNoDetail")
+              ) {
+                message += `\n${t("chat.upstreamRaw", { msg: data.upstreamMessage })}`;
               }
             }
           } catch {
             /* 非 JSON 响应，走下面的兜底 */
           }
           if (!fromServer) {
-            if (res.status === 401) message = "API Key 无效，请在设置中检查你的 Key";
-            else if (res.status === 429) message = "请求过快（429），请稍等几秒后再试";
-            else if (res.status >= 500) message = "服务暂时不可用，请稍后重试";
+            if (res.status === 401) message = t("chat.keyInvalid");
+            else if (res.status === 429) message = t("chat.rateLimited");
+            else if (res.status >= 500) message = t("chat.serverUnavailable");
           }
           patchAssistant({ error: message });
           return;
@@ -662,11 +673,11 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
           }
         }
 
-        if (!acc && !reasoningAcc) patchAssistant({ error: "未收到模型返回内容，请重试" });
+        if (!acc && !reasoningAcc) patchAssistant({ error: t("chat.noContent") });
         else patchAssistant({ reasoningDone: true });
       } catch (error) {
         const isAbort = (error as Error)?.name === "AbortError";
-        patchAssistant({ error: isAbort ? "已停止生成" : "网络错误，请检查连接后重试" });
+        patchAssistant({ error: isAbort ? t("chat.stopped") : t("chat.networkErr") });
       } finally {
         setStatus("idle");
         setStreamingId(null);
@@ -688,8 +699,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
        * 免得用户打完一长段字才被告知需要登录。
        */
       if (REQUIRE_LOGIN && !user) {
-        toast.error("本站需要登录后才能对话", {
-          description: "右上角「登录 / 注册」即可，第一个注册的账号自动成为管理员。",
+        toast.error(t("chat.needLogin"), {
+          description: t("chat.needLoginDesc"),
           duration: 5000,
         });
         return;
@@ -755,7 +766,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     messagesRef.current = [];
     setMessages([]);
     setAttachments([]);
-    toast.success("已清空当前对话");
+    toast.success(t("chat.clearedCurrent"));
   }
 
   function clearAllData() {
@@ -772,7 +783,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     } catch {
       /* 忽略 */
     }
-    toast.success("已清空全部本地数据");
+    toast.success(t("chat.clearedAll"));
   }
 
   /* --------------------------- 对象存储上传 --------------------------- */
@@ -847,7 +858,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       contentType?: string;
     };
     if (!res.ok || !data.url) {
-      throw new Error(data.error ?? `直传失败（${res.status}）`);
+      throw new Error(data.error ?? t("chat.directFailed", { code: res.status }));
     }
 
     const mime = data.contentType || file.type || "application/octet-stream";
@@ -880,7 +891,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       kind?: string;
     };
     if (!res.ok || !data.uploadUrl || !data.publicUrl) {
-      throw new Error(data.error ?? `预签名失败（${res.status}）`);
+      throw new Error(data.error ?? t("chat.presignFailed", { code: res.status }));
     }
 
     // 直传对象存储：文件不经过本站服务器（Vercel 请求体上限 4.5MB）
@@ -890,7 +901,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
       headers: { "content-type": file.type || "application/octet-stream" },
     });
     if (!put.ok) {
-      throw new Error(`上传失败（${put.status}）：请检查存储桶 CORS 与公开读设置`);
+      throw new Error(t("chat.putFailed", { code: put.status }));
     }
 
     const kind: AttachmentKind =
@@ -934,11 +945,11 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
 
     const room = MAX_FILES - attachments.length;
     if (room <= 0) {
-      toast.error(`最多同时上传 ${MAX_FILES} 个文件`);
+      toast.error(t("chat.maxFilesReached", { n: MAX_FILES }));
       return;
     }
     if (list.length > room) {
-      toast.warning(`最多 ${MAX_FILES} 个文件，已只取前 ${room} 个`);
+      toast.warning(t("chat.maxFilesTrimmed", { n: MAX_FILES, room }));
     }
 
     const picked = list.slice(0, room);
@@ -956,7 +967,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     const willUpload = storageAvailable && picked.some(needsRemote);
 
     let toastId: string | number | undefined;
-    if (willUpload) toastId = toast.loading("正在上传到对象存储…");
+    if (willUpload) toastId = toast.loading(t("chat.uploading"));
 
     // 本地内嵌（base64）的体积红线：超过这个就别硬塞了，必被服务端拒。
     // 图片经压缩后一般远低于此值，触发说明图确实太大或压缩没生效。
@@ -1052,7 +1063,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
 
     if (toastId !== undefined) {
       const okCount = parsed.filter((a) => a.content?.startsWith("http")).length;
-      if (okCount > 0) toast.success(`已上传 ${okCount} 个文件`, { id: toastId });
+      if (okCount > 0) toast.success(`${t("chat.uploadedFiles")} ${okCount} ${t("chat.filesUnit")}`, { id: toastId });
       else toast.dismiss(toastId);
     }
 
@@ -1154,7 +1165,7 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
     } catch {
       /* 忽略 */
     }
-    toast.success("设置已保存");
+    toast.success(t("chat.settingsSaved"));
   }
 
   const isEmpty = messages.length === 0;
@@ -1193,8 +1204,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
               variant="ghost"
               size="icon"
               onClick={handleSidebarButton}
-              aria-label={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
-              title={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
+              aria-label={sidebarCollapsed ? t("sidebar.expand") : t("sidebar.collapse")}
+              title={sidebarCollapsed ? t("sidebar.expand") : t("sidebar.collapse")}
             >
               {sidebarCollapsed ? (
                 <PanelLeftOpen className="h-4 w-4" />
@@ -1208,8 +1219,8 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
                 variant="ghost"
                 size="icon"
                 onClick={handleNew}
-                aria-label="开启新对话"
-                title="开启新对话"
+                aria-label={t("sidebar.newChat")}
+                title={t("sidebar.newChat")}
                 className="hidden md:inline-flex"
               >
                 <Plus className="h-4 w-4" />
@@ -1217,27 +1228,27 @@ export function ChatWorkspace({ user }: { user: SafeUser | null }) {
             ) : null}
             <span className="truncate text-sm text-fg-secondary">
               {isEmpty
-                ? "新对话"
-                : (conversations.find((c) => c.id === currentId)?.title ?? "新对话")}
+                ? t("chat.newChat")
+                : (conversations.find((c) => c.id === currentId)?.title ?? t("chat.newChat"))}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Button variant="ghost" size="icon" asChild title="导航站">
+            <Button variant="ghost" size="icon" asChild title={t("chat.navSite")}>
               <Link href="/nav">
                 <Compass className="h-4 w-4" />
               </Link>
             </Button>
-            <Button variant="ghost" size="icon" asChild title="云电脑">
+            <Button variant="ghost" size="icon" asChild title={t("chat.cloudPc")}>
               <Link href="/pc">
                 <Monitor className="h-4 w-4" />
               </Link>
             </Button>
             {!isEmpty ? (
-              <Button variant="ghost" size="icon" onClick={handleClearCurrent} title="清空当前对话">
+              <Button variant="ghost" size="icon" onClick={handleClearCurrent} title={t("chat.clearCurrent")}>
                 <Eraser className="h-4 w-4" />
               </Button>
             ) : null}
-            <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title="设置">
+            <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title={t("settings.title")}>
               <Settings2 className="h-4 w-4" />
             </Button>
             {/* 主题切换：常驻顶栏，液态玻璃 */}

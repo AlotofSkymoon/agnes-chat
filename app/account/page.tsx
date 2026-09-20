@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AccountClient } from "@/components/account-client";
+import { PageTitle } from "@/components/page-i18n";
 import { getCurrentSafeUser } from "@/lib/auth";
 import { hasRedisConfig } from "@/lib/redis";
 import { pageTitle } from "@/lib/site";
@@ -16,5 +17,12 @@ export default async function AccountPage() {
   }
   const me = user as NonNullable<typeof user>;
 
-  return <AccountClient user={{ id: me.id, email: me.email, role: me.role, createdAt: me.createdAt }} />;
+  return (
+    <>
+      <PageTitle titleKey="route.account" />
+      <AccountClient
+        user={{ id: me.id, email: me.email, role: me.role, createdAt: me.createdAt }}
+      />
+    </>
+  );
 }

@@ -26,7 +26,8 @@ import { t as translate } from "@/lib/i18n/dict";
 interface I18nValue {
   locale: Locale;
   setLocale: (next: Locale) => void;
-  t: (key: string) => string;
+  /** vars 用于 {name} 插值，如 t("video.transcodingPlan", { i: 1, n: 3, name: "H.264" }) */
+  t: (key: string, vars?: Record<string, string | number>) => string;
   /** 是否已从存储恢复：避免把"还没恢复"误当成"用户选了简体" */
   ready: boolean;
 }
@@ -67,7 +68,10 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const t = React.useCallback((key: string) => translate(key, locale), [locale]);
+  const t = React.useCallback(
+    (key: string, vars?: Record<string, string | number>) => translate(key, locale, vars),
+    [locale],
+  );
 
   const value = React.useMemo<I18nValue>(
     () => ({ locale, setLocale, t, ready }),
@@ -94,7 +98,8 @@ export function useI18n(): I18nValue {
   return {
     locale: DEFAULT_LOCALE,
     setLocale: () => {},
-    t: (key: string) => translate(key, DEFAULT_LOCALE),
+    t: (key: string, vars?: Record<string, string | number>) =>
+      translate(key, DEFAULT_LOCALE, vars),
     ready: false,
   };
 }

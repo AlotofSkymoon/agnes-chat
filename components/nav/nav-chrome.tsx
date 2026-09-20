@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Compass, LogIn, MessageSquare, Shield, User as UserIcon } from "lucide-react";
 
 import { AgnesIcon } from "@/components/agnes-logo";
+import { useI18n } from "@/components/i18n-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { SITE_NAME } from "@/lib/site";
@@ -18,6 +19,7 @@ interface ChromeUser {
 
 /** 导航站 / 通用子页面的顶部栏（含主题切换、聊天入口、账户入口） */
 export function NavChrome({ user }: { user?: ChromeUser | null }) {
+  const { t } = useI18n();
   const [me, setMe] = React.useState<ChromeUser | null>(user ?? null);
 
   React.useEffect(() => {
@@ -45,10 +47,10 @@ export function NavChrome({ user }: { user?: ChromeUser | null }) {
         <Button variant="ghost" size="sm" asChild>
           <Link href="/">
             <MessageSquare className="h-4 w-4" />
-            <span className="hidden sm:inline">聊天</span>
+            <span className="hidden sm:inline">{t("chrome.chat")}</span>
           </Link>
         </Button>
-        <Button variant="ghost" size="icon" asChild title="导航">
+        <Button variant="ghost" size="icon" asChild title={t("chrome.nav")}>
           <Link href="/nav">
             <Compass className="h-4 w-4" />
           </Link>
@@ -58,13 +60,13 @@ export function NavChrome({ user }: { user?: ChromeUser | null }) {
         {me ? (
           <>
             {me.role === "admin" ? (
-              <Button variant="ghost" size="icon" asChild title="管理员">
+              <Button variant="ghost" size="icon" asChild title={t("chrome.admin")}>
                 <Link href="/admin">
                   <Shield className="h-4 w-4 text-primary" />
                 </Link>
               </Button>
             ) : null}
-            <Button variant="ghost" size="icon" asChild title="账户">
+            <Button variant="ghost" size="icon" asChild title={t("chrome.account")}>
               <Link href="/account">
                 <UserIcon className="h-4 w-4" />
               </Link>
@@ -74,7 +76,7 @@ export function NavChrome({ user }: { user?: ChromeUser | null }) {
           <Button variant="ghost" size="sm" asChild>
             <Link href="/login">
               <LogIn className="h-4 w-4" />
-              登录
+              {t("sidebar.login")}
             </Link>
           </Button>
         )}

@@ -50,6 +50,9 @@ jobs:
       NEXT_PUBLIC_ALLOW_WEB_SEARCH: ${{ vars.NEXT_PUBLIC_ALLOW_WEB_SEARCH || 'true' }}
       SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      # 邮箱验证（Resend）。不填则注册跳过验证，站点照常可用。
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_FROM: ${{ secrets.RESEND_FROM || vars.RESEND_FROM }}
 
     steps:
       - name: 拉取代码

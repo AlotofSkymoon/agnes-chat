@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ExternalLink, Loader2, Search, Sparkles } from "lucide-react";
 
+import { useI18n } from "@/components/i18n-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ interface TldPayload {
 }
 
 export function NavBoard() {
+  const { t } = useI18n();
   const [categories, setCategories] = React.useState<NavCategory[]>(DEFAULT_NAV);
   const [query, setQuery] = React.useState("");
   const [tab, setTab] = React.useState<"tools" | "tld">("tools");
@@ -102,13 +104,13 @@ export function NavBoard() {
       {/* Header */}
       <div className="mb-8 text-center">
         <h1 className="bg-gradient-to-r from-violet-500 to-blue-500 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl">
-          Agnes AI 导航
+          {t("nav.titleMain")}
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          🚀 站长工具 · 免费资源 · 全球域名后缀速查
+          🚀 {t("nav.tagline")}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          📡 域名数据来源：ICANN / IANA
+          📡 {t("nav.source")}
         </p>
       </div>
 
@@ -123,7 +125,7 @@ export function NavBoard() {
               : "border border-border/70 bg-card/50 text-muted-foreground hover:text-foreground",
           )}
         >
-          🧰 工具导航
+          🧰 {t("nav.tools")}
         </button>
         <button
           onClick={() => setTab("tld")}
@@ -134,7 +136,7 @@ export function NavBoard() {
               : "border border-border/70 bg-card/50 text-muted-foreground hover:text-foreground",
           )}
         >
-          📄 全球域名后缀
+          📄 {t("nav.tlds")}
         </button>
       </div>
 
@@ -146,7 +148,7 @@ export function NavBoard() {
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={`搜索 ${totalLinks} 个站点…`}
+              placeholder={`${t("nav.searchSites")} ${totalLinks} ${t("nav.sitesUnit")}`}
               className="pl-9"
             />
           </div>
@@ -180,7 +182,7 @@ export function NavBoard() {
                       <div className="flex items-start justify-between gap-2">
                         <span className="font-medium leading-snug">{item.name}</span>
                         {item.recommended ? (
-                          <Badge className="shrink-0 text-[10px]">荐</Badge>
+                          <Badge className="shrink-0 text-[10px]">{t("nav.recommended")}</Badge>
                         ) : null}
                       </div>
                       {item.desc ? (
@@ -189,7 +191,7 @@ export function NavBoard() {
                         </span>
                       ) : null}
                       <span className="mt-2 flex items-center gap-1 text-[11px] text-primary opacity-0 transition-opacity group-hover:opacity-100">
-                        访问
+                        {t("nav.visit")}
                         <ExternalLink className="h-3 w-3" />
                       </span>
                     </a>
@@ -198,7 +200,7 @@ export function NavBoard() {
               </section>
             ))}
             {filtered.length === 0 ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">没有匹配的站点</p>
+              <p className="py-12 text-center text-sm text-muted-foreground">{t("nav.noMatch")}</p>
             ) : null}
           </div>
         </>
@@ -207,16 +209,16 @@ export function NavBoard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Sparkles className="h-4 w-4" />
-              全球域名后缀速查
+              {t("nav.tldLookup")}
             </CardTitle>
             <CardDescription>
               {tldMeta
                 ? tldMeta.source === "iana" || tldMeta.source === "cache"
-                  ? `ICANN / IANA 权威列表 · 共 ${tldMeta.count} 个后缀`
+                  ? `${t("nav.authoritative")} · ${t("nav.totalUnit")} ${tldMeta.count} ${t("nav.tldUnit")}`
                   : tldMeta.source === "fallback"
-                    ? `内置常用列表（IANA 拉取失败） · 共 ${tldMeta.count} 个后缀`
-                    : "加载失败"
-                : "加载中…"}
+                    ? `${t("nav.builtIn")} · ${t("nav.totalUnit")} ${tldMeta.count} ${t("nav.tldUnit")}`
+                    : t("nav.loadFailed")
+                : t("nav.loading")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -225,7 +227,7 @@ export function NavBoard() {
               <Input
                 value={tldQuery}
                 onChange={(e) => setTldQuery(e.target.value)}
-                placeholder="搜索后缀，如 dev / 中国…"
+                placeholder={t("nav.tldPlaceholder")}
                 className="pl-9"
                 disabled={tldLoading}
               />
@@ -234,7 +236,7 @@ export function NavBoard() {
             {tldLoading ? (
               <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                正在从 IANA 获取…
+                {t("nav.fetchingIana")}
               </div>
             ) : (
               <>
@@ -273,14 +275,14 @@ export function NavBoard() {
                   ))}
                   {grouped.length === 0 ? (
                     <p className="py-10 text-center text-sm text-muted-foreground">
-                      {tq ? `没有匹配 ".${tq}" 的后缀` : "暂无数据"}
+                      {tq ? `${t("nav.noTldMatch")} ".${tq}" ${t("nav.tldUnit")}` : t("nav.noData")}
                     </p>
                   ) : null}
                 </div>
 
                 {tldQuery ? (
                   <p className="mt-3 text-xs text-muted-foreground">
-                    匹配 {filteredTlds.length} 个后缀
+                    {t("nav.matched")} {filteredTlds.length} {t("nav.tldUnit")}
                   </p>
                 ) : null}
               </>
@@ -290,7 +292,7 @@ export function NavBoard() {
       )}
 
       <p className="mt-10 text-center text-xs text-muted-foreground">
-        链接由社区整理，站长可在管理后台增删改 · 点击卡片跳转外部站点
+        {t("nav.communityNote")}
       </p>
     </div>
   );

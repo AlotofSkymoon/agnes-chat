@@ -3,6 +3,7 @@
 import * as React from "react";
 import { QrCode, TriangleAlert } from "lucide-react";
 
+import { useI18n } from "@/components/i18n-provider";
 import { GlareCard } from "@/components/ui/glare-card";
 import type { SponsorChannel } from "@/lib/site";
 
@@ -17,6 +18,7 @@ import type { SponsorChannel } from "@/lib/site";
  * 加载失败时切成说明卡：访客看到"暂未配置"，站长看到该去哪配。
  */
 function ChannelCard({ channel }: { channel: SponsorChannel }) {
+  const { t } = useI18n();
   const [failed, setFailed] = React.useState(false);
 
   /**
@@ -43,10 +45,10 @@ function ChannelCard({ channel }: { channel: SponsorChannel }) {
               <TriangleAlert className="h-5 w-5" />
             </div>
             <p className="text-sm font-medium text-white">
-              {channel.name} 收款码暂未配置
+              {t("sponsor.notConfigured", { name: channel.name })}
             </p>
             <p className="px-2 text-xs leading-relaxed text-white/60">
-              把图片放到{" "}
+              {t("sponsor.putFileHere")}{" "}
               <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-[11px] text-white/80">
                 {channel.qr}
               </code>
@@ -66,7 +68,7 @@ function ChannelCard({ channel }: { channel: SponsorChannel }) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={channel.qr}
-              alt={`${channel.name} 收款二维码`}
+              alt={t("sponsor.qrAlt", { name: channel.name })}
               width={640}
               height={640}
               loading="lazy"
@@ -95,6 +97,7 @@ function ChannelCard({ channel }: { channel: SponsorChannel }) {
  * 两个都摆出来，各自挑方便的那个。
  */
 export function SponsorChannels({ channels }: { channels: SponsorChannel[] }) {
+  const { t } = useI18n();
   const list = (channels ?? []).filter((c) => c && c.qr);
   if (list.length === 0) return null;
 
@@ -113,8 +116,8 @@ export function SponsorChannels({ channels }: { channels: SponsorChannel[] }) {
       </div>
       <p className="mt-3 text-center text-[11px] text-white/50">
         {single
-          ? "长按或扫描二维码 · 金额随意"
-          : "挑一个你方便的方式 · 长按或扫描二维码 · 金额随意"}
+          ? t("sponsor.hintSingle")
+          : t("sponsor.hintMulti")}
       </p>
     </section>
   );

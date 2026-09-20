@@ -797,6 +797,73 @@ API Key 属于敏感信息，**服务端用 AES-256-GCM 加密后入库，明文
 
 ---
 
+## 📧 注册邮箱验证（Resend，可选）
+
+注册时发一封 6 位验证码到用户邮箱，验证通过才算注册成功。
+
+**不配也能用**：没填 Key 时注册会**跳过验证**直接放行，站点照常可用。
+这是刻意的 fail-open —— 否则站长忘了配邮件服务，所有新用户都注册不了。
+
+### 三步配好
+
+**1. 拿 API Key**
+
+去 [resend.com/api-keys](https://resend.com/api-keys) 注册并创建一个 Key。
+免费额度 3,000 封/月、每天 100 封，个人站够用。
+
+**2. 验证发件域名**
+
+Resend 后台 → Domains → 添加你的域名 → 按提示加两条 DNS 记录（SPF / DKIM）。
+
+> ⚠️ 免费用户**不验证域名只能发到你自己注册邮箱**，别人收不到。
+> 这一步最容易漏，漏了的表现是"注册时收不到邮件，但站点没报错"。
+>
+> 赶时间可以用 `onboarding@resend.dev` 这个 Resend 提供的测试发件地址，
+> 但同样只能发给你自己，仅适合自测。
+
+**3. 填两个变量**
+
+```bash
+RESEND_API_KEY=re_xxxxxxxxxxxx
+RESEND_FROM=Agnes AI <onboarding@yourdomain.com>
+```
+
+`RESEND_FROM` 支持 `名字 <地址>` 和纯地址两种写法，域名必须已在 Resend 验证过。
+
+### 按部署方式填在哪
+
+| 部署方式 | 填在哪 | 备注 |
+|---|---|---|
+| **Actions** | Settings → Secrets → Actions | 脚本已自动注入，改完推送一次即可 |
+| **界面部署** | Workers → 设置 → 变量和机密 | 类型选「机密」，**改完要重新部署** |
+| **Vercel** | 项目 → Settings → Environment Variables | 改完 Redeploy |
+
+> ⚠️ Actions 部署时，**填在 GitHub Secrets 但没被脚本注入的话运行时读不到**，
+> 表现是"配了邮箱验证，但注册从来不发信"。
+> `RESEND_API_KEY` / `RESEND_FROM` 已在注入列表里（`scripts/prepare-deploy.mjs` 的 `SECRET_VARS`），
+> 正常推送即可生效。
+
+### 其他行为
+
+- 验证码 **30 分钟**有效
+- 重发有 **60 秒**冷却，防刷
+- **发信失败时放行并提示**：账号会被标记为已验证、直接登录，页面提示
+  「注册成功（邮件服务暂不可用，已直接放行）」。
+  这是刻意的 —— 邮件服务故障不该变成用户的注册障碍；
+  但反过来说，**配了 Key 也不代表一定能拦住未验证邮箱**，这点要有预期。
+- 邮件标题与正文里的站名跟随 `SITE_NAME`
+
+### 排查
+
+收不到信，按顺序查：
+
+1. `RESEND_API_KEY` 和 `RESEND_FROM` **两个都填了**（只填一个等于没配）
+2. 发件域名在 Resend 后台显示 **Verified**
+3. 检查垃圾邮件箱
+4. Resend 后台 → Emails 看投递状态和失败原因（这里能看到被拒的真实原因）
+
+---
+
 ## 路由一览
 
 | 路由 | 说明 |

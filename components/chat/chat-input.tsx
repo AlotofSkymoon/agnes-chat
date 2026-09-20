@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 
+import { useI18n } from "@/components/i18n-provider";
 import { ModelPicker } from "@/components/chat/model-picker";
 import type { CustomProviderConfig } from "@/lib/config";
 import { formatBytes, type Attachment } from "@/lib/types";
@@ -55,7 +56,7 @@ export function ChatInput({
   model,
   onModelChange,
   customProviders = [],
-  placeholder = "给 Agnes 发送消息",
+  placeholder,
   attachments = [],
   onPickFiles,
   onRemoveAttachment,
@@ -66,6 +67,7 @@ export function ChatInput({
   webSearch = false,
   onWebSearchChange,
 }: ChatInputProps) {
+  const { t } = useI18n();
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
@@ -150,7 +152,7 @@ export function ChatInput({
         ref={textareaRef}
         rows={1}
         value={value}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("input.placeholder")}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
@@ -173,8 +175,8 @@ export function ChatInput({
               onClick={() => onThinkingChange(!thinking)}
               title={
                 thinking
-                  ? "思考模式已开启：模型会先输出推理过程"
-                  : "开启思考模式：模型先推理再作答"
+                  ? t("input.thinkOn")
+                  : t("input.thinkOff")
               }
               aria-pressed={thinking}
               className={
@@ -184,7 +186,7 @@ export function ChatInput({
               }
             >
               <Brain className="h-3.5 w-3.5" />
-              思考
+              {t("input.think")}
             </button>
           ) : null}
           {webSearchSupported && onWebSearchChange ? (
@@ -193,8 +195,8 @@ export function ChatInput({
               onClick={() => onWebSearchChange(!webSearch)}
               title={
                 webSearch
-                  ? "联网已开启：会先搜索再作答，回答会标注来源"
-                  : "开启联网：先搜再答，回答会标注来源"
+                  ? t("input.webOn")
+                  : t("input.webOff")
               }
               aria-pressed={webSearch}
               className={
@@ -204,7 +206,7 @@ export function ChatInput({
               }
             >
               <Globe className="h-3.5 w-3.5" />
-              联网
+              {t("input.web")}
             </button>
           ) : null}
           {onPickFiles ? (
@@ -212,8 +214,8 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                title="添加附件（也可拖拽文件到页面）"
-                aria-label="添加附件"
+                title={t("input.attachTip")}
+                aria-label={t("input.attach")}
                 className="flex h-7 w-7 items-center justify-center rounded-full text-fg-tertiary transition-colors hover:bg-muted hover:text-foreground"
               >
                 <Paperclip className="h-3.5 w-3.5" />
@@ -240,14 +242,14 @@ export function ChatInput({
               className="flex h-8 items-center gap-1.5 rounded-full border border-border bg-background px-3.5 text-sm transition-colors hover:bg-muted"
             >
               <Square className="h-3.5 w-3.5 fill-current" />
-              停止
+              {t("input.stop")}
             </button>
           ) : (
             <button
               onClick={onSubmit}
               disabled={!value.trim() && attachments.length === 0}
               className="flex h-8 w-8 items-center justify-center rounded-full bg-[#4D6BFE] text-white transition-all hover:bg-[#3757E4] disabled:cursor-not-allowed disabled:bg-muted disabled:text-fg-quaternary"
-              title="发送"
+              title={t("input.send")}
             >
               <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
             </button>

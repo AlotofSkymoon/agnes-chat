@@ -2,6 +2,8 @@
 
 import * as React from "react";
 
+import { useI18n } from "@/components/i18n-provider";
+
 /**
  * 备案徽章。
  *
@@ -138,6 +140,7 @@ export function SiteFooterBadge({
   href?: string;
   size?: number;
 }) {
+  const { t } = useI18n();
   // 图片加载失败就退回内联 SVG
   const [failed, setFailed] = React.useState(false);
 
@@ -157,7 +160,7 @@ export function SiteFooterBadge({
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
-      alt={alt || "备案徽章"}
+      alt={alt || t("footer.badge")}
       /**
        * ⚠️ 必须给宽度。
        * 只有 height + w-auto 时，图片加载前元素面积为 0，
@@ -180,7 +183,7 @@ export function SiteFooterBadge({
 
   if (!href) {
     return (
-      <span className="inline-flex items-center" title={alt || "备案徽章"}>
+      <span className="inline-flex items-center" title={alt || t("footer.badge")}>
         {node}
       </span>
     );
@@ -192,7 +195,7 @@ export function SiteFooterBadge({
       target="_blank"
       rel="noreferrer noopener"
       className="inline-flex items-center"
-      title={alt || "备案徽章"}
+      title={alt || t("footer.badge")}
     >
       {node}
     </a>

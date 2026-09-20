@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { useI18n } from "@/components/i18n-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +44,7 @@ interface AdminUser {
 }
 
 export function AdminClient({ me }: { me: AdminUser }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [users, setUsers] = React.useState<AdminUser[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -57,12 +59,12 @@ export function AdminClient({ me }: { me: AdminUser }) {
       const res = await fetch("/api/admin/users", { cache: "no-store" });
       const data = (await res.json()) as { users?: AdminUser[]; error?: string };
       if (!res.ok) {
-        toast.error(data.error ?? "加载失败");
+        toast.error(data.error ?? t("admin.loadFailed"));
         return;
       }
       setUsers(data.users ?? []);
     } catch {
-      toast.error("网络错误");
+      toast.error(t("account.networkError"));
     } finally {
       setLoading(false);
     }
@@ -85,7 +87,7 @@ export function AdminClient({ me }: { me: AdminUser }) {
 
   async function toggleRole(user: AdminUser) {
     if (user.id === me.id) {
-      toast.error("不能取消自己的管理员权限");
+      toast.error(t("admin.cantDemoteSelf"));
       return;
     }
     setBusyId(user.id);
@@ -98,13 +100,13 @@ export function AdminClient({ me }: { me: AdminUser }) {
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        toast.error(data.error ?? "操作失败");
+        toast.error(data.error ?? t("admin.changeFailed"));
         return;
       }
-      toast.success(`已把 ${user.email} 设为 ${nextRole === "admin" ? "管理员" : "普通用户"}`);
+      toast.success(`${t("admin.roleChanged")} ${user.email} ${t("admin.roleTo")} ${nextRole === "admin" ? t("account.adminRole") : t("account.userRole")}`);
       await load();
     } catch {
-      toast.error("网络错误");
+      toast.error(t("common.networkError"));
     } finally {
       setBusyId(null);
     }
@@ -112,10 +114,10 @@ export function AdminClient({ me }: { me: AdminUser }) {
 
   async function remove(user: AdminUser) {
     if (user.id === me.id) {
-      toast.error("不能删除自己");
+      toast.error(t("admin.cantDeleteSelf"));
       return;
     }
-    if (!confirm(`确定删除用户 ${user.email}？该用户的会话与云端记录会一并清除。`)) return;
+    if (!confirm(`${t("admin.confirmDelete")} ${user.email}${t("admin.deleteWarn")}`)) return;
     setBusyId(user.id);
     try {
       const res = await fetch(`/api/admin/users?userId=${encodeURIComponent(user.id)}`, {
@@ -123,13 +125,13 @@ export function AdminClient({ me }: { me: AdminUser }) {
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        toast.error(data.error ?? "删除失败");
+        toast.error(data.error ?? t("admin.deleteFailed"));
         return;
       }
-      toast.success("已删除用户");
+      toast.success(t("admin.userDeleted"));
       await load();
     } catch {
-      toast.error("网络错误");
+      toast.error(t("common.networkError"));
     } finally {
       setBusyId(null);
     }
@@ -141,7 +143,7 @@ export function AdminClient({ me }: { me: AdminUser }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      toast.error("复制失败");
+      toast.error(t("chat.copyFailed"));
     }
   }
 
@@ -154,12 +156,12 @@ export function AdminClient({ me }: { me: AdminUser }) {
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          返回聊天
+          {t("admin.backToChat")}
         </Link>
 
         <div className="flex items-center gap-2 rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm text-primary">
           <Crown className="h-4 w-4 shrink-0" />
-          你是第一位注册用户，已自动成为管理员
+          {t("admin.firstAdmin")}
         </div>
 
         <Card>
@@ -167,13 +169,13 @@ export function AdminClient({ me }: { me: AdminUser }) {
             <div className="space-y-1.5">
               <CardTitle className="flex items-center gap-2">
                 <KeyRound className="h-4 w-4" />
-                站点内置 Agnes API Key
+                {t("admin.presetKey")}
               </CardTitle>
               <CardDescription>
-                仅管理员可见。普通用户只能使用，永远拿不到完整值（不下发到浏览器）。
+                {t("admin.presetKeyNote")}
               </CardDescription>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => void loadKey()} title="刷新">
+            <Button variant="ghost" size="icon" onClick={() => void loadKey()} title={t("admin.refresh")}>
               <RefreshCw className="h-4 w-4" />
             </Button>
           </CardHeader>
@@ -185,16 +187,16 @@ export function AdminClient({ me }: { me: AdminUser }) {
                 </code>
                 <Button variant="outline" size="sm" onClick={() => setShowKey((v) => !v)}>
                   {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  {showKey ? "隐藏" : "显示"}
+                  {showKey ? t("admin.hide") : t("admin.show")}
                 </Button>
                 <Button variant="outline" size="sm" onClick={copyKey}>
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  {copied ? "已复制" : "复制"}
+                  {copied ? t("chat.copied") : t("chat.copy")}
                 </Button>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                未配置 PRESET_AGNES_API_KEY 环境变量。
+                {t("admin.notSet")}
               </p>
             )}
           </CardContent>
@@ -205,19 +207,19 @@ export function AdminClient({ me }: { me: AdminUser }) {
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
             <div className="space-y-1.5">
-              <CardTitle>用户管理</CardTitle>
-              <CardDescription>共 {users.length} 位用户</CardDescription>
+              <CardTitle>{t("admin.usersTitle")}</CardTitle>
+              <CardDescription>{t("admin.usersCount")} {users.length} {t("admin.usersUnit")}</CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              刷新
+              {t("admin.refresh")}
             </Button>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                加载中…
+                {t("common.loading")}
               </div>
             ) : (
               <div className="space-y-2">
@@ -240,7 +242,7 @@ export function AdminClient({ me }: { me: AdminUser }) {
                             user
                           </Badge>
                         )}
-                        {u.id === me.id ? <Badge variant="outline">我</Badge> : null}
+                        {u.id === me.id ? <Badge variant="outline">{t("admin.me")}</Badge> : null}
                       </div>
                       <p className="mt-1 truncate text-xs text-muted-foreground">
                         id: {u.id} · {new Date(u.createdAt).toLocaleString("zh-CN")}
@@ -253,7 +255,7 @@ export function AdminClient({ me }: { me: AdminUser }) {
                         onClick={() => toggleRole(u)}
                         disabled={busyId === u.id}
                       >
-                        {u.role === "admin" ? "设为普通用户" : "设为管理员"}
+                        {u.role === "admin" ? t("admin.toUser") : t("admin.toAdmin")}
                       </Button>
                       <Button
                         variant="destructive"
@@ -262,13 +264,13 @@ export function AdminClient({ me }: { me: AdminUser }) {
                         disabled={busyId === u.id}
                       >
                         <Trash2 className="h-4 w-4" />
-                        删除
+                        {t("common.delete")}
                       </Button>
                     </div>
                   </div>
                 ))}
                 {users.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">暂无用户</p>
+                  <p className="py-6 text-center text-sm text-muted-foreground">{t("admin.noUsers")}</p>
                 ) : null}
               </div>
             )}
@@ -297,6 +299,7 @@ interface SiteSettings {
 }
 
 function SiteSettingsCard() {
+  const { t } = useI18n();
   const [form, setForm] = React.useState<SiteSettings>({
     defaultBaseUrl: "",
     defaultModel: "",
@@ -338,7 +341,10 @@ function SiteSettingsCard() {
       };
 
       if (!res.ok) {
-        setLoadError({ msg: data.error ?? `读取失败（HTTP ${res.status}）`, fatal: true });
+        setLoadError({
+          msg: data.error ?? t("admin.readFailedHttp", { code: res.status }),
+          fatal: true,
+        });
         return;
       }
 
@@ -359,7 +365,7 @@ function SiteSettingsCard() {
       // storage:false 表示后端没配存储，配置能读但保存会失败，提前告知
       if (data.storage === false) {
         setLoadError({
-          msg: "未配置存储后端，当前显示的是默认值，保存也不会生效",
+          msg: t("admin.noStorage"),
           fatal: false,
         });
       }
@@ -368,8 +374,8 @@ function SiteSettingsCard() {
       setLoadError({
         msg:
           name === "TimeoutError" || name === "AbortError"
-            ? "读取超时（10 秒），请检查服务端存储是否正常"
-            : "读取站点配置失败，请检查网络",
+            ? t("admin.readTimeout")
+            : t("admin.readFailed"),
         fatal: true,
       });
     } finally {
@@ -398,7 +404,7 @@ function SiteSettingsCard() {
       };
       if (!res.ok) {
         // 服务端会给出中文原因（如"需要管理员权限""未配置存储"），优先展示
-        toast.error(data.error ?? `保存失败（HTTP ${res.status}）`);
+        toast.error(data.error ?? `${t("admin.saveFailed")}（HTTP ${res.status}）`);
         return;
       }
       /**
@@ -409,15 +415,15 @@ function SiteSettingsCard() {
        * 现在服务端会回读并给出 verified，存没存进去当场能看出来。
        */
       if (data.verified === false) {
-        toast.error("保存后回读不一致，配置可能未真正写入存储");
+        toast.error(t("admin.saveMismatch"));
       } else {
-        toast.success("站点配置已保存，全站生效");
+        toast.success(t("admin.saved"));
       }
       await load();
     } catch (err) {
       const name = err instanceof Error ? err.name : "";
       toast.error(
-        name === "TimeoutError" || name === "AbortError" ? "保存超时，请重试" : "保存失败",
+        name === "TimeoutError" || name === "AbortError" ? t("admin.saveTimeout") : t("admin.saveFailed"),
       );
     } finally {
       setSaving(false);
@@ -430,13 +436,13 @@ function SiteSettingsCard() {
         <div className="space-y-1.5">
           <CardTitle className="flex items-center gap-2">
             <Settings2 className="h-4 w-4" />
-            站点配置
+            {t("admin.siteSettingsTitle")}
           </CardTitle>
           <CardDescription>
-            Base URL、默认模型、云端保存等站点级设置。普通用户的设置面板不显示这些项。
+            {t("admin.siteSettingsDesc")}
           </CardDescription>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => void load()} title="刷新">
+        <Button variant="ghost" size="icon" onClick={() => void load()} title={t("admin.refresh")}>
           <RefreshCw className="h-4 w-4" />
         </Button>
       </CardHeader>
@@ -463,7 +469,7 @@ function SiteSettingsCard() {
             </p>
             <Button variant="outline" size="sm" onClick={() => void load()}>
               <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-              重试
+              {t("admin.retry")}
             </Button>
           </div>
         ) : (
@@ -478,25 +484,25 @@ function SiteSettingsCard() {
             <div className="space-y-1.5">
               <Label htmlFor="ss-base" className="flex items-center gap-2">
                 <Server className="h-4 w-4" />
-                默认 Base URL
+                {t("admin.defaultBaseUrl")}
               </Label>
               <Input
                 id="ss-base"
-                placeholder="留空则使用内置地址（如 https://apihub.agnes-ai.com/v1）"
+                placeholder={t("admin.baseUrlPlaceholder")}
                 value={form.defaultBaseUrl}
                 onChange={(e) => setForm((f) => ({ ...f, defaultBaseUrl: e.target.value }))}
                 autoComplete="off"
               />
               <p className="text-[11px] text-muted-foreground">
-                兼容 OpenAI /chat/completions 的中转地址均可。用户未自定义时生效。
+                {t("admin.baseUrlHint")}
               </p>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="ss-model">默认模型</Label>
+              <Label htmlFor="ss-model">{t("admin.defaultModel")}</Label>
               <Input
                 id="ss-model"
-                placeholder="留空则使用内置默认（agnes-3.0-flash）"
+                placeholder={t("admin.modelPlaceholder")}
                 value={form.defaultModel}
                 onChange={(e) => setForm((f) => ({ ...f, defaultModel: e.target.value }))}
                 autoComplete="off"
@@ -505,9 +511,9 @@ function SiteSettingsCard() {
 
             <div className="flex items-center justify-between rounded-xl border border-border/70 bg-muted/30 px-3 py-3">
               <div className="pr-3">
-                <p className="text-sm font-medium">默认开启云端保存</p>
+                <p className="text-sm font-medium">{t("admin.cloudSaveDefault")}</p>
                 <p className="text-xs text-muted-foreground">
-                  新用户是否默认把聊天记录存到服务端（用户仍可自行关闭）
+                  {t("admin.cloudSaveDefaultHint")}
                 </p>
               </div>
               <Switch
@@ -520,14 +526,14 @@ function SiteSettingsCard() {
             <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-3">
               <p className="flex items-center gap-2 text-sm font-medium">
                 <FileText className="h-4 w-4" />
-                页脚与备案
+                {t("admin.footer")}
               </p>
 
               <div className="space-y-1.5">
-                <Label htmlFor="ss-icp-text">备案号</Label>
+                <Label htmlFor="ss-icp-text">{t("admin.icpText")}</Label>
                 <Input
                   id="ss-icp-text"
-                  placeholder="如 京ICP备12345678号-1 / 萌ICP备20260645号，留空不显示"
+                  placeholder={t("admin.icpTextPlaceholder")}
                   value={form.icpText}
                   onChange={(e) => {
                     const v = e.target.value;
@@ -542,7 +548,7 @@ function SiteSettingsCard() {
                         icpText: parsed.icpText || f.icpText,
                         icpUrl: parsed.icpUrl || f.icpUrl,
                       }));
-                      toast.success("已识别备案链接，请确认备案号文字");
+                      toast.success(t("admin.icpParsed"));
                       return;
                     }
                     setForm((f) => ({ ...f, icpText: v }));
@@ -550,15 +556,15 @@ function SiteSettingsCard() {
                   autoComplete="off"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  可直接粘贴第三方备案给的整段 &lt;a&gt; 标签，会自动拆出链接与文字。
+                  {t("admin.icpPasteHint")}
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="ss-icp-url">备案链接</Label>
+                <Label htmlFor="ss-icp-url">{t("admin.icpUrl")}</Label>
                 <Input
                   id="ss-icp-url"
-                  placeholder="留空则自动指向工信部备案查询系统"
+                  placeholder={t("admin.icpUrlPlaceholder")}
                   value={form.icpUrl}
                   onChange={(e) => {
                     const v = e.target.value;
@@ -578,41 +584,39 @@ function SiteSettingsCard() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="ss-icp-icon">备案徽章图片地址</Label>
+                <Label htmlFor="ss-icp-icon">{t("admin.icpIcon")}</Label>
                 <Input
                   id="ss-icp-icon"
-                  placeholder="icp.gov.moe / icp.sakura.ink 给的图标链接（可选）"
+                  placeholder={t("admin.icpIconPlaceholder")}
                   value={form.icpIconUrl}
                   onChange={(e) => setForm((f) => ({ ...f, icpIconUrl: e.target.value }))}
                   autoComplete="off"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  可选。留空会根据备案链接自动生成徽章（萌备案显示「萌」、
-                  工信部显示「ICP」）。填了自己的图片就以图片为准，
-                  加载失败会自动退回生成的徽章，不会显示破图。
+                  {t("admin.icpIconHint")}
                 </p>
               </div>
 
               {/* 实时预览：填完立刻能看出效果，不用去前台刷新 */}
               {form.icpUrl || form.icpText ? (
                 <div className="space-y-1.5">
-                  <Label>徽章预览</Label>
+                  <Label>{t("admin.badgePreview")}</Label>
                   <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-[11px] text-fg-tertiary">
                     <SiteFooterBadge
                       src={form.icpIconUrl || undefined}
-                      alt={form.icpText || "备案徽章"}
+                      alt={form.icpText || t("admin.badgeAlt")}
                       href={form.icpUrl || undefined}
                     />
-                    <span>{form.icpText || "（未填备案号）"}</span>
+                    <span>{form.icpText || t("admin.icpNotSet")}</span>
                   </div>
                 </div>
               ) : null}
 
               <div className="space-y-1.5">
-                <Label htmlFor="ss-footer-extra">页脚额外文字</Label>
+                <Label htmlFor="ss-footer-extra">{t("admin.footerExtra")}</Label>
                 <Input
                   id="ss-footer-extra"
-                  placeholder="版权声明、联系方式等（可选）"
+                  placeholder={t("admin.footerExtraPlaceholder")}
                   value={form.footerExtra}
                   onChange={(e) => setForm((f) => ({ ...f, footerExtra: e.target.value }))}
                   autoComplete="off"
@@ -622,7 +626,7 @@ function SiteSettingsCard() {
 
             <Button onClick={() => void save()} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              保存配置
+              {t("admin.saveConfig")}
             </Button>
           </>
         )}

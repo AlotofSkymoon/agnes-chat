@@ -3,6 +3,8 @@
 import * as React from "react";
 import { Download, X, ZoomIn, ZoomOut } from "lucide-react";
 
+import { useI18n } from "@/components/i18n-provider";
+
 /**
  * 图片预览：点缩略图看原图。
  *
@@ -18,6 +20,7 @@ export function ImageLightbox({
   name?: string;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [scale, setScale] = React.useState(1);
 
   React.useEffect(() => {
@@ -52,13 +55,13 @@ export function ImageLightbox({
         className="flex items-center justify-between gap-3 px-4 py-3 text-white"
         onClick={(e) => e.stopPropagation()}
       >
-        <span className="truncate text-sm opacity-80">{name ?? "图片预览"}</span>
+        <span className="truncate text-sm opacity-80">{name ?? t("image.preview")}</span>
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => setScale((s) => Math.max(0.2, s - 0.25))}
             className="rounded-lg p-2 hover:bg-white/15"
-            aria-label="缩小"
+            aria-label={t("common.zoomOut")}
           >
             <ZoomOut className="h-4 w-4" />
           </button>
@@ -69,7 +72,7 @@ export function ImageLightbox({
             type="button"
             onClick={() => setScale((s) => Math.min(5, s + 0.25))}
             className="rounded-lg p-2 hover:bg-white/15"
-            aria-label="放大"
+            aria-label={t("common.zoomIn")}
           >
             <ZoomIn className="h-4 w-4" />
           </button>
@@ -79,7 +82,7 @@ export function ImageLightbox({
             target="_blank"
             rel="noreferrer noopener"
             className="rounded-lg p-2 hover:bg-white/15"
-            aria-label="下载原图"
+            aria-label={t("image.downloadOriginal")}
             onClick={(e) => e.stopPropagation()}
           >
             <Download className="h-4 w-4" />
@@ -88,7 +91,7 @@ export function ImageLightbox({
             type="button"
             onClick={onClose}
             className="rounded-lg p-2 hover:bg-white/15"
-            aria-label="关闭"
+            aria-label={t("common.close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -104,7 +107,7 @@ export function ImageLightbox({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
-          alt={name ?? "预览图"}
+          alt={name ?? t("image.alt")}
           onClick={(e) => e.stopPropagation()}
           style={{ transform: `scale(${scale})` }}
           className="max-h-full max-w-full origin-center rounded-lg object-contain transition-transform duration-150"
@@ -113,7 +116,7 @@ export function ImageLightbox({
       </div>
 
       <p className="pb-4 text-center text-[11px] text-white/50">
-        滚轮或按钮缩放 · 点击空白处关闭 · Esc 关闭
+        {t("image.hint")}
       </p>
     </div>
   );

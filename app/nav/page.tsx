@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MessageSquare } from "lucide-react";
 
 import { NavBoard } from "@/components/nav/nav-board";
+import { I18nText, PageTitle } from "@/components/page-i18n";
 import { NavChrome } from "@/components/nav/nav-chrome";
 import { Beams, GridBackground, Meteors, Noise } from "@/components/ui/aceternity";
 import { pageTitle } from "@/lib/site";
@@ -14,6 +15,8 @@ export const metadata = {
 
 export default function NavPage() {
   return (
+    <>
+      <PageTitle titleKey="route.nav" />
     <main className="relative min-h-screen-safe">
       {/* Aceternity 风格背景：极光 + 网格 + 落下的光束 + 流星 */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-96 aurora" />
@@ -31,9 +34,10 @@ export default function NavPage() {
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <MessageSquare className="h-4 w-4" />
-          返回聊天
+          <I18nText k="auth.backToChat" />
         </Link>
       </div>
     </main>
+    </>
   );
 }

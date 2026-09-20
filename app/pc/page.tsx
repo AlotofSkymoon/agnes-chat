@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 
+import { useI18n } from "@/components/i18n-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
@@ -39,14 +40,16 @@ interface WinState {
 type AppId = "terminal" | "notes" | "calculator" | "clock" | "about";
 
 const APPS: Record<AppId, { label: string; icon: React.ReactNode }> = {
-  terminal: { label: "终端", icon: <TerminalIcon className="h-5 w-5" /> },
-  notes: { label: "记事本", icon: <NotebookPen className="h-5 w-5" /> },
-  calculator: { label: "计算器", icon: <CalculatorIcon className="h-5 w-5" /> },
-  clock: { label: "时钟", icon: <Clock className="h-5 w-5" /> },
-  about: { label: "关于本机", icon: <Info className="h-5 w-5" /> },
+  // label 存词典 key：语言切换后要跟着变
+  terminal: { label: "pc.terminal", icon: <TerminalIcon className="h-5 w-5" /> },
+  notes: { label: "pc.notes", icon: <NotebookPen className="h-5 w-5" /> },
+  calculator: { label: "pc.calculator", icon: <CalculatorIcon className="h-5 w-5" /> },
+  clock: { label: "pc.clock", icon: <Clock className="h-5 w-5" /> },
+  about: { label: "pc.about", icon: <Info className="h-5 w-5" /> },
 };
 
 export default function CloudPcPage() {
+  const { t } = useI18n();
   const [wins, setWins] = React.useState<WinState[]>([]);
   const [topZ, setTopZ] = React.useState(10);
   const desktopRef = React.useRef<HTMLDivElement>(null);
@@ -138,9 +141,9 @@ export default function CloudPcPage() {
       <header className="ios-glass absolute inset-x-3 top-3 z-[60] flex items-center justify-between rounded-[var(--radius-ios-lg)] px-4 py-2">
         <div className="flex items-center gap-3">
           <Link href="/" className="text-sm font-medium text-primary hover:underline">
-            ← 返回聊天
+            {t("pc.back")}
           </Link>
-          <span className="text-xs text-fg-tertiary">云电脑 · 本地运行，数据不出浏览器</span>
+          <span className="text-xs text-fg-tertiary">{t("pc.localNote")}</span>
         </div>
         <ThemeToggle />
       </header>
@@ -182,12 +185,12 @@ export default function CloudPcPage() {
                 <button
                   onClick={() => close(w.id)}
                   className="h-3 w-3 rounded-full bg-[#FF5F57] transition hover:brightness-90"
-                  aria-label="关闭"
+                  aria-label={t("pc.close")}
                 />
                 <button
                   onClick={() => minimize(w.id)}
                   className="h-3 w-3 rounded-full bg-[#FEBC2E] transition hover:brightness-90"
-                  aria-label="最小化"
+                  aria-label={t("pc.minimize")}
                 />
                 <span className="h-3 w-3 rounded-full bg-[#28C840]" />
               </div>
@@ -230,6 +233,7 @@ export default function CloudPcPage() {
 /* ------------------------------ 各个应用 ------------------------------ */
 
 function AppView({ app }: { app: AppId }) {
+  const { t } = useI18n();
   switch (app) {
     case "terminal":
       return <TerminalApp />;
@@ -248,8 +252,9 @@ function AppView({ app }: { app: AppId }) {
 
 /** 终端：模拟几条常用命令，纯前端，不执行任何真实操作 */
 function TerminalApp() {
+  const { t } = useI18n();
   const [lines, setLines] = React.useState<string[]>([
-    "agnes-cloud-pc ~ % 输入 help 查看可用命令",
+    t("pc.termWelcome"),
   ]);
   const [input, setInput] = React.useState("");
   const endRef = React.useRef<HTMLDivElement>(null);
@@ -269,14 +274,14 @@ function TerminalApp() {
     switch (name) {
       case "help":
         out.push(
-          "可用命令：",
-          "  help        显示本帮助",
-          "  ls          列出（虚拟）文件",
-          "  echo <文本>  原样输出",
-          "  date        当前时间",
-          "  whoami      当前用户",
-          "  neofetch    系统信息",
-          "  clear       清屏",
+          t("pc.cmdHelpTitle"),
+          t("pc.cmdHelp"),
+          t("pc.cmdLs"),
+          t("pc.cmdEcho"),
+          t("pc.cmdDate"),
+          t("pc.cmdWhoami"),
+          t("pc.cmdNeofetch"),
+          t("pc.cmdClear"),
         );
         break;
       case "ls":
@@ -289,14 +294,14 @@ function TerminalApp() {
         out.push(new Date().toString());
         break;
       case "whoami":
-        out.push("guest（本地访客，未登录）");
+        out.push(t("pc.whoamiGuest"));
         break;
       case "neofetch":
         out.push(
-          "  OS: 云电脑 Web 版",
-          `  内核: ${navigator.userAgent.slice(0, 60)}…`,
-          `  分辨率: ${window.screen.width}x${window.screen.height}`,
-          `  语言: ${navigator.language}`,
+          t("pc.neofetchOs"),
+          t("pc.neofetchKernel", { ua: navigator.userAgent.slice(0, 60) }),
+          t("pc.neofetchRes", { w: window.screen.width, h: window.screen.height }),
+          t("pc.neofetchLang", { lang: navigator.language }),
         );
         break;
       case "clear":
@@ -304,7 +309,7 @@ function TerminalApp() {
         setInput("");
         return;
       default:
-        out.push(`command not found: ${name}（输入 help 看可用的）`);
+        out.push(t("pc.notFound", { name }));
     }
     setLines((l) => [...l, ...out]);
     setInput("");
@@ -330,7 +335,7 @@ function TerminalApp() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="输入命令后回车"
+          placeholder={t("pc.cmdPlaceholder")}
           className="flex-1 rounded-xl border border-border bg-background px-3 py-1.5 text-xs outline-none focus:border-primary/50"
           autoComplete="off"
         />
@@ -338,7 +343,7 @@ function TerminalApp() {
           type="submit"
           className="ios-pill bg-primary px-4 text-xs font-medium text-primary-foreground"
         >
-          执行
+          {t("pc.run")}
         </button>
       </form>
     </div>
@@ -347,6 +352,7 @@ function TerminalApp() {
 
 /** 记事本：内容存 localStorage */
 function NotesApp() {
+  const { t } = useI18n();
   const KEY = "agnes:cloudpc:notes";
   const [text, setText] = React.useState("");
 
@@ -368,11 +374,11 @@ function NotesApp() {
 
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-fg-tertiary">自动保存到浏览器本地，不会上传。</p>
+      <p className="text-[11px] text-fg-tertiary">{t("pc.autoSaveNote")}</p>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="随手记点什么…"
+        placeholder={t("pc.notesPlaceholder")}
         className="h-52 w-full resize-none rounded-xl border border-border bg-background p-3 text-sm outline-none focus:border-primary/50"
       />
     </div>
@@ -381,6 +387,7 @@ function NotesApp() {
 
 /** 计算器：四则运算，带键盘输入 */
 function CalculatorApp() {
+  const { t } = useI18n();
   const [disp, setDisp] = React.useState("0");
   const [acc, setAcc] = React.useState<number | null>(null);
   const [op, setOp] = React.useState<string | null>(null);
@@ -402,7 +409,7 @@ function CalculatorApp() {
     const b = Number(disp);
     const r =
       op === "+" ? acc + b : op === "-" ? acc - b : op === "×" ? acc * b : op === "÷" ? (b === 0 ? NaN : acc / b) : b;
-    setDisp(Number.isNaN(r) ? "错误" : String(Math.round(r * 1e10) / 1e10));
+    setDisp(Number.isNaN(r) ? t("pc.error") : String(Math.round(r * 1e10) / 1e10));
     setAcc(null);
     setOp(null);
     setFresh(true);
@@ -423,7 +430,7 @@ function CalculatorApp() {
           }}
           className="ios-pill col-span-2 bg-muted py-2.5 text-sm"
         >
-          清空
+          {t("pc.clear")}
         </button>
         {keys.map((k) => (
           <button
@@ -450,6 +457,7 @@ function CalculatorApp() {
 
 /** 时钟 */
 function ClockApp() {
+  const { t } = useI18n();
   const [now, setNow] = React.useState<Date | null>(null);
 
   React.useEffect(() => {
@@ -458,7 +466,7 @@ function ClockApp() {
     return () => clearInterval(t);
   }, []);
 
-  if (!now) return <div className="py-8 text-center text-sm text-fg-tertiary">加载中…</div>;
+  if (!now) return <div className="py-8 text-center text-sm text-fg-tertiary">{t("common.loading")}</div>;
 
   const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -469,7 +477,11 @@ function ClockApp() {
         <span className="text-2xl text-fg-tertiary">:{pad(now.getSeconds())}</span>
       </div>
       <div className="mt-2 text-sm text-fg-secondary">
-        {now.getFullYear()} 年 {now.getMonth() + 1} 月 {now.getDate()} 日
+        {t("pc.dateFmt", {
+          y: now.getFullYear(),
+          m: now.getMonth() + 1,
+          d: now.getDate(),
+        })}
       </div>
     </div>
   );
@@ -477,6 +489,7 @@ function ClockApp() {
 
 /** 关于本机 */
 function AboutApp() {
+  const { t } = useI18n();
   const [info, setInfo] = React.useState<{ os: string; screen: string; lang: string } | null>(null);
 
   React.useEffect(() => {
@@ -487,17 +500,17 @@ function AboutApp() {
     });
   }, []);
 
-  if (!info) return <div className="py-6 text-center text-sm text-fg-tertiary">读取中…</div>;
+  if (!info) return <div className="py-6 text-center text-sm text-fg-tertiary">{t("pc.reading")}</div>;
 
   return (
     <div className="space-y-2 text-sm">
-      <Row k="系统" v="云电脑 Web 版（浏览器内运行）" />
-      <Row k="内核" v={info.os} />
-      <Row k="分辨率" v={info.screen} />
-      <Row k="语言" v={info.lang} />
-      <Row k="存储" v="全部保存在浏览器本地" />
+      <Row k={t("pc.aboutSystem")} v={t("pc.aboutSystemVal")} />
+      <Row k={t("pc.aboutKernel")} v={info.os} />
+      <Row k={t("pc.aboutScreen")} v={info.screen} />
+      <Row k={t("pc.aboutLang")} v={info.lang} />
+      <Row k={t("pc.aboutStorage")} v={t("pc.aboutStorageVal")} />
       <p className="pt-2 text-[11px] text-fg-tertiary">
-        这是一个趣味功能：所有程序都在你的浏览器里跑，不联网、不上传、不执行真实系统命令。
+        {t("pc.aboutNote")}
       </p>
     </div>
   );

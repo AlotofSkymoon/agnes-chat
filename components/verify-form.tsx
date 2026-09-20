@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, MailCheck } from "lucide-react";
 import { toast } from "sonner";
 
+import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,6 +22,7 @@ import { Label } from "@/components/ui/label";
 const COOLDOWN = 60;
 
 export function VerifyForm() {
+  const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -44,7 +46,7 @@ export function VerifyForm() {
     e.preventDefault();
     if (loading) return;
     if (code.trim().length !== 6) {
-      toast.error("请输入 6 位验证码");
+      toast.error(t("auth.enterCode"));
       return;
     }
     setLoading(true);
@@ -56,14 +58,14 @@ export function VerifyForm() {
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        toast.error(data.error ?? "验证失败");
+        toast.error(data.error ?? t("auth.verifyFailed"));
         return;
       }
-      toast.success("验证通过，已自动登录");
+      toast.success(t("auth.verifyOk"));
       router.push("/");
       router.refresh();
     } catch {
-      toast.error("网络错误，请稍后重试");
+      toast.error(t("auth.networkError"));
     } finally {
       setLoading(false);
     }
@@ -72,7 +74,7 @@ export function VerifyForm() {
   async function resend() {
     if (resending || left > 0) return;
     if (!email.trim()) {
-      toast.error("请先填写邮箱");
+      toast.error(t("auth.fillEmailFirst"));
       return;
     }
     setResending(true);
@@ -84,13 +86,13 @@ export function VerifyForm() {
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        toast.error(data.error ?? "重发失败");
+        toast.error(data.error ?? t("auth.resendFailed"));
         return;
       }
-      toast.success("验证码已重新发送");
+      toast.success(t("auth.codeResent"));
       setLeft(COOLDOWN);
     } catch {
-      toast.error("网络错误，请稍后重试");
+      toast.error(t("common.retryLater"));
     } finally {
       setResending(false);
     }
@@ -102,15 +104,15 @@ export function VerifyForm() {
         <div className="mx-auto mb-1 flex h-12 w-12 items-center justify-center rounded-2xl brand-gradient shadow-xl shadow-primary/30">
           <MailCheck className="h-6 w-6 text-primary-foreground" />
         </div>
-        <CardTitle className="text-2xl">验证你的邮箱</CardTitle>
+        <CardTitle className="text-2xl">{t("auth.verifyTitle")}</CardTitle>
         <CardDescription>
-          验证码已发送到你的邮箱，30 分钟内有效
+          {t("auth.verifyDesc")}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">邮箱</Label>
+            <Label htmlFor="email">{t("auth.email")}</Label>
             <Input
               id="email"
               type="email"
@@ -123,12 +125,12 @@ export function VerifyForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="code">验证码</Label>
+            <Label htmlFor="code">{t("auth.verifyCode")}</Label>
             <Input
               id="code"
               inputMode="numeric"
               autoComplete="one-time-code"
-              placeholder="6 位数字"
+              placeholder={t("auth.codePlaceholder")}
               maxLength={6}
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
@@ -139,7 +141,7 @@ export function VerifyForm() {
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            完成验证
+            {t("auth.submitVerify")}
           </Button>
 
           <Button
@@ -150,23 +152,23 @@ export function VerifyForm() {
             disabled={resending || left > 0}
           >
             {resending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {left > 0 ? `重发验证码（${left}s）` : "重发验证码"}
+            {left > 0 ? `${t("auth.resendCode")}（${left}s）` : t("auth.resendCode")}
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
-            没收到？检查一下垃圾邮件，或者
+            {t("verify.noCode")}
             <button
               type="button"
               onClick={() => window.location.reload()}
               className="mx-1 font-medium text-primary hover:underline"
             >
-              刷新页面
+              {t("verify.refreshPage")}
             </button>
-            再试。
+            {t("verify.again")}
           </p>
           <p className="text-center text-sm text-muted-foreground">
             <Link href="/login" className="font-medium text-primary hover:underline">
-              返回登录
+              {t("verify.backToLogin")}
             </Link>
           </p>
         </form>

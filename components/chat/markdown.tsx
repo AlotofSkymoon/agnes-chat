@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { Check, Copy } from "lucide-react";
 
+import { useI18n } from "@/components/i18n-provider";
 import { cn } from "@/lib/utils";
 
 /**
@@ -33,6 +34,7 @@ interface CodeBlockProps {
 }
 
 function CodeBlock({ language, code }: CodeBlockProps) {
+  const { t } = useI18n();
   const [copied, setCopied] = React.useState(false);
 
   async function copy() {
@@ -55,7 +57,7 @@ function CodeBlock({ language, code }: CodeBlockProps) {
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-white/70 transition-colors hover:bg-white/10 hover:text-white"
         >
           {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-          {copied ? "已复制" : "复制"}
+          {copied ? t("common.copied") : t("common.copy")}
         </button>
       </div>
       <pre className="overflow-x-auto p-3 text-[13px] leading-6">

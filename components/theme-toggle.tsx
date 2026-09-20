@@ -2,6 +2,7 @@
 
 import { Monitor, Moon, Sun } from "lucide-react";
 
+import { useI18n } from "@/components/i18n-provider";
 import { useTheme } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 
@@ -18,18 +19,21 @@ interface ThemeToggleProps {
  * 新主题会从手指/鼠标按下的那一点以圆形扩散开，而不是整屏硬切。
  */
 export function ThemeToggle({ className, withLabel = false }: ThemeToggleProps) {
+  const { t } = useI18n();
   const { resolvedTheme, theme, cycleTheme, systemTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
   const label =
     theme === "system"
-      ? `跟随系统（当前${systemTheme === "dark" ? "深色" : "浅色"}）`
+      ? `${t("theme.systemTip")}（${t("theme.current")}${
+          systemTheme === "dark" ? t("theme.dark") : t("theme.light")
+        }）`
       : isDark
-        ? "深色（点击切换）"
-        : "浅色（点击切换）";
+        ? t("theme.darkTip")
+        : t("theme.lightTip");
 
   const nextLabel =
-    theme === "light" ? "切换到深色" : theme === "dark" ? "切换到跟随系统" : "切换到浅色";
+    theme === "light" ? t("theme.toDark") : theme === "dark" ? t("theme.toSystem") : t("theme.toLight");
 
   return (
     <button
@@ -95,7 +99,7 @@ export function ThemeToggle({ className, withLabel = false }: ThemeToggleProps) 
 
       {withLabel ? (
         <span className="relative text-fg-secondary group-hover:text-fg">
-          {theme === "system" ? "跟随" : isDark ? "深色" : "浅色"}
+          {theme === "system" ? t("theme.shortSystem") : isDark ? t("theme.dark") : t("theme.light")}
         </span>
       ) : null}
     </button>

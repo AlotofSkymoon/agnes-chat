@@ -3,6 +3,11 @@
 import * as React from "react";
 import { Loader2, Play, TriangleAlert } from "lucide-react";
 
+import { useI18n } from "@/components/i18n-provider";
+
+/** 取文案的函数签名：模块级函数也用它，避免把 hook 拆得到处都是 */
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
+
 /**
  * 通用视频播放器。
  *
@@ -68,7 +73,7 @@ function tailLogs(n = 8): string[] {
 }
 
 /** 惰性加载 ffmpeg.wasm（全站只加载一次） */
-async function loadFFmpeg(onProgress: (msg: string) => void): Promise<any> {
+async function loadFFmpeg(onProgress: (msg: string) => void, t: TFn): Promise<any> {
   if (ffmpegPromise) return ffmpegPromise;
 
   ffmpegPromise = (async () => {
@@ -77,7 +82,11 @@ async function loadFFmpeg(onProgress: (msg: string) => void): Promise<any> {
     for (let i = 0; i < CDN_SOURCES.length; i++) {
       const cdn = CDN_SOURCES[i];
       try {
-        onProgress(i === 0 ? "正在加载解码器…" : `换用备用源重试（${i + 1}/${CDN_SOURCES.length}）…`);
+        onProgress(
+          i === 0
+            ? t("video.loadingDecoder")
+            : t("video.retrySource", { i: i + 1, n: CDN_SOURCES.length }),
+        );
 
         // @ts-expect-error - UMD 包没有类型声明
         if (!window.FFmpegWASM) {
@@ -85,7 +94,7 @@ async function loadFFmpeg(onProgress: (msg: string) => void): Promise<any> {
             const s = document.createElement("script");
             s.src = cdn.js;
             s.onload = () => resolve();
-            s.onerror = () => reject(new Error(`解码器脚本加载失败：${cdn.js}`));
+            s.onerror = () => reject(new Error(t("video.scriptFailed", { url: cdn.js })));
             document.head.appendChild(s);
           });
         }
@@ -109,9 +118,10 @@ async function loadFFmpeg(onProgress: (msg: string) => void): Promise<any> {
     }
 
     throw new Error(
-      `解码器加载失败（已尝试 ${CDN_SOURCES.length} 个源）：${
-        lastErr instanceof Error ? lastErr.message : "未知错误"
-      }`,
+      t("video.loadFailed", {
+        n: CDN_SOURCES.length,
+        msg: lastErr instanceof Error ? lastErr.message : t("video.unknownError"),
+      }),
     );
   })();
 
@@ -156,12 +166,12 @@ type Plan = { name: string; args: (i: string, o: string) => string[] };
  * 于是整条命令挂掉、连视频轨都拿不到。
  * 先试完整版，再逐步降级，至少保证画面能出来。
  */
-function buildPlans(hasAudio: boolean): Plan[] {
+function buildPlans(hasAudio: boolean, t: TFn): Plan[] {
   const plans: Plan[] = [];
 
   if (hasAudio) {
     plans.push({
-      name: "H.264 + AAC",
+      name: t("video.planH264"),
       args: (i, o) => [
         "-i", i,
         "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
@@ -174,7 +184,7 @@ function buildPlans(hasAudio: boolean): Plan[] {
 
   // 音频转不了就丢掉音轨，画面优先
   plans.push({
-    name: "H.264（静音）",
+    name: t("video.planH264Silent"),
     args: (i, o) => [
       "-i", i,
       "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
@@ -191,7 +201,7 @@ function buildPlans(hasAudio: boolean): Plan[] {
    * "Application provided invalid, non monotonic dts"。
    */
   plans.push({
-    name: "MPEG-4（兼容兜底）",
+    name: t("video.planMpeg4"),
     args: (i, o) => [
       "-fflags", "+genpts",
       "-i", i,
@@ -213,6 +223,7 @@ export function UniversalVideoPlayer({
   name: string;
   className?: string;
 }) {
+  const { t } = useI18n();
   const ext = (name.split(".").pop() ?? "").toLowerCase();
   const native = ["mp4", "m4v", "webm", "ogv", "ogg"].includes(ext);
 
@@ -228,42 +239,43 @@ export function UniversalVideoPlayer({
   );
 
   async function transcode() {
-    setPhase({ kind: "loading", progress: "准备中…" });
+    setPhase({ kind: "loading", progress: t("video.preparing") });
     const inName = `in.${ext || "dat"}`;
     const outName = "out.mp4";
     let ffmpeg: any = null;
 
     try {
-      ffmpeg = await loadFFmpeg((progress) =>
-        setPhase((p) => (p.kind === "idle" ? p : { ...p, progress })),
+      ffmpeg = await loadFFmpeg(
+        (progress) => setPhase((p) => (p.kind === "idle" ? p : { ...p, progress })),
+        t,
       );
 
-      setPhase({ kind: "transcoding", progress: "读取文件…" });
+      setPhase({ kind: "transcoding", progress: t("video.readingFile") });
       const buf = await fetch(src).then((r) => {
-        if (!r.ok) throw new Error(`文件读取失败（HTTP ${r.status}）`);
+        if (!r.ok) throw new Error(t("video.readFailed", { code: r.status }));
         return r.arrayBuffer();
       });
 
       if (buf.byteLength > SIZE_WARN_BYTES) {
         throw new Error(
-          `文件约 ${(buf.byteLength / 1024 / 1024).toFixed(0)}MB，浏览器内解码大概率超时或内存溢出。建议下载后用本地播放器（如 VLC）打开。`,
+          t("video.tooLarge", { mb: (buf.byteLength / 1024 / 1024).toFixed(0) }),
         );
       }
-      if (buf.byteLength === 0) throw new Error("文件为空");
+      if (buf.byteLength === 0) throw new Error(t("video.emptyFile"));
 
       recentLogs = [];
       await ffmpeg.writeFile(inName, new Uint8Array(buf));
 
       // 先探测：有没有视频轨/音频轨（决定用哪套参数）
-      setPhase({ kind: "transcoding", progress: "分析文件…" });
+      setPhase({ kind: "transcoding", progress: t("video.analyzing") });
       const probe = await execSafe(ffmpeg, ["-i", inName]);
       const info = parseStreams(recentLogs);
 
       if (!info.hasVideo) {
-        throw new Error("没有检测到视频轨，这可能不是视频文件（或编码不被支持）");
+        throw new Error(t("video.noVideoTrack"));
       }
 
-      const plans = buildPlans(info.hasAudio);
+      const plans = buildPlans(info.hasAudio, t);
       let lastErr = "";
 
       for (let n = 0; n < plans.length; n++) {
@@ -272,13 +284,13 @@ export function UniversalVideoPlayer({
           kind: "transcoding",
           progress:
             plans.length > 1
-              ? `转码中（方案 ${n + 1}/${plans.length}：${plan.name}）`
-              : "转码为 MP4…",
+              ? t("video.transcodingPlan", { i: n + 1, n: plans.length, name: plan.name })
+              : t("video.transcoding"),
         });
 
         const r = await execSafe(ffmpeg, plan.args(inName, outName));
         if (!r.ok) {
-          lastErr = r.err || `退出码 ${r.code}`;
+          lastErr = r.err || t("video.exitCode", { code: r.code });
           // 换方案前清掉残留输出，避免读到上一次的半成品
           try { await ffmpeg.deleteFile(outName); } catch { /* 不存在 */ }
           continue;
@@ -286,7 +298,7 @@ export function UniversalVideoPlayer({
 
         const data = await ffmpeg.readFile(outName);
         if (!data || (data as Uint8Array).byteLength === 0) {
-          lastErr = "输出为空";
+          lastErr = t("video.emptyOutput");
           continue;
         }
 
@@ -306,11 +318,11 @@ export function UniversalVideoPlayer({
         return;
       }
 
-      throw new Error(`全部 ${plans.length} 种方案都失败了：${lastErr}`);
+      throw new Error(t("video.allPlansFailed", { n: plans.length, err: lastErr }));
     } catch (err) {
       setPhase({
         kind: "error",
-        message: err instanceof Error ? err.message : "转码失败",
+        message: err instanceof Error ? err.message : t("video.transcodeFailed"),
         logs: tailLogs(),
       });
     } finally {
@@ -330,7 +342,7 @@ export function UniversalVideoPlayer({
         preload="metadata"
         className={className ?? "max-h-[420px] w-full rounded-[var(--radius-card)] bg-black"}
       >
-        你的浏览器不支持视频播放。
+        {t("video.unsupported")}
       </video>
     );
   }
@@ -347,7 +359,7 @@ export function UniversalVideoPlayer({
           className={className ?? "max-h-[420px] w-full rounded-[var(--radius-card)] bg-black"}
         />
         <p className="text-xs text-fg-tertiary">
-          已由内置解码器转为 MP4 播放（原文件未改动）· {phase.via}
+          {t("video.transcodedNote")} · {phase.via}
         </p>
       </div>
     );
@@ -359,7 +371,7 @@ export function UniversalVideoPlayer({
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
         <p className="text-sm font-medium">{phase.progress}</p>
         <p className="max-w-[280px] text-center text-xs text-fg-tertiary">
-          .{ext} 浏览器无法直接播放，正在用内置解码器转换。文件越大耗时越久。
+          {t("video.cannotPlayNote", { ext })}
         </p>
       </div>
     );
@@ -376,7 +388,7 @@ export function UniversalVideoPlayer({
         {phase.logs.length > 0 && (
           <details className="text-xs text-fg-tertiary">
             <summary className="cursor-pointer select-none text-muted-foreground hover:text-fg-secondary">
-              查看解码器输出（排查用）
+              {t("video.showLog")}
             </summary>
             <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-muted/60 p-2 font-mono text-[11px] leading-relaxed">
               {phase.logs.join("\n")}
@@ -385,7 +397,7 @@ export function UniversalVideoPlayer({
         )}
 
         <p className="text-xs text-fg-tertiary">
-          可以下载原文件后用本地播放器（如 VLC）打开。
+          {t("video.downloadHint")}
         </p>
       </div>
     );
@@ -397,7 +409,7 @@ export function UniversalVideoPlayer({
         <span className="font-medium">{name}</span>
       </p>
       <p className="max-w-[300px] text-center text-xs text-fg-tertiary">
-        .{ext} 不是浏览器原生格式，需要先用内置解码器转换为 MP4。
+        {t("video.needTranscode", { ext })}
       </p>
       <button
         type="button"
@@ -405,7 +417,7 @@ export function UniversalVideoPlayer({
         className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.03] active:scale-[0.98]"
       >
         <Play className="h-3.5 w-3.5" />
-        解码并播放
+        {t("video.decodeAndPlay")}
       </button>
     </div>
   );
