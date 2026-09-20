@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-  ArrowUp,
   Brain,
   Globe,
   FileText,
@@ -13,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { ModelPicker } from "@/components/chat/model-picker";
+import { Button as StatefulButton } from "@/components/ui/stateful-button";
 import type { CustomProviderConfig } from "@/lib/config";
 import { formatBytes, type Attachment } from "@/lib/types";
 
@@ -234,6 +234,11 @@ export function ChatInput({
 
         {/* 右侧：发送 / 停止 */}
         <div className="flex shrink-0 items-center gap-2">
+          {/*
+            发送按钮用带状态的版本：点击后先转 spinner 再变「已传送」。
+            否则同步返回的提交动作没有任何反馈，用户会以为没点上而连点。
+            尺寸压到 h-9 以适配输入框高度。
+          */}
           {streaming ? (
             <button
               onClick={onStop}
@@ -243,14 +248,18 @@ export function ChatInput({
               停止
             </button>
           ) : (
-            <button
+            <StatefulButton
               onClick={onSubmit}
               disabled={!value.trim() && attachments.length === 0}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#4D6BFE] text-white transition-all hover:bg-[#3757E4] disabled:cursor-not-allowed disabled:bg-muted disabled:text-fg-quaternary"
-              title="发送"
+              pendingText="传送中"
+              successText="已传送"
+              errorText="传送失败"
+              minPendingMs={380}
+              resetAfter={1400}
+              className="h-9 bg-gradient-to-r from-[#4D6BFE] to-[#6B5BFE] px-4 text-[13px] shadow-none hover:brightness-110"
             >
-              <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
-            </button>
+              传送讯息
+            </StatefulButton>
           )}
         </div>
       </div>

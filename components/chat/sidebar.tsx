@@ -39,6 +39,17 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
 }
 
+/**
+ * 底部行的 Aceternity 风格改良：hover 时有一道柔光横向扫过。
+ *
+ * 纯 CSS 实现（group-hover + translate），不引入动画库 ——
+ * 上次升级因为 peer 依赖冲突折腾过一轮，能不加依赖就不加。
+ */
+const GLOW_ROW =
+  "group relative overflow-hidden rounded-xl transition-colors duration-300 hover:bg-white/[0.06]";
+const GLOW_BAR =
+  "pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.14] to-transparent transition-transform duration-700 group-hover:translate-x-full";
+
 export function Sidebar({
   conversations,
   currentId,
@@ -233,8 +244,9 @@ export function Sidebar({
           <div className="space-y-0.5 border-t border-border px-3 py-2">
             <button
               onClick={onOpenSettings}
-              className="liquid-item flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]"
+              className={`liquid-item ${GLOW_ROW} flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]`}
             >
+              <span className={GLOW_BAR} aria-hidden />
               <Settings2 className="h-4 w-4" />
               设置
             </button>
@@ -243,16 +255,18 @@ export function Sidebar({
                 {user.role === "admin" ? (
                   <Link
                     href="/admin"
-                    className="liquid-item flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]"
+                    className={`liquid-item ${GLOW_ROW} flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]`}
                   >
+                    <span className={GLOW_BAR} aria-hidden />
                     <Shield className="h-4 w-4" />
                     管理员面板
                   </Link>
                 ) : null}
                 <Link
                   href="/account"
-                  className="liquid-item flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]"
+                  className={`liquid-item ${GLOW_ROW} flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]`}
                 >
+                  <span className={GLOW_BAR} aria-hidden />
                   <UserIcon className="h-4 w-4" />
                   <span className="truncate">{user.email}</span>
                 </Link>
@@ -260,8 +274,9 @@ export function Sidebar({
             ) : (
               <Link
                 href="/login"
-                className="liquid-item flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]"
+                className={`liquid-item ${GLOW_ROW} flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]`}
               >
+                <span className={GLOW_BAR} aria-hidden />
                 <LogIn className="h-4 w-4" />
                 登录 / 注册
               </Link>
@@ -270,8 +285,9 @@ export function Sidebar({
             {SPONSOR_ENABLED ? (
               <Link
                 href="/sponsor"
-                className="liquid-item flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]"
+                className={`liquid-item ${GLOW_ROW} flex w-full items-center gap-2 px-2.5 py-2 text-sm text-[hsl(var(--sidebar-foreground))]`}
               >
+                <span className={GLOW_BAR} aria-hidden />
                 <HeartHandshake className="h-4 w-4" />
                 赞助支持
               </Link>
