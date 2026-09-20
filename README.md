@@ -374,16 +374,32 @@ binding 的权限来自 Worker 本身，不走 API。令牌只在「自动查找
 
 ---
 
-## 🎭 三套界面风格
+## 🎭 五套界面风格
 
 主题切换改的不是配色，而是**整套设计语言**：字体、圆角、阴影、间距密度、
 卡片材质、背景处理全都不同。
 
 | 风格 | 气质 | 字体 | 圆角 | 表面 |
 |---|---|---|---|---|
-| **Anthropic** | 纸感编辑排版，克制 | Inter（近似 Styrene B）+ Source Serif 4（近似 Tiempos） | 中等（控件 10px / 卡片 20px） | 几乎无阴影，发丝边框分层 |
-| **Fuwari** | 极简卡片博客，清爽 | Montserrat + 昭源環方 | 偏大（卡片 24px） | 卡片有存在感，hover 轻抬 |
+| **Anthropic** | 纸感编辑排版，克制 | Inter（近似 Styrene B）+ Source Serif 4（近似 Tiempos） | 中等（控件 16px / 卡片 28px） | 几乎无阴影，发丝边框分层 |
+| **Fuwari** | 极简卡片博客，清爽 | Montserrat + 昭源環方 | 偏大（卡片 36px） | 卡片有存在感，hover 轻抬 |
 | **Violet Rose** | 紫粉柔光糖果，软 | Montserrat + 昭源環方 | 最大（卡片 28px） | 带紫色调的柔和扩散阴影 |
+| **Sidefolio** | 侧栏工作台，冷峻 | Inter + Source Serif 4 | 偏小（卡片 12px） | 几乎无阴影，靠 1px 描边；深色下近纯黑 |
+| **Minimalist** | 极简作品集，纸上排版 | Inter + Source Serif 4 | 最小（卡片 6px） | 无阴影，纯留白 + 发丝框；密度最宽松 |
+
+### 后面两套是怎么来的
+
+**Sidefolio** 参考 Aceternity 的同名作品集模板：侧边栏布局、现代克制，
+层次靠 hover 的微交互而不是阴影。识别点是**中性灰阶 + 单一蓝紫强调色**，
+深色下背景接近 `#0a0a0a`。想换强调色改 CSS 里 `--hue` 一个数即可（默认 258 蓝紫）。
+
+**Minimalist** 参考极简作品集模板：纯白纸面、发丝描边、大留白，
+标题用衬线做锚点。刻意把强调色做成**低饱和**（默认 hue 215 石板蓝）——
+极简风里鲜艳的彩色只会破坏留白。圆角是五套里最小的：
+大圆角在这套里会显得"没做完"。
+
+> 两套都没引入 framer-motion。微交互用 CSS transition 就够，
+> 为一个过渡拉进一整个动画库不值得（项目刚因为 peer 依赖冲突折腾过一轮）。
 
 ### Anthropic 风格的两个细节
 
@@ -550,7 +566,7 @@ R2 桶是你自己的，Worker 通过 binding 读写时，权限来自 binding �
 | Key | 默认值 | 说明 |
 |---|---|---|
 | `NEXT_PUBLIC_SITE_NAME` | `Agnes AI` | 站点名 |
-| `NEXT_PUBLIC_THEME` | `anthropic` | 配色：`anthropic` / `fuwari` / `violet-rose` |
+| `NEXT_PUBLIC_THEME` | `anthropic` | 配色：`anthropic` / `fuwari` / `violet-rose` / `sidefolio` / `minimalist` |
 | `NEXT_PUBLIC_REQUIRE_LOGIN` | `false` | 设 `true` 则必须登录才能对话 |
 | `NEXT_PUBLIC_ALLOW_WEB_SEARCH` | `true` | 设 `false` 关闭联网开关 |
 | `NEXT_PUBLIC_ALLOW_CUSTOM_KEY` | `true` | 设 `false` 锁死只能用站长的 Key |
@@ -576,7 +592,7 @@ R2 桶是你自己的，Worker 通过 binding 读写时，权限来自 binding �
 | `NEXT_PUBLIC_SITE_NAME` | `Agnes AI` | 站点名，出现在标题栏、侧边栏、页脚 |
 | `NEXT_PUBLIC_SITE_TAGLINE` | `免费聊天` | 副标题，跟在站点名后面 |
 | `NEXT_PUBLIC_SITE_DESCRIPTION` | 自动拼接 | SEO 描述 |
-| `NEXT_PUBLIC_THEME` | `anthropic` | 界面风格：`anthropic` / `fuwari` / `violet-rose` |
+| `NEXT_PUBLIC_THEME` | `anthropic` | 界面风格：`anthropic` / `fuwari` / `violet-rose` / `sidefolio` / `minimalist` |
 | `NEXT_PUBLIC_AUTHOR_NAME` | `wcvjk8tnz8` | 页脚创作者署名 |
 | `NEXT_PUBLIC_SHOW_SOURCE_LINKS` | `false` | 设 `true` 才在页脚/赞助页显示源码与上游仓库链接（**默认不显示，避免暴露 GitHub 账号**） |
 | `NEXT_PUBLIC_REPO_URL` | 本仓库 | 页脚源码链接 |

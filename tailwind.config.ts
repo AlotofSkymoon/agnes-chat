@@ -76,7 +76,7 @@ const config: Config = {
        * 换主题时卡片圆角纹丝不动，"换个风格还是不够圆润"。
        *
        * 改成变量后，每套主题可以真正定义自己的圆角语言：
-       * fuwari 圆润、anthropic 克制、violet-rose 直角。
+       * fuwari 最圆、anthropic 克制、sidefolio 面板感、minimalist 近直角。
        * 变量在 globals.css 的 :root 与各 [data-theme] 里定义。
        */
       borderRadius: {

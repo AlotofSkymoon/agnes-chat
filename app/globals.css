@@ -1114,6 +1114,297 @@ body {
   }
 
   /* ==========================================================================
+     Sidefolio —— 「开发者作品集 / 侧栏工作台」
+
+     参考 Aceternity 的 Sidefolio 模板：侧边栏布局、现代克制、
+     靠微交互（hover 的辉光与位移）而不是阴影来制造层次。
+
+     这套的性格是**中性灰阶 + 单一冷调强调色**：
+     - 几乎不用彩色，只用中性灰分层，让内容自己是主角
+     - 唯一的强调色是蓝紫（Aceternity 的招牌 indigo→violet）
+     - 圆角收敛到中等偏小，卡片是"面板"而不是"糖果"
+     - 阴影几乎为零，靠 1px 描边分隔 —— 深色下描边是 neutral-800 那种极暗灰
+     - 深色下背景接近纯黑（#0a0a0a），这是它最辨识度的一点
+
+     ⚠️ 不引入 framer-motion：微交互靠 CSS transition 就够，
+     为一个过渡引入依赖不值得（项目刚因为 peer 冲突折腾过）。
+     ========================================================================== */
+  [data-theme="sidefolio"] {
+    --hue: 258; /* 蓝紫：改这一个数即可整体换强调色 */
+
+    --font-sans: "Inter", "Chiron GoRound TC", -apple-system, BlinkMacSystemFont,
+      "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    --font-serif: "Source Serif 4", "Chiron GoRound TC", Georgia, Cambria,
+      "Times New Roman", serif;
+    --font-mono: "SuperSFMonoV1", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --background: 0 0% 99%;
+    --foreground: 0 0% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
+
+    --primary: var(--hue) 88% 62%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 12%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 42%;
+    --accent: 0 0% 94%;
+    --accent-foreground: 0 0% 16%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: var(--hue) 88% 62%;
+
+    --sidebar: 0 0% 97%;
+    --sidebar-foreground: 0 0% 10%;
+    --assistant-bubble: 0 0% 98%;
+    --user-bubble: var(--hue) 60% 96%;
+    --user-bubble-foreground: 0 0% 12%;
+
+    --text-secondary: 0 0% 28%;
+    --text-tertiary: 0 0% 44%;
+    --text-quaternary: 0 0% 55%;
+
+    /* ---- 形状：中等偏小，面板感 ---- */
+    --radius-ctrl: 0.5rem;
+    --radius-card: 0.75rem;
+    --radius-panel: 1rem;
+    --radius-pill: 999px;
+
+    --r-sm: 0.25rem;
+    --r-default: 0.5rem;
+    --r-md: 0.5rem;
+    --r-lg: 0.625rem;
+    --r-xl: 0.75rem;
+    --r-2xl: 1rem;
+    --r-3xl: 1.25rem;
+    --r-4xl: 1.5rem;
+
+    /* ---- 表面：几乎无阴影，全靠描边 ---- */
+    --shadow-card: 0 1px 2px 0 hsl(0 0% 0% / 0.04);
+    --shadow-panel: 0 8px 24px -12px hsl(0 0% 0% / 0.16);
+    --card-border-w: 1px;
+    --card-border: 0 0% 90%;
+
+    /* ---- 密度：紧凑，像工作台而不是阅读页 ---- */
+    --density-gap: 0.92;
+    --leading-body: 1.5;
+
+    --lg-tint: 0 0% 100%;
+    --lg-tint-a1: 0.78;
+    --lg-tint-a2: 0.62;
+    --lg-blur: 12px;
+    --lg-saturate: 130%;
+    --lg-edge-a: 0.50;
+    --lg-spec-a: 0.08;
+    --lg-thick-a: 0.03;
+    --glass-bg: 0 0% 100%;
+    --glass-border: 0 0% 90%;
+
+    --radius: 0.5rem;
+    --radius-ios: 0.625rem;
+    --radius-ios-lg: 0.875rem;
+    --radius-ios-xl: 1rem;
+  }
+
+  [data-theme="sidefolio"].dark {
+    --destructive: 0 62% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --background: 0 0% 4%; /* #0a0a0a，Sidefolio 最辨识度的一点 */
+    --foreground: 0 0% 96%;
+    --card: 0 0% 8%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 96%;
+
+    --primary: var(--hue) 90% 70%;
+    --primary-foreground: 0 0% 8%;
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 0 0% 92%;
+    --muted: 0 0% 13%;
+    --muted-foreground: 0 0% 62%;
+    --accent: 0 0% 16%;
+    --accent-foreground: 0 0% 94%;
+
+    --border: 0 0% 17%;
+    --input: 0 0% 17%;
+    --ring: var(--hue) 90% 70%;
+
+    --sidebar: 0 0% 6%;
+    --sidebar-foreground: 0 0% 92%;
+    --assistant-bubble: 0 0% 10%;
+    --user-bubble: var(--hue) 30% 18%;
+    --user-bubble-foreground: 0 0% 94%;
+
+    --text-secondary: 0 0% 80%;
+    --text-tertiary: 0 0% 64%;
+    --text-quaternary: 0 0% 50%;
+
+    --shadow-card: 0 1px 2px 0 hsl(0 0% 0% / 0.4);
+    --shadow-panel: 0 12px 32px -12px hsl(0 0% 0% / 0.7);
+    --card-border: 0 0% 17%;
+
+    --lg-tint: 0 0% 20%;
+    --lg-tint-a1: 0.42;
+    --lg-tint-a2: 0.28;
+    --lg-edge-a: 0.20;
+    --lg-spec-a: 0.06;
+    --lg-thick-a: 0.14;
+    --glass-bg: 0 0% 16%;
+    --glass-border: 0 0% 22%;
+  }
+
+  /* ==========================================================================
+     Minimalist —— 「极简作品集 / 纸上排版」
+
+     参考极简作品集模板：纯白底、发丝级描边、大留白、
+     标题用衬线做视觉锚点，正文用无衬线保证长文可读。
+
+     与 Sidefolio 的区别（两套都是"克制"，但路子不同）：
+     - Sidefolio 是深色优先、中性灰、面板感、紧凑
+     - Minimalist 是浅色优先、暖白纸质、近乎直角、极度宽松
+     - 强调色刻意做**低饱和**：极简风的彩色只会破坏留白
+     - 圆角收到 6px 一档，是五套里最小的 —— 大圆角在这套里会显得"没做完"
+
+     ⚠️ 为什么 serif 只给 --font-serif 而不强行替换全局 sans：
+     作品集用衬线的是**标题**，正文换衬线会让聊天记录难读。
+     这里提供变量，组件想用就用。
+     ========================================================================== */
+  [data-theme="minimalist"] {
+    --hue: 215; /* 石板蓝：低饱和，改这个数可换整体色调 */
+
+    --font-sans: "Inter", "Chiron GoRound TC", -apple-system, BlinkMacSystemFont,
+      "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    --font-serif: "Source Serif 4", "Chiron GoRound TC", Georgia, Cambria,
+      "Times New Roman", serif;
+    --font-mono: "SuperSFMonoV1", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --background: 30 20% 99%; /* 极淡的暖白，比纯白更"纸" */
+    --foreground: var(--hue) 15% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: var(--hue) 15% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: var(--hue) 15% 12%;
+
+    --primary: var(--hue) 45% 40%; /* 低饱和深蓝，不抢戏 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: var(--hue) 15% 96%;
+    --secondary-foreground: var(--hue) 20% 22%;
+    --muted: var(--hue) 15% 96%;
+    --muted-foreground: var(--hue) 8% 46%;
+    --accent: var(--hue) 20% 94%;
+    --accent-foreground: var(--hue) 30% 26%;
+    --destructive: 6 55% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: var(--hue) 12% 91%;
+    --input: var(--hue) 12% 91%;
+    --ring: var(--hue) 45% 40%;
+
+    --sidebar: 30 16% 98%;
+    --sidebar-foreground: var(--hue) 15% 14%;
+    --assistant-bubble: 0 0% 100%;
+    --user-bubble: var(--hue) 18% 95%;
+    --user-bubble-foreground: var(--hue) 18% 16%;
+
+    --text-secondary: var(--hue) 10% 32%;
+    --text-tertiary: var(--hue) 8% 48%;
+    --text-quaternary: var(--hue) 6% 57%;
+
+    /* ---- 形状：极小圆角，接近直角 ---- */
+    --radius-ctrl: 0.25rem;
+    --radius-card: 0.375rem;
+    --radius-panel: 0.5rem;
+    --radius-pill: 999px;
+
+    --r-sm: 0.125rem;
+    --r-default: 0.25rem;
+    --r-md: 0.25rem;
+    --r-lg: 0.375rem;
+    --r-xl: 0.5rem;
+    --r-2xl: 0.625rem;
+    --r-3xl: 0.75rem;
+    --r-4xl: 1rem;
+
+    /* ---- 表面：无阴影，纯靠留白和发丝描边 ---- */
+    --shadow-card: 0 0 0 0 hsl(0 0% 0% / 0);
+    --shadow-panel: 0 1px 3px 0 hsl(var(--hue) 20% 20% / 0.06);
+    --card-border-w: 1px;
+    --card-border: var(--hue) 12% 91%;
+
+    /* ---- 密度：五套里最宽松，行高最高 ---- */
+    --density-gap: 1.35;
+    --leading-body: 1.75;
+
+    --lg-tint: 0 0% 100%;
+    --lg-tint-a1: 0.86;
+    --lg-tint-a2: 0.72;
+    --lg-blur: 8px;
+    --lg-saturate: 105%;
+    --lg-edge-a: 0.45;
+    --lg-spec-a: 0.05;
+    --lg-thick-a: 0.02;
+    --glass-bg: 0 0% 100%;
+    --glass-border: var(--hue) 12% 91%;
+
+    --radius: 0.25rem;
+    --radius-ios: 0.375rem;
+    --radius-ios-lg: 0.5rem;
+    --radius-ios-xl: 0.625rem;
+  }
+
+  [data-theme="minimalist"].dark {
+    --destructive: 6 55% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --background: var(--hue) 12% 7%;
+    --foreground: var(--hue) 10% 90%;
+    --card: var(--hue) 10% 10%;
+    --card-foreground: var(--hue) 10% 90%;
+    --popover: var(--hue) 10% 11%;
+    --popover-foreground: var(--hue) 10% 90%;
+
+    --primary: var(--hue) 55% 68%;
+    --primary-foreground: var(--hue) 30% 10%;
+    --secondary: var(--hue) 8% 15%;
+    --secondary-foreground: var(--hue) 10% 86%;
+    --muted: var(--hue) 8% 14%;
+    --muted-foreground: var(--hue) 6% 58%;
+    --accent: var(--hue) 12% 18%;
+    --accent-foreground: var(--hue) 10% 88%;
+
+    --border: var(--hue) 8% 18%;
+    --input: var(--hue) 8% 18%;
+    --ring: var(--hue) 55% 68%;
+
+    --sidebar: var(--hue) 12% 8%;
+    --sidebar-foreground: var(--hue) 10% 88%;
+    --assistant-bubble: var(--hue) 10% 11%;
+    --user-bubble: var(--hue) 16% 17%;
+    --user-bubble-foreground: var(--hue) 10% 90%;
+
+    --text-secondary: var(--hue) 8% 76%;
+    --text-tertiary: var(--hue) 6% 60%;
+    --text-quaternary: var(--hue) 5% 46%;
+
+    --shadow-panel: 0 1px 3px 0 hsl(0 0% 0% / 0.4);
+    --card-border: var(--hue) 8% 18%;
+
+    --lg-tint: var(--hue) 10% 22%;
+    --lg-tint-a1: 0.40;
+    --lg-tint-a2: 0.26;
+    --lg-edge-a: 0.14;
+    --lg-spec-a: 0.04;
+    --lg-thick-a: 0.12;
+    --glass-bg: var(--hue) 10% 18%;
+    --glass-border: var(--hue) 8% 22%;
+  }
+
+  /* ==========================================================================
      iOS 26 液态玻璃（Liquid Glass）
      与 .glass 的区别：圆角更大、层次更分明、带折射感的双层高光。
      ========================================================================== */

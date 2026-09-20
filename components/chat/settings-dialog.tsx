@@ -580,7 +580,8 @@ export function SettingsDialog({
               <Palette className="h-4 w-4" />
               {t("settings.colorTheme")}
             </Label>
-            <div className="grid grid-cols-2 gap-2">
+            {/* 5 套风格用 2 列会剩一个空格，中等屏起给 3 列 */}
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
               {THEME_PRESETS.map((t) => (
                 <button
                   key={t.id}

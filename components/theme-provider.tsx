@@ -34,7 +34,7 @@ interface ThemeContextValue {
   cycleTheme: (origin?: { x: number; y: number }) => void;
   /** 系统偏好（供 UI 显示「跟随系统（当前暗）」这类提示） */
   systemTheme: ResolvedTheme;
-  /** 配色预设：anthropic / fuwari / violet-rose */
+  /** 界面风格预设：anthropic / fuwari / violet-rose / sidefolio / minimalist */
   preset: ThemePreset;
   setPreset: (preset: ThemePreset) => void;
 }

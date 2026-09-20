@@ -34,16 +34,31 @@ export const SITE_DESCRIPTION: string =
  * - fuwari：静态博客主题的观感 —— 极简、卡片、大留白，色相可调
  * - violet-rose：紫粉渐变 + 白色圆角卡片（玫瑰点缀）
  * - anthropic：克制的暖色调 —— 米白底、赤陶橙点缀、细边框
+ * - sidefolio：侧栏工作台 —— 中性灰阶、近黑深底、面板感（参考 Aceternity Sidefolio）
+ * - minimalist：极简作品集 —— 暖白纸面、大留白、近直角发丝框
  */
-export type ThemePreset = "fuwari" | "violet-rose" | "anthropic";
+export type ThemePreset =
+  | "fuwari"
+  | "violet-rose"
+  | "anthropic"
+  | "sidefolio"
+  | "minimalist";
 
 export const THEME_PRESETS: { id: ThemePreset; label: string; desc: string }[] = [
   { id: "anthropic", label: "Anthropic", desc: "纸感排版 · 衬线思考 · Inter + Source Serif" },
   { id: "fuwari", label: "Fuwari", desc: "极简卡片 · 大留白 · 单色相驱动" },
   { id: "violet-rose", label: "Violet Rose", desc: "紫粉柔光 · 大圆角糖果 · 实心白卡" },
+  { id: "sidefolio", label: "Sidefolio", desc: "侧栏工作台 · 中性灰阶 · 近黑深底" },
+  { id: "minimalist", label: "Minimalist", desc: "极简作品集 · 大留白 · 近直角发丝框" },
 ];
 
-export const THEME_IDS: ThemePreset[] = ["anthropic", "fuwari", "violet-rose"];
+export const THEME_IDS: ThemePreset[] = [
+  "anthropic",
+  "fuwari",
+  "violet-rose",
+  "sidefolio",
+  "minimalist",
+];
 
 const DEFAULT_THEME: ThemePreset = (() => {
   const t = process.env.NEXT_PUBLIC_THEME?.trim();
