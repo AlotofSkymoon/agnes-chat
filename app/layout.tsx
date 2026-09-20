@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
 import { DynamicTitle } from "@/components/dynamic-title";
+import { I18nProvider } from "@/components/i18n-provider";
 import {
   SITE_DESCRIPTION,
   SITE_NAME,
@@ -48,6 +49,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="font-sans">
+        {/* I18nProvider 包在最外层：语言切换会重渲染整棵子树 */}
+        <I18nProvider>
         <ThemeProvider>
           <DynamicTitle />
           {children}
@@ -60,6 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* 页面切换过渡：挂在最外层，全站生效 */}
           <PageTransition />
         </ThemeProvider>
+        </I18nProvider>
       </body>
     </html>
   );

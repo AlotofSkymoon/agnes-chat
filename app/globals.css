@@ -2488,38 +2488,76 @@ body {
  *
  * ⚠️ 为什么不是一层简单渐变：
  * 纯渐变等于"云不见了"，而这个背景存在的意义就是那层云。
- * 这里用多层不同位置的模糊光斑堆叠出云的层次，观感接近 shader 的输出。
- *
- * 配色与 shader 一致（近黑蓝 → 紫 → 亮紫），不做蓝天白云 ——
- * 赞助页是暗色调，亮色云会跟卡片和文字打架。
+ * 这里用多层白色模糊光斑堆叠出云团，配色与 shader 一致（蓝天白云）。
  */
 .cloud-fallback {
   background:
-    radial-gradient(58% 42% at 18% 22%, rgba(115, 81, 173, 0.55) 0%, rgba(115, 81, 173, 0) 68%),
-    radial-gradient(48% 36% at 82% 30%, rgba(77, 107, 254, 0.42) 0%, rgba(77, 107, 254, 0) 70%),
-    radial-gradient(66% 46% at 52% 78%, rgba(167, 108, 254, 0.38) 0%, rgba(167, 108, 254, 0) 72%),
-    radial-gradient(40% 30% at 8% 74%, rgba(90, 70, 150, 0.34) 0%, rgba(90, 70, 150, 0) 70%),
-    linear-gradient(180deg, #241d47 0%, #191534 42%, #0b0a16 100%);
+    radial-gradient(46% 30% at 22% 26%, rgba(255, 255, 255, 0.92) 0%, rgba(255, 255, 255, 0) 70%),
+    radial-gradient(38% 24% at 74% 34%, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0) 72%),
+    radial-gradient(54% 32% at 56% 72%, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0) 74%),
+    radial-gradient(34% 20% at 12% 66%, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0) 72%),
+    linear-gradient(180deg, #0e4aad 0%, #2a7de0 45%, #7ab8f3 100%);
 }
 
-/* 缓慢漂移，避免看起来像一张死图；不动也能看，只是没那么活 */
+/*
+ * 第二层云：反向、更慢，与上层形成视差。
+ * 单层同向平移看着像整块在滑，两层交错才像云在各自飘。
+ */
 .cloud-fallback::before {
   content: "";
   position: absolute;
-  inset: -10%;
+  inset: -12%;
   background:
-    radial-gradient(38% 28% at 30% 40%, rgba(196, 181, 253, 0.16) 0%, rgba(196, 181, 253, 0) 70%),
-    radial-gradient(34% 24% at 70% 62%, rgba(148, 163, 254, 0.14) 0%, rgba(148, 163, 254, 0) 72%);
-  animation: cloud-drift 26s ease-in-out infinite alternate;
+    radial-gradient(34% 22% at 34% 44%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 70%),
+    radial-gradient(30% 18% at 68% 62%, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 72%),
+    radial-gradient(26% 16% at 88% 24%, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0) 72%);
+  animation: cloud-drift-a 22s ease-in-out infinite alternate;
 }
 
-@keyframes cloud-drift {
-  from { transform: translate3d(-3%, 0, 0) scale(1); }
-  to { transform: translate3d(4%, -2%, 0) scale(1.08); }
+.cloud-fallback::after {
+  content: "";
+  position: absolute;
+  inset: -16%;
+  background:
+    radial-gradient(28% 18% at 62% 34%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 72%),
+    radial-gradient(24% 15% at 24% 74%, rgba(255, 255, 255, 0.30) 0%, rgba(255, 255, 255, 0) 74%);
+  animation: cloud-drift-b 34s ease-in-out infinite alternate;
+}
+
+@keyframes cloud-drift-a {
+  from { transform: translate3d(-6%, 0, 0) scale(1); }
+  to { transform: translate3d(8%, -3%, 0) scale(1.12); }
+}
+
+@keyframes cloud-drift-b {
+  from { transform: translate3d(5%, 1%, 0) scale(1.08); }
+  to { transform: translate3d(-7%, -2%, 0) scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cloud-fallback::before {
+  .cloud-fallback::before,
+  .cloud-fallback::after {
     animation: none;
   }
+}
+
+/* ==========================================================================
+   天空背景上的文字
+   ========================================================================== */
+
+/*
+ * 云是白色的，会飘到文字下面 —— 白字压在白云上会糊成一片。
+ *
+ * ⚠️ 为什么不用半透明蒙版：
+ * 整块加蒙版会把蓝天压灰，云也不再通透，等于白做了。
+ * 只给文字本身加投影，天空该亮的地方照常亮。
+ */
+.on-sky,
+.on-sky * {
+  text-shadow: 0 1px 3px rgba(8, 32, 78, 0.55), 0 0 12px rgba(8, 32, 78, 0.35);
+}
+
+/* 天空背景上的浅色卡片：略微加深底色，免得白云透过来吃掉对比度 */
+.on-sky .glare-surface {
+  background-color: rgba(10, 28, 66, 0.55);
 }
