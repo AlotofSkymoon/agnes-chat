@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Coffee, Github, HeartHandshake, Share2 } from "lucide-react";
 
 import { SponsorChannels } from "@/components/sponsor/sponsor-qr";
-import { Beams, GridBackground, Meteors, Noise } from "@/components/ui/aceternity";
+import { CloudShader } from "@/components/ui/cloud-shader";
 import { SiteFooter } from "@/components/site-footer";
 import {
   PROJECT_LINK,
@@ -72,18 +72,23 @@ export default function SponsorPage() {
 
   return (
     <main className="relative min-h-screen-safe">
-      {/* 与导航站一致的 Aceternity 风格背景 */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] aurora" />
-      <GridBackground className="h-[420px]" />
-      <Beams count={8} className="h-[420px]" />
-      <Meteors count={10} className="h-[420px]" />
-      <Noise className="h-[420px]" />
+      {/*
+        整页背景：WebGL 云层（fbm noise），紫黑色调。
+        WebGL 不可用时由组件内部的 CSS 云团兜底，不会退化成一片纯渐变。
+
+        ⚠️ 整页文字统一用白色系，不跟主题变量走：
+        云层是深色且不随主题变化，浅色主题下 text-fg-secondary 是深灰，
+        压在深色背景上几乎看不见。
+      */}
+      <CloudShader className="pointer-events-none fixed inset-0 -z-10" />
+      {/* 顶部压一层暗渐变，让返回链接与标题更稳 */}
+      <div className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-64 bg-gradient-to-b from-black/40 to-transparent" />
 
       <div className="relative mx-auto max-w-3xl px-4 py-10 sm:py-14">
         {/* 返回聊天 */}
         <Link
           href="/"
-          className="mb-8 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="mb-8 inline-flex items-center gap-1.5 text-sm text-white/65 transition-colors hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
           返回聊天
@@ -91,13 +96,13 @@ export default function SponsorPage() {
 
         {/* 标题 */}
         <header className="mb-10 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white">
             <Coffee className="h-6 w-6" />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
             支持 {SITE_NAME}
           </h1>
-          <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-fg-secondary">
+          <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-white/75">
             本站永久免费、无广告、不采集隐私数据。
             <br className="hidden sm:block" />
             服务器、域名、API 额度用的都是免费额度，站长不担心这块 ——
@@ -111,17 +116,17 @@ export default function SponsorPage() {
 
         {/* 资金去向 */}
         <section className="mt-10">
-          <h2 className="mb-4 text-center text-sm font-medium text-fg-secondary">
+          <h2 className="mb-4 text-center text-sm font-medium text-white/70">
             赞助用在哪
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
             {USES.map((u) => (
               <div
                 key={u.label}
-                className="rounded-[var(--radius-card)] border border-border bg-card/60 px-4 py-4 backdrop-blur-xl"
+                className="rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-4 py-4 backdrop-blur-xl"
               >
-                <p className="text-sm font-medium">{u.label}</p>
-                <p className="mt-1.5 text-xs leading-relaxed text-fg-tertiary">
+                <p className="text-sm font-medium text-white">{u.label}</p>
+                <p className="mt-1.5 text-xs leading-relaxed text-white/65">
                   {u.desc}
                 </p>
               </div>
@@ -131,7 +136,7 @@ export default function SponsorPage() {
 
         {/* 其他支持方式 */}
         <section className="mt-10">
-          <h2 className="mb-4 text-center text-sm font-medium text-fg-secondary">
+          <h2 className="mb-4 text-center text-sm font-medium text-white/70">
             不出钱也能帮忙
           </h2>
           <div className="grid gap-3 sm:grid-cols-3">
@@ -139,13 +144,13 @@ export default function SponsorPage() {
               const Icon = w.icon;
               const body = (
                 <>
-                  <Icon className="mb-2.5 h-4 w-4 text-primary" />
-                  <p className="text-sm font-medium">{w.title}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-fg-tertiary">
+                  <Icon className="mb-2.5 h-4 w-4 text-white" />
+                  <p className="text-sm font-medium text-white">{w.title}</p>
+                  <p className="mt-1 text-xs leading-relaxed text-white/65">
                     {w.desc}
                   </p>
                   {w.cta ? (
-                    <span className="mt-2.5 inline-block text-xs font-medium text-primary">
+                    <span className="mt-2.5 inline-block text-xs font-medium text-white/90">
                       {w.cta} →
                     </span>
                   ) : null}
@@ -157,14 +162,14 @@ export default function SponsorPage() {
                   href={w.href}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="rounded-[var(--radius-card)] border border-border bg-card/60 px-4 py-4 backdrop-blur-xl transition-transform hover:scale-[1.02]"
+                  className="rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-4 py-4 backdrop-blur-xl transition-transform hover:scale-[1.02]"
                 >
                   {body}
                 </Link>
               ) : (
                 <div
                   key={w.title}
-                  className="rounded-[var(--radius-card)] border border-border bg-card/60 px-4 py-4 backdrop-blur-xl"
+                  className="rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-4 py-4 backdrop-blur-xl"
                 >
                   {body}
                 </div>
@@ -174,7 +179,7 @@ export default function SponsorPage() {
         </section>
 
         {/* 说明 */}
-        <p className="mt-10 text-center text-xs leading-relaxed text-fg-tertiary">
+        <p className="mt-10 text-center text-xs leading-relaxed text-white/55">
           赞助完全自愿，不影响任何功能使用。
           <br />
           本站不提供任何付费会员或增值服务。
@@ -188,7 +193,7 @@ export default function SponsorPage() {
               href={PROJECT_LINK}
               target="_blank"
               rel="noreferrer noopener"
-              className="text-xs text-fg-quaternary underline decoration-dotted underline-offset-2 hover:text-fg-secondary"
+              className="text-xs text-white/45 underline decoration-dotted underline-offset-2 hover:text-white/80"
             >
               项目主页
             </Link>
@@ -196,7 +201,7 @@ export default function SponsorPage() {
         ) : null}
       </div>
 
-      <SiteFooter />
+      <SiteFooter className="border-white/10! text-white/55 [&_*]:text-white/55 [&_span]:text-white/80 [&_a:hover]:text-white" />
     </main>
   );
 }

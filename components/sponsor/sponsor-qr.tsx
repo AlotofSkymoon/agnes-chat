@@ -3,6 +3,7 @@
 import * as React from "react";
 import { QrCode, TriangleAlert } from "lucide-react";
 
+import { GlareCard } from "@/components/ui/glare-card";
 import type { SponsorChannel } from "@/lib/site";
 
 /**
@@ -26,27 +27,37 @@ function ChannelCard({ channel }: { channel: SponsorChannel }) {
     setFailed(false);
   }, [channel.qr]);
 
+  /*
+   * 卡片底是 Aceternity 的高光卡片：指针附近有柔光 + 边缘亮线。
+   *
+   * ⚠️ 为什么这一块不用主题色变量：
+   * 赞助页背景是深色云层，浅色主题下 text-fg-secondary 是深灰，
+   * 放在深色卡片上几乎看不见。所以统一用浅色，不跟主题走。
+   */
   return (
-    <div className="w-full rounded-[var(--r-2xl)] border border-border bg-card/70 p-5 shadow-[var(--shadow-card)] backdrop-blur-xl">
-      {failed ? (
-        <div className="flex flex-col items-center gap-2.5 py-6 text-center">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-            <TriangleAlert className="h-5 w-5" />
+    <GlareCard className="w-full">
+      <div className="w-full p-5">
+        {failed ? (
+          <div className="flex flex-col items-center gap-2.5 py-6 text-center">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-white/70">
+              <TriangleAlert className="h-5 w-5" />
+            </div>
+            <p className="text-sm font-medium text-white">
+              {channel.name} 收款码暂未配置
+            </p>
+            <p className="px-2 text-xs leading-relaxed text-white/60">
+              把图片放到{" "}
+              <code className="rounded bg-white/10 px-1 py-0.5 font-mono text-[11px] text-white/80">
+                {channel.qr}
+              </code>
+            </p>
           </div>
-          <p className="text-sm font-medium">{channel.name} 收款码暂未配置</p>
-          <p className="text-xs leading-relaxed text-fg-tertiary">
-            把图片放到{" "}
-            <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
-              {channel.qr}
-            </code>
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="mb-3 flex items-center justify-center gap-1.5 text-xs text-fg-tertiary">
-            <QrCode className="h-3.5 w-3.5" />
-            {channel.name}
-          </div>
+        ) : (
+          <>
+            <div className="mb-3 flex items-center justify-center gap-1.5 text-xs text-white/65">
+              <QrCode className="h-3.5 w-3.5" />
+              {channel.name}
+            </div>
             {/*
               用原生 img 而不是 next/image ——
               项目已全局关闭图片优化（images.unoptimized），且二维码是本地静态资源，
@@ -61,16 +72,17 @@ function ChannelCard({ channel }: { channel: SponsorChannel }) {
               loading="lazy"
               decoding="async"
               onError={() => setFailed(true)}
-              className="mx-auto aspect-square w-full rounded-[var(--radius-card)] bg-white object-contain"
+              className="mx-auto aspect-square w-full rounded-2xl bg-white object-contain"
             />
             {channel.note ? (
-              <p className="mt-3 text-center text-xs leading-relaxed text-fg-tertiary">
+              <p className="mt-3 text-center text-xs leading-relaxed text-white/60">
                 {channel.note}
               </p>
             ) : null}
           </>
         )}
-    </div>
+      </div>
+    </GlareCard>
   );
 }
 
@@ -99,7 +111,7 @@ export function SponsorChannels({ channels }: { channels: SponsorChannel[] }) {
           <ChannelCard key={c.id} channel={c} />
         ))}
       </div>
-      <p className="mt-3 text-center text-[11px] text-fg-quaternary">
+      <p className="mt-3 text-center text-[11px] text-white/50">
         {single
           ? "长按或扫描二维码 · 金额随意"
           : "挑一个你方便的方式 · 长按或扫描二维码 · 金额随意"}
