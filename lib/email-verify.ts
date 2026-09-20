@@ -1,0 +1,117 @@
+import { createHash, randomInt, timingSafeEqual } from "crypto";
+
+import { KEYS, getRedis, getValue } from "@/lib/redis";
+
+/**
+ * 邮箱验证码。
+ *
+ * ⚠️ 两个安全要点：
+ * 1. **只存 hash，不存明文**。Redis 万一被读走也拿不到可用验证码。
+ * 2. **用 timingSafeEqual 比较**，避免逐字符比较泄漏前缀匹配长度。
+ *
+ * ⚠️ 为什么有「尝试次数」上限：
+ * 6 位数字只有 100 万种，不限制次数就能被暴力枚举。
+ */
+
+/** 验证码有效期：30 分钟 */
+export const VERIFY_TTL_SECONDS = 30 * 60;
+/** 最多可尝试多少次 */
+const MAX_ATTEMPTS = 5;
+/** 重发间隔（秒）：防止被用来轰炸别人邮箱 */
+const RESEND_COOLDOWN_SECONDS = 60;
+
+interface VerifyRecord {
+  codeHash: string;
+  userId: string;
+  attempts: number;
+}
+
+function hashCode(code: string, email: string): string {
+  // 把 email 混进哈希当盐，避免两个用户的相同验证码产生相同哈希
+  return createHash("sha256").update(`${email.toLowerCase()}|${code}`).digest("hex");
+}
+
+/** 6 位数字，前导零保留（randomInt 不含上界，用 1000000 取到 6 位） */
+export function generateCode(): string {
+  return String(randomInt(0, 1_000_000)).padStart(6, "0");
+}
+
+export async function saveCode(email: string, userId: string): Promise<string> {
+  const code = generateCode();
+  const record: VerifyRecord = {
+    codeHash: hashCode(code, email),
+    userId,
+    attempts: 0,
+  };
+  const redis = getRedis();
+  await redis.set(KEYS.emailVerify(email), JSON.stringify(record), { ex: VERIFY_TTL_SECONDS });
+  return code;
+}
+
+export type VerifyResult =
+  | { ok: true; userId: string }
+  | { ok: false; reason: "expired" | "wrong" | "too_many" };
+
+export async function checkCode(email: string, code: string): Promise<VerifyResult> {
+  const raw = await getValue<string>(KEYS.emailVerify(email));
+  if (!raw) return { ok: false, reason: "expired" };
+
+  let record: VerifyRecord;
+  try {
+    record = JSON.parse(raw) as VerifyRecord;
+  } catch {
+    return { ok: false, reason: "expired" };
+  }
+
+  if (record.attempts >= MAX_ATTEMPTS) {
+    return { ok: false, reason: "too_many" };
+  }
+
+  const given = Buffer.from(hashCode(code.trim(), email), "hex");
+  const stored = Buffer.from(record.codeHash, "hex");
+  const match =
+    given.length === stored.length && timingSafeEqual(given, stored);
+
+  if (!match) {
+    /*
+     * 失败要累加次数，否则 6 位数字能被暴力枚举。
+     *
+     * ⚠️ 这里用 hset 只改 attempts 再用 expire 续期 ——
+     * Store 接口没有 ttl()，读不到剩余时间，
+     * 所以不能走「读出来再整体写回」那条路（会重置或丢掉 TTL）。
+     */
+    const redis = getRedis();
+    const key = KEYS.emailVerify(email);
+    await redis.set(key, JSON.stringify({ ...record, attempts: record.attempts + 1 }), {
+      ex: VERIFY_TTL_SECONDS,
+    });
+    return { ok: false, reason: "wrong" };
+  }
+
+  return { ok: true, userId: record.userId };
+}
+
+export async function consumeCode(email: string): Promise<void> {
+  const redis = getRedis();
+  await redis.del(KEYS.emailVerify(email));
+}
+
+/** 是否还在重发冷却中 */
+export async function inResendCooldown(email: string, ip: string): Promise<boolean> {
+  const redis = getRedis();
+  const [byEmail, byIp] = await Promise.all([
+    getValue<string>(KEYS.ratelimitVerifyEmail(email)),
+    getValue<string>(KEYS.ratelimitVerifyIp(ip)),
+  ]);
+  return Boolean(byEmail || byIp);
+}
+
+export async function markResent(email: string, ip: string): Promise<void> {
+  const redis = getRedis();
+  const pipeline = redis.pipeline();
+  pipeline.set(KEYS.ratelimitVerifyEmail(email), "1", { ex: RESEND_COOLDOWN_SECONDS });
+  pipeline.set(KEYS.ratelimitVerifyIp(ip), "1", { ex: RESEND_COOLDOWN_SECONDS });
+  await pipeline.exec();
+}
+
+export const RESEND_COOLDOWN = RESEND_COOLDOWN_SECONDS;

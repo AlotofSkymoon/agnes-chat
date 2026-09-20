@@ -32,15 +32,42 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = (await res.json()) as { error?: string; isFirstUser?: boolean };
+      const data = (await res.json()) as {
+        error?: string;
+        isFirstUser?: boolean;
+        needVerification?: boolean;
+        email?: string;
+        mailFailed?: boolean;
+      };
 
       if (!res.ok) {
+        /*
+         * 登录被"邮箱未验证"拦下时，直接把人送到验证页 ——
+         * 否则用户只知道登不进去，不知道该去哪补验证。
+         */
+        if (data.needVerification && data.email) {
+          router.push(`/verify?email=${encodeURIComponent(data.email)}`);
+          return;
+        }
         toast.error(data.error ?? "操作失败");
+        return;
+      }
+
+      /*
+       * 注册需要验证邮箱：不建 session，先去验证页。
+       * 邮件没发出去时（mailFailed）服务端已放行并给了 session，走正常跳转。
+       */
+      if (!isLogin && data.needVerification) {
+        toast.success("验证码已发送，请查收邮箱");
+        router.push(`/verify?email=${encodeURIComponent(data.email ?? email)}`);
         return;
       }
 
       if (!isLogin && data.isFirstUser) {
         toast.success("你是第一位用户，已获得管理员权限。");
+      } else if (data.mailFailed) {
+        // 邮件服务异常，已放行但让用户知道验证码没发出去
+        toast.success("注册成功（邮件服务暂不可用，已直接放行）");
       } else {
         toast.success(isLogin ? "登录成功" : "注册成功");
       }
@@ -62,7 +89,9 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         </div>
         <CardTitle className="text-2xl">{isLogin ? "登录" : "注册"}</CardTitle>
         <CardDescription>
-          {isLogin ? "登录后可选把聊天记录保存到云端" : "第一个注册的用户将自动成为管理员"}
+          {isLogin
+            ? "登录后可选把聊天记录保存到云端"
+            : "第一个注册的用户将自动成为管理员"}
         </CardDescription>
       </CardHeader>
       <CardContent>

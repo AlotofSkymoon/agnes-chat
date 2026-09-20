@@ -25,6 +25,14 @@ export interface UserRecord {
   passwordHash: string;
   role: Role;
   createdAt: string;
+  /**
+   * 邮箱是否已验证。
+   *
+   * ⚠️ 老数据没有这个字段（undefined）—— 一律按「已验证」处理，
+   * 否则一次改动会把所有老账号锁在门外。
+   * 只有 `=== false` 才算未验证。
+   */
+  emailVerified?: boolean;
 }
 
 /** 可以安全返回给前端的用户信息（永远不含 passwordHash） */
