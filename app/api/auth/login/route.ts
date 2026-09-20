@@ -10,6 +10,7 @@ import {
   verifyPassword,
   type UserRecord,
 } from "@/lib/auth";
+import { isEmailConfigured } from "@/lib/email";
 import { getRedis, getValue, hasRedisConfig,
   storageErrorMessage, hgetAll, KEYS } from "@/lib/redis";
 
@@ -58,6 +59,19 @@ export async function POST(request: Request) {
     const ok = await verifyPassword(password, user.passwordHash);
     if (!ok) {
       return NextResponse.json({ error: GENERIC_ERROR }, { status: 401 });
+    }
+
+    /*
+     * 密码对了，但邮箱还没验证 —— 不放行。
+     *
+     * 只在**确实要求验证**时才拦：老账号没有 emailVerified 字段（undefined），
+     * 按已验证处理；只有显式 false 才算未验证，否则一次更新会把老用户全锁在门外。
+     */
+    if (user.emailVerified === false && isEmailConfigured()) {
+      return NextResponse.json(
+        { error: "邮箱尚未验证，请先完成验证", needVerification: true, email },
+        { status: 403 },
+      );
     }
 
     const { sessionId, maxAge } = await createSession(user.id);

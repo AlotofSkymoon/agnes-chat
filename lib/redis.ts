@@ -35,6 +35,11 @@ export const KEYS = {
   /** 用户个人设置（含自带 API Key，服务端加密后存储） */
   userSettings: (userId: string) => `user:${userId}:settings`,
   statMessages: "stat:messages",
+  /** 邮箱验证码（存的是 code 的 hash，不存明文） */
+  emailVerify: (email: string) => `verify:email:${email.toLowerCase()}`,
+  /** 发信限流：同一邮箱 / 同一 IP 的重发间隔 */
+  ratelimitVerifyEmail: (email: string) => `ratelimit:verify:email:${email.toLowerCase()}`,
+  ratelimitVerifyIp: (ip: string) => `ratelimit:verify:ip:${ip}`,
 } as const;
 
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 天
